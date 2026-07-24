@@ -96,5 +96,6 @@
     "Sending frequently, please try again later": "Sending frequently, please try again later",
     "Current product is sold out": "Current product is sold out",
     "There are too many password errors, please try again after :minute minutes.": "There are too many password errors, please try again after :minute minutes.",
-    "Reset failed, Please try again later": "Reset failed, Please try again later"
+    "Reset failed, Please try again later": "Reset failed, Please try again later",
+    "You need to use at least 90% of your traffic before starting the next period": "You need to use at least 90% of your traffic before starting the next period"
 }

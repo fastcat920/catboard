@@ -98,8 +98,8 @@ class UserController extends Controller
             if (!$user) {
                 abort(500, __('The user does not exist'));
             }
-            if ($user->transfer_enable > $user->u + $user->d) {
-                abort(500, __('You have not used up your traffic, you cannot renew your subscription'));
+            if (($user->u + $user->d) * 100 < $user->transfer_enable * 90) {
+                abort(500, __('You need to use at least 90% of your traffic before starting the next period'));
             }
             $userService = new UserService();
             $reset_day = $userService->getResetDay($user);

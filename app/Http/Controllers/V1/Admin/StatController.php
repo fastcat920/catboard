@@ -18,6 +18,7 @@ use App\Models\StatServer;
 use App\Models\StatUser;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\StatisticalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -25,6 +26,8 @@ class StatController extends Controller
 {
     public function getOverride(Request $request)
     {
+        $todayPaidStats = (new StatisticalService())->generatePaidStatData();
+
         return [
             'data' => [
                 'online_user' => User::where('t','>=', time() - 600)
@@ -47,10 +50,8 @@ class StatController extends Controller
                     ->whereNotIn('status', [0, 2])
                     ->where('commission_balance', '>', 0)
                     ->count(),
-                'day_income' => Order::where('created_at', '>=', strtotime(date('Y-m-d')))
-                    ->where('created_at', '<', time())
-                    ->whereNotIn('status', [0, 2])
-                    ->sum('total_amount'),
+                'day_income' => $todayPaidStats['paid_total'],
+                'day_paid_count' => $todayPaidStats['paid_count'],
                 'last_month_income' => Order::where('created_at', '>=', strtotime('-1 month', strtotime(date('Y-m-1'))))
                     ->where('created_at', '<', strtotime(date('Y-m-1')))
                     ->whereNotIn('status', [0, 2])
@@ -293,4 +294,3 @@ class StatController extends Controller
     }
 
 }
-

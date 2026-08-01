@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\OrderService;
 use App\Services\PaymentService;
+use App\Services\StatisticalService;
 use App\Services\TelegramService;
 use Illuminate\Http\Request;
 
@@ -37,11 +38,14 @@ class PaymentController extends Controller
         if (!$orderService->paid($callbackNo)) {
             return false;
         }
+        $todayPaidStats = (new StatisticalService())->generatePaidStatData();
         $telegramService = new TelegramService();
         $message = sprintf(
-            "💰成功收款%s元\n———————————————\n订单号：%s",
+            "💰成功收款 %.2f 元\n———————————————\n订单号：%s\n今日支付订单：%d 笔\n今日总收入：%.2f 元",
             $order->total_amount / 100,
-            $order->trade_no
+            $order->trade_no,
+            $todayPaidStats['paid_count'],
+            $todayPaidStats['paid_total'] / 100
         );
         $telegramService->sendMessageWithAdmin($message);
         return true;

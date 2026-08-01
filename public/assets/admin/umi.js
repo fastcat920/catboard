@@ -98480,7 +98480,16 @@
                     className: "display-4 text-black font-w300 mb-2"
                 }, t.day_income ? (t.day_income / 100).toFixed(2) : "0.00", l.a.createElement("span", {
                     className: "font-size-h5 font-w600 text-muted"
-                }, n.site.currency))) , l.a.createElement("div", {
+                }, n.site.currency))), l.a.createElement("div", {
+                    className: "pr-4 pr-sm-5 pl-0 pl-sm-3 "
+                }, l.a.createElement("i", {
+                    className: "fa fa-shopping-cart fa-2x text-gray-light float-right"
+                }), l.a.createElement("div", {
+                    className: "text-muted mb-1",
+                    style: { width: '120px' }
+                }, "\u4eca\u65e5\u8ba2\u5355"), l.a.createElement("div", {
+                    className: "display-4 text-black font-w300 mb-2"
+                }, t.day_paid_count ? t.day_paid_count : "0")), l.a.createElement("div", {
                     className: "pr-4 pr-sm-5 pl-0 pl-sm-3 "
                 }, l.a.createElement("i", {
                     className: "fa fa-user fa-2x text-gray-light float-right"

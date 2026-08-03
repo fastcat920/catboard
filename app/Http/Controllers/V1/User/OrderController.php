@@ -238,11 +238,59 @@ class OrderController extends Controller
             'total_amount' => isset($order->handling_amount) ? ($order->total_amount + $order->handling_amount) : $order->total_amount,
             'user_id' => $order->user_id,
             'stripe_token' => $request->input('token')
-        ]);
+        ], $this->getPaymentReturnUrl($request, $tradeNo));
         return response([
             'type' => $result['type'],
             'data' => $result['data']
         ]);
+    }
+
+    private function getPaymentReturnUrl(Request $request, $tradeNo)
+    {
+        $defaultOrigin = $this->normalizePaymentReturnOrigin(config('v2board.app_url'));
+        if (!$defaultOrigin) {
+            return url('/#/order/' . rawurlencode($tradeNo));
+        }
+
+        $allowedOrigins = array_filter(array_merge(
+            [$defaultOrigin],
+            config('app.payment_return_domains', [])
+        ));
+        $allowedOrigins = array_map([$this, 'normalizePaymentReturnOrigin'], $allowedOrigins);
+        $allowedOrigins = array_filter($allowedOrigins);
+
+        foreach ([$request->header('origin'), $request->header('referer')] as $source) {
+            $origin = $this->normalizePaymentReturnOrigin($source);
+            if ($origin && in_array($origin, $allowedOrigins, true)) {
+                return $origin . '/#/order/' . rawurlencode($tradeNo);
+            }
+        }
+
+        return $defaultOrigin . '/#/order/' . rawurlencode($tradeNo);
+    }
+
+    private function normalizePaymentReturnOrigin($url)
+    {
+        if (!is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (!$parts || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $origin = $scheme . '://' . strtolower($parts['host']);
+        if (isset($parts['port'])) {
+            $origin .= ':' . $parts['port'];
+        }
+
+        return $origin;
     }
 
     public function check(Request $request)

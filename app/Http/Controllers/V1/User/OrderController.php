@@ -249,7 +249,7 @@ class OrderController extends Controller
     {
         $defaultOrigin = $this->normalizePaymentReturnOrigin(config('v2board.app_url'));
         if (!$defaultOrigin) {
-            return url('/#/order/' . rawurlencode($tradeNo));
+            return url('/#/payment?trade_no=' . rawurlencode($tradeNo));
         }
 
         $allowedOrigins = array_filter(array_merge(
@@ -262,11 +262,11 @@ class OrderController extends Controller
         foreach ([$request->header('origin'), $request->header('referer')] as $source) {
             $origin = $this->normalizePaymentReturnOrigin($source);
             if ($origin && in_array($origin, $allowedOrigins, true)) {
-                return $origin . '/#/order/' . rawurlencode($tradeNo);
+                return $origin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
             }
         }
 
-        return $defaultOrigin . '/#/order/' . rawurlencode($tradeNo);
+        return $defaultOrigin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
     }
 
     private function normalizePaymentReturnOrigin($url)

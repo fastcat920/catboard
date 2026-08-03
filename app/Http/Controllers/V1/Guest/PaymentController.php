@@ -41,7 +41,7 @@ class PaymentController extends Controller
         $todayPaidStats = (new StatisticalService())->generatePaidStatData();
         $telegramService = new TelegramService();
         $message = sprintf(
-            "💰成功收款 %.2f 元\n———————————————\n订单号：%s\n今日支付订单：%d 笔\n今日总收入：%.2f 元",
+            "💰成功收款 %.2f 元\n订单号：%s\n———————————————\n今日支付订单：%d 笔\n今日总收入：%.2f 元",
             $order->total_amount / 100,
             $order->trade_no,
             $todayPaidStats['paid_count'],

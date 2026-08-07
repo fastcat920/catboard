@@ -98,6 +98,7 @@
                 carrier_issue: "疑似运营商线路异常",
                 insufficient_probes: "探测点不足",
                 unknown: "等待判断",
+                waiting_first_probe: "等待首次检测",
             }[status] ||
             status ||
             "未知"
@@ -485,7 +486,10 @@
     }
     function probes(d) {
         var rows = d.probes || [],
-            states = d.states || [];
+            states = d.states || [],
+            activeTargets = states.filter(function (x) {
+                return x.target_status === "active";
+            }).length;
         return (
             '<div class="toolbar"><button class="btn primary" data-new-probe>创建探测点</button><span class="muted">建议至少部署国内两个不同运营商和一个海外探测点</span></div><section class="panel"><h2>探测点</h2>' +
             (rows.length
@@ -551,13 +555,21 @@
                       .join("") +
                   "</tbody></table>"
                 : '<div class="empty">还没有探测点，创建后在其他服务器运行安装命令</div>') +
-            '</section><section class="panel"><h2>节点监控状态</h2>' +
+            '</section><section class="panel"><div class="monitor-header"><div><h2>节点监控状态</h2><span class="muted">仅检测手动加入监控池的节点，不会自动检测全部节点</span></div><div class="toolbar"><span class="monitor-count">监控中 ' +
+            activeTargets +
+            " / " +
+            states.length +
+            '</span><button class="btn primary" data-add-target>添加监控节点</button></div></div>' +
             (states.length
-                ? "<table><thead><tr><th>节点</th><th>名称</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th></tr></thead><tbody>" +
+                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
                   states
                       .map(function (x) {
                           return (
-                              "<tr><td>" +
+                              '<tr><td><input class="row-check" type="checkbox" data-target-check data-type="' +
+                              esc(x.server_type) +
+                              '" data-id="' +
+                              x.server_id +
+                              '"></td><td>' +
                               esc(x.server_type) +
                               " / " +
                               x.server_id +
@@ -565,7 +577,16 @@
                               esc(x.server_name || "未命名节点") +
                               "</td><td>" +
                               badge(
-                                  nodeStatusLabel(x.status),
+                                  x.target_status === "active"
+                                      ? "监控中"
+                                      : "已暂停",
+                                  x.target_status === "active" ? "ok" : "",
+                              ) +
+                              "</td><td>" +
+                              badge(
+                                  x.target_status === "active"
+                                      ? nodeStatusLabel(x.status)
+                                      : "暂停期间不判断",
                                   x.status === "healthy"
                                       ? "ok"
                                       : x.status === "suspected_blocked"
@@ -584,12 +605,26 @@
                               x.consecutive_failures +
                               "</td><td>" +
                               time(x.last_checked_at) +
-                              "</td></tr>"
+                              '</td><td><button class="btn" data-single-target="' +
+                              (x.target_status === "active"
+                                  ? "pause"
+                                  : "resume") +
+                              '" data-type="' +
+                              esc(x.server_type) +
+                              '" data-id="' +
+                              x.server_id +
+                              '">' +
+                              (x.target_status === "active" ? "暂停" : "恢复") +
+                              '</button> <button class="btn danger" data-single-target="remove" data-type="' +
+                              esc(x.server_type) +
+                              '" data-id="' +
+                              x.server_id +
+                              '">移除</button></td></tr>'
                           );
                       })
                       .join("") +
-                  "</tbody></table>"
-                : '<div class="empty">探测点上报结果后将在这里显示节点状态</div>') +
+                  "</tbody></table></div>"
+                : '<div class="empty"><b>还没有监控节点</b><br>点击“添加监控节点”，批量选择需要检测的节点。</div>') +
             "</section>"
         );
     }
@@ -936,6 +971,78 @@
                 '>其他</option></select></label><div class="span2 edit-note">修改会从下一次上报开始生效，不会重写历史探测记录。</div><div class="span2 modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary" type="submit">保存修改</button></div></form>',
         );
     }
+    function targetPicker(rows) {
+        rows = rows || [];
+        var types = rows
+            .map(function (x) {
+                return x.server_type;
+            })
+            .filter(function (x, i, all) {
+                return all.indexOf(x) === i;
+            });
+        modal(
+            "添加监控节点",
+            '<div class="target-picker-tools"><input id="target-search" placeholder="搜索节点名称或 ID"><select id="target-type"><option value="">全部类型</option>' +
+                types
+                    .map(function (type) {
+                        return (
+                            '<option value="' +
+                            esc(type) +
+                            '">' +
+                            esc(type) +
+                            "</option>"
+                        );
+                    })
+                    .join("") +
+                '</select><label class="check"><input type="checkbox" data-select-candidates> 全选当前结果</label></div><form id="target-picker-form"><div class="picker-summary"><span data-candidate-selected>已选择 0 个节点</span><span class="muted">只显示当前支持 TCP 端口探测且已启用的节点</span></div><div class="table-wrap target-picker-table"><table><thead><tr><th></th><th>名称</th><th>类型 / ID</th><th>端口</th><th>状态</th></tr></thead><tbody>' +
+                rows
+                    .map(function (x) {
+                        var monitored = !!x.monitored_status;
+                        return (
+                            '<tr data-candidate-row data-search="' +
+                            esc(
+                                (
+                                    x.server_name +
+                                    " " +
+                                    x.server_id
+                                ).toLowerCase(),
+                            ) +
+                            '" data-type="' +
+                            esc(x.server_type) +
+                            '"><td><input class="row-check" type="checkbox" data-candidate-check data-type="' +
+                            esc(x.server_type) +
+                            '" data-id="' +
+                            x.server_id +
+                            '" ' +
+                            (monitored ? "disabled" : "") +
+                            "></td><td><b>" +
+                            esc(x.server_name) +
+                            "</b></td><td>" +
+                            esc(x.server_type) +
+                            " / " +
+                            x.server_id +
+                            "</td><td>" +
+                            esc(x.port) +
+                            "</td><td>" +
+                            (monitored
+                                ? badge(
+                                      x.monitored_status === "active"
+                                          ? "已监控"
+                                          : "已暂停",
+                                      x.monitored_status === "active"
+                                          ? "ok"
+                                          : "",
+                                  )
+                                : "可添加") +
+                            "</td></tr>"
+                        );
+                    })
+                    .join("") +
+                '</tbody></table></div><div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary" type="submit" data-add-selected disabled>添加所选节点</button></div></form>',
+        );
+        var box = root.querySelector(".modal-box");
+        if (box) box.classList.add("modal-wide");
+    }
     function deleteProbeForm(id, name) {
         modal(
             "删除探测点",
@@ -953,9 +1060,17 @@
         state.error = "";
         render();
         if (state.page === "probes") {
-            Promise.all([api("probes"), api("node-states")])
+            Promise.all([
+                api("probes"),
+                api("node-states"),
+                api("probe-targets/candidates"),
+            ])
                 .then(function (x) {
-                    state.data = { probes: x[0], states: x[1] };
+                    state.data = {
+                        probes: x[0],
+                        states: x[1],
+                        candidates: x[2],
+                    };
                     state.loading = false;
                     render();
                 })
@@ -1238,6 +1353,125 @@
         });
         var np = root.querySelector("[data-new-probe]");
         if (np) np.onclick = probeForm;
+        var addTarget = root.querySelector("[data-add-target]");
+        if (addTarget)
+            addTarget.onclick = function () {
+                targetPicker((state.data || {}).candidates || []);
+            };
+        function checkedTargets(selector) {
+            return Array.from(root.querySelectorAll(selector + ":checked")).map(
+                function (x) {
+                    return {
+                        server_type: x.dataset.type,
+                        server_id: Number(x.dataset.id),
+                    };
+                },
+            );
+        }
+        function updateTargetSelection() {
+            var selected = checkedTargets("[data-target-check]");
+            var label = root.querySelector("[data-target-selected]");
+            if (label) label.textContent = "已选择 " + selected.length + " 个";
+            root.querySelectorAll("[data-target-batch]").forEach(function (x) {
+                x.disabled = !selected.length;
+            });
+        }
+        root.querySelectorAll("[data-target-check]").forEach(function (x) {
+            x.onchange = updateTargetSelection;
+        });
+        var selectTargets = root.querySelector("[data-select-targets]");
+        if (selectTargets)
+            selectTargets.onchange = function () {
+                root.querySelectorAll("[data-target-check]").forEach(
+                    function (x) {
+                        x.checked = selectTargets.checked;
+                    },
+                );
+                updateTargetSelection();
+            };
+        function submitTargetAction(action, targets) {
+            if (!targets.length) return;
+            if (
+                action === "remove" &&
+                !confirm(
+                    "确认将所选节点移出监控池？这不会删除面板节点，历史探测记录会保留。",
+                )
+            )
+                return;
+            post(
+                "probe-targets/batch",
+                { action: action, targets: targets },
+                load,
+            );
+        }
+        root.querySelectorAll("[data-target-batch]").forEach(function (x) {
+            x.onclick = function () {
+                submitTargetAction(
+                    x.dataset.targetBatch,
+                    checkedTargets("[data-target-check]"),
+                );
+            };
+        });
+        root.querySelectorAll("[data-single-target]").forEach(function (x) {
+            x.onclick = function () {
+                submitTargetAction(x.dataset.singleTarget, [
+                    {
+                        server_type: x.dataset.type,
+                        server_id: Number(x.dataset.id),
+                    },
+                ]);
+            };
+        });
+        function updateCandidateSelection() {
+            var selected = checkedTargets("[data-candidate-check]");
+            var label = root.querySelector("[data-candidate-selected]");
+            var submit = root.querySelector("[data-add-selected]");
+            if (label)
+                label.textContent = "已选择 " + selected.length + " 个节点";
+            if (submit) submit.disabled = !selected.length;
+        }
+        function filterCandidates() {
+            var search =
+                (root.querySelector("#target-search") || {}).value || "";
+            var type = (root.querySelector("#target-type") || {}).value || "";
+            search = search.trim().toLowerCase();
+            root.querySelectorAll("[data-candidate-row]").forEach(
+                function (row) {
+                    row.hidden =
+                        (!!search &&
+                            row.dataset.search.indexOf(search) === -1) ||
+                        (!!type && row.dataset.type !== type);
+                },
+            );
+        }
+        root.querySelectorAll("[data-candidate-check]").forEach(function (x) {
+            x.onchange = updateCandidateSelection;
+        });
+        var candidateSearch = root.querySelector("#target-search");
+        var candidateType = root.querySelector("#target-type");
+        if (candidateSearch) candidateSearch.oninput = filterCandidates;
+        if (candidateType) candidateType.onchange = filterCandidates;
+        var selectCandidates = root.querySelector("[data-select-candidates]");
+        if (selectCandidates)
+            selectCandidates.onchange = function () {
+                root.querySelectorAll("[data-candidate-row]").forEach(
+                    function (row) {
+                        var input = row.querySelector("[data-candidate-check]");
+                        if (!row.hidden && input && !input.disabled)
+                            input.checked = selectCandidates.checked;
+                    },
+                );
+                updateCandidateSelection();
+            };
+        var targetPickerForm = root.querySelector("#target-picker-form");
+        if (targetPickerForm)
+            targetPickerForm.onsubmit = function (e) {
+                e.preventDefault();
+                submitTargetAction(
+                    "add",
+                    checkedTargets("[data-candidate-check]"),
+                );
+            };
         root.querySelectorAll("[data-probe-toggle]").forEach(function (x) {
             x.onclick = function () {
                 post(

@@ -12,8 +12,17 @@ class ProbeService
         $settings = (new SettingsService())->all();
         $interval = max(30, (int)($settings['probe_interval_seconds'] ?? 300));
         $timeout = max(1, min(10, (int)($settings['health_timeout_seconds'] ?? 3)));
+        try {
+            $targets = DB::table('v2_security_probe_target')->where('status', 'active')->get()
+                ->mapWithKeys(function ($target) {
+                    return [$target->server_type . ':' . $target->server_id => true];
+                });
+        } catch (\Throwable $e) {
+            return [];
+        }
         $tasks = [];
         foreach ((new ServerService())->getAllServers() as $server) {
+            if (!$targets->has($server['type'] . ':' . $server['id'])) continue;
             if (empty($server['show']) || empty($server['host']) || empty($server['port'])) continue;
             if (in_array($server['type'], ['tuic', 'hysteria'], true)) continue;
             if ($server['type'] === 'v2node' && in_array($server['protocol'] ?? '', ['tuic', 'hysteria'], true)) continue;

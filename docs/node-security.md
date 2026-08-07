@@ -16,6 +16,12 @@
    ```bash
    php artisan migrate --path=database/migrations/2026_08_07_000002_create_node_security_probe_tables.php --force
    ```
+
+   私有探测点使用手动监控目标池，还需要执行第三个迁移：
+
+   ```bash
+   php artisan migrate --path=database/migrations/2026_08_07_000003_create_security_probe_targets.php --force
+   ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右下角“节点安全”，或访问 `/{secure_path}/security/dashboard`。
@@ -61,7 +67,10 @@ php artisan test --filter NodeSecurityTest
    ```
 
 4. Agent 只需要主动访问面板 HTTPS 和被监控节点端口，无需开放入站端口。
-5. 至少需要两个中国大陆不同运营商探测点和一个海外探测点，数据不足时状态显示 `insufficient_probes`，不会自动创建异常事件。
+5. 在“节点监控状态”中点击“添加监控节点”，批量选择需要检测的节点；目标池默认为空，系统不会自动检测全部节点。
+6. 至少需要两个中国大陆不同运营商探测点和一个海外探测点，数据不足时显示“探测点不足”，不会自动创建异常事件。
+
+监控目标支持单个或批量暂停、恢复和移除。移除只停止探测，不会删除面板节点，历史结果继续按照系统保留策略保存。
 
 Agent 每个请求都使用独立密钥进行 HMAC-SHA256 签名，并包含时间戳和一次性 nonce。暂停或吊销探测点后，其密钥立即失效。当前自动 TCP 检测跳过 TUIC、Hysteria 及相应 V2Node UDP 协议，避免用 TCP 结果误判 UDP 节点。
 

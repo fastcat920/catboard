@@ -374,16 +374,94 @@ class NodeSecurityController extends Controller
 
     public function nodeStates(Request $request)
     {
-        $names = collect((new \App\Services\ServerService())->getAllServers())->mapWithKeys(function ($server) {
-            return [($server['type'] ?? '') . ':' . ($server['id'] ?? '') => $server['name'] ?? '未命名节点'];
+        $servers = collect((new \App\Services\ServerService())->getAllServers())->mapWithKeys(function ($server) {
+            return [($server['type'] ?? '') . ':' . ($server['id'] ?? '') => $server];
         });
-        $states = DB::table('v2_security_node_state')
-            ->orderByRaw("FIELD(status, 'suspected_blocked','suspected_outage','carrier_issue','insufficient_probes','unknown','healthy')")
-            ->get()->map(function ($state) use ($names) {
-                $state->server_name = $names->get($state->server_type . ':' . $state->server_id, '节点已删除');
-                return $state;
-            });
-        return response(['data' => $states]);
+        $stateMap = DB::table('v2_security_node_state')->get()->mapWithKeys(function ($state) {
+            return [$state->server_type . ':' . $state->server_id => $state];
+        });
+        $targets = DB::table('v2_security_probe_target')->orderByDesc('created_at')->get()->map(function ($target) use ($servers, $stateMap) {
+            $key = $target->server_type . ':' . $target->server_id;
+            $server = $servers->get($key);
+            $state = $stateMap->get($key);
+            return (object)[
+                'target_id' => $target->id,
+                'target_status' => $target->status,
+                'server_type' => $target->server_type,
+                'server_id' => $target->server_id,
+                'server_name' => $server['name'] ?? '源节点已删除',
+                'source_available' => (bool)$server,
+                'status' => $state->status ?? 'waiting_first_probe',
+                'domestic_ok' => $state->domestic_ok ?? 0,
+                'domestic_failed' => $state->domestic_failed ?? 0,
+                'overseas_ok' => $state->overseas_ok ?? 0,
+                'overseas_failed' => $state->overseas_failed ?? 0,
+                'consecutive_failures' => $state->consecutive_failures ?? 0,
+                'last_checked_at' => $state->last_checked_at ?? null,
+            ];
+        });
+        return response(['data' => $targets]);
+    }
+
+    public function probeTargetCandidates(Request $request)
+    {
+        $monitored = DB::table('v2_security_probe_target')->get()->mapWithKeys(function ($target) {
+            return [$target->server_type . ':' . $target->server_id => $target->status];
+        });
+        $servers = collect((new \App\Services\ServerService())->getAllServers())
+            ->filter(function ($server) { return $this->probeCompatible($server); })
+            ->map(function ($server) use ($monitored) {
+                $key = $server['type'] . ':' . $server['id'];
+                return [
+                    'server_type' => $server['type'],
+                    'server_id' => (int)$server['id'],
+                    'server_name' => $server['name'] ?? '未命名节点',
+                    'port' => (string)$server['port'],
+                    'monitored_status' => $monitored->get($key),
+                ];
+            })->sortBy('server_name')->values();
+        return response(['data' => $servers]);
+    }
+
+    public function batchProbeTargets(Request $request)
+    {
+        $request->validate([
+            'action' => 'required|in:add,pause,resume,remove',
+            'targets' => 'required|array|min:1|max:500',
+            'targets.*.server_type' => 'required|string|max:32',
+            'targets.*.server_id' => 'required|integer|min:1',
+        ]);
+        $action = $request->input('action');
+        $targets = collect($request->input('targets'))->unique(function ($target) {
+            return $target['server_type'] . ':' . $target['server_id'];
+        })->values();
+        if ($action === 'add') {
+            $valid = collect((new \App\Services\ServerService())->getAllServers())
+                ->filter(function ($server) { return $this->probeCompatible($server); })
+                ->mapWithKeys(function ($server) { return [$server['type'] . ':' . $server['id'] => true]; });
+            foreach ($targets as $target) {
+                if (!$valid->has($target['server_type'] . ':' . $target['server_id'])) abort(422, '包含不存在、未启用或不支持 TCP 探测的节点');
+            }
+        }
+        $now = time();
+        DB::transaction(function () use ($targets, $action, $request, $now) {
+            foreach ($targets as $target) {
+                $where = ['server_type' => $target['server_type'], 'server_id' => (int)$target['server_id']];
+                if ($action === 'add') {
+                    DB::table('v2_security_probe_target')->updateOrInsert($where, [
+                        'status' => 'active', 'created_by' => $request->user['id'], 'created_at' => $now, 'updated_at' => $now,
+                    ]);
+                } elseif ($action === 'remove') {
+                    DB::table('v2_security_probe_target')->where($where)->delete();
+                } else {
+                    DB::table('v2_security_probe_target')->where($where)->update([
+                        'status' => $action === 'pause' ? 'paused' : 'active', 'updated_at' => $now,
+                    ]);
+                }
+            }
+        });
+        $this->adminLog($request, 'probe_target.' . $action, 'probe_target', null, ['targets' => $targets->all()]);
+        return response(['data' => ['affected' => $targets->count()]]);
     }
 
     public function probeResults(Request $request)
@@ -399,6 +477,15 @@ class NodeSecurityController extends Controller
     {
         return DB::table('v2_security_user_score as s')->join('v2_user as u', 'u.id', '=', 's.user_id')
             ->select('s.*', 'u.email', 'u.plan_id', 'u.banned', 'u.created_at as registered_at');
+    }
+
+    private function probeCompatible(array $server): bool
+    {
+        if (empty($server['show']) || empty($server['host']) || empty($server['port'])) return false;
+        if (in_array($server['type'] ?? '', ['tuic', 'hysteria'], true)) return false;
+        if (($server['type'] ?? '') === 'v2node' && in_array($server['protocol'] ?? '', ['tuic', 'hysteria'], true)) return false;
+        $port = (string)$server['port'];
+        return strpos($port, '-') === false && ctype_digit($port);
     }
 
     private function from(Request $request): int { return time() - max(1, min(90, (int)$request->input('days', 7))) * 86400; }

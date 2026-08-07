@@ -13,7 +13,10 @@ class ProbeAnalysisService
         $since = time() - max(180, (int)($settings['probe_result_window_seconds'] ?? 600));
         $targets = DB::table('v2_security_probe_result as r')
             ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
-            ->where('p.status', 'active')->where('r.checked_at', '>=', $since)
+            ->join('v2_security_probe_target as t', function ($join) {
+                $join->on('t.server_type', '=', 'r.server_type')->on('t.server_id', '=', 'r.server_id');
+            })
+            ->where('p.status', 'active')->where('t.status', 'active')->where('r.checked_at', '>=', $since)
             ->select('r.server_type', 'r.server_id')->distinct()->get();
         foreach ($targets as $target) $this->analyzeTarget($target->server_type, $target->server_id, $since, $threshold);
         DB::table('v2_security_probe_result')->where('checked_at', '<', time() - 7 * 86400)->delete();
@@ -24,7 +27,10 @@ class ProbeAnalysisService
     {
         $latest = DB::table('v2_security_probe_result as r')
             ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
-            ->where('p.status', 'active')->where('r.checked_at', '>=', $since)
+            ->join('v2_security_probe_target as t', function ($join) {
+                $join->on('t.server_type', '=', 'r.server_type')->on('t.server_id', '=', 'r.server_id');
+            })
+            ->where('p.status', 'active')->where('t.status', 'active')->where('r.checked_at', '>=', $since)
             ->where('r.server_type', $type)->where('r.server_id', $id)
             ->select('r.*')->orderByDesc('r.checked_at')->get()
             ->unique('probe_id')->values();

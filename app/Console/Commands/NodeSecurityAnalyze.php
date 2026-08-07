@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
+use App\Services\NodeSecurity\ProbeAnalysisService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +17,7 @@ class NodeSecurityAnalyze extends Command
     {
         $settings = (new SettingsService())->all();
         (new RiskService())->recompute();
+        (new ProbeAnalysisService())->analyze();
         $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
         $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
         DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();

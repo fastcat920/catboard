@@ -190,6 +190,11 @@ class AdminRoute
             $router->post('/security/settings', 'V1\\Admin\\NodeSecurityController@saveSettings');
             $router->get ('/security/alerts', 'V1\\Admin\\NodeSecurityController@alerts');
             $router->post('/security/alert/read', 'V1\\Admin\\NodeSecurityController@readAlert');
+            $router->get ('/security/probes', 'V1\\Admin\\NodeSecurityController@probes');
+            $router->post('/security/probe/create', 'V1\\Admin\\NodeSecurityController@createProbe');
+            $router->post('/security/probe/update', 'V1\\Admin\\NodeSecurityController@updateProbe');
+            $router->get ('/security/node-states', 'V1\\Admin\\NodeSecurityController@nodeStates');
+            $router->get ('/security/probe-results', 'V1\\Admin\\NodeSecurityController@probeResults');
         });
     }
 }

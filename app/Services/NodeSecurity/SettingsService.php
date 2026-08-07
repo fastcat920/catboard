@@ -18,6 +18,9 @@ class SettingsService
         'auto_suspend_score' => 0,
         'multi_account_ip_threshold' => 5,
         'alert_webhook_url' => '',
+        'probe_interval_seconds' => 300,
+        'probe_failures_to_event' => 3,
+        'probe_result_window_seconds' => 600,
     ];
 
     public function all(): array

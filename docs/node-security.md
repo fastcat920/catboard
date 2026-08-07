@@ -10,6 +10,12 @@
    ```
 
    不要直接执行无 `--path` 的全量迁移。该面板安装器会从 `database/install.sql` 创建部分 Laravel 标准表，但未登记对应迁移，全量迁移可能与已有表冲突。
+
+   若需要使用私有多地区探测点，再执行第二个迁移：
+
+   ```bash
+   php artisan migrate --path=database/migrations/2026_08_07_000002_create_node_security_probe_tables.php --force
+   ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右下角“节点安全”，或访问 `/{secure_path}/security/dashboard`。
@@ -43,5 +49,20 @@ php artisan security:analyze
 php artisan route:list | grep security
 php artisan test --filter NodeSecurityTest
 ```
+
+## 私有探测点
+
+1. 在“节点安全 → 探测点”分别创建国内不同运营商和海外探测点。
+2. AMD64 Linux 探测服务器直接执行后台生成的一行安装命令。它会从你自己的面板下载预编译二进制、校验 SHA-256 后安装 systemd 服务。
+3. 如使用 ARM64，可在有 Go 1.20+ 的机器进入 `probe-agent` 自行编译：
+
+   ```bash
+   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o node-security-probe .
+   ```
+
+4. Agent 只需要主动访问面板 HTTPS 和被监控节点端口，无需开放入站端口。
+5. 至少需要两个中国大陆不同运营商探测点和一个海外探测点，数据不足时状态显示 `insufficient_probes`，不会自动创建异常事件。
+
+Agent 每个请求都使用独立密钥进行 HMAC-SHA256 签名，并包含时间戳和一次性 nonce。暂停或吊销探测点后，其密钥立即失效。当前自动 TCP 检测跳过 TUIC、Hysteria 及相应 V2Node UDP 协议，避免用 TCP 结果误判 UDP 节点。
 
 若尚未执行迁移，审计模块会 fail-open，不影响正常节点下发，但安全后台接口会因数据表不存在而报错。

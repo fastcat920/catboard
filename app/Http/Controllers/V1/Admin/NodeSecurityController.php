@@ -10,6 +10,8 @@ use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
+use App\Utils\Helper;
 
 class NodeSecurityController extends Controller
 {
@@ -222,6 +224,58 @@ class NodeSecurityController extends Controller
     {
         DB::table('v2_security_alert')->where('id', $request->input('id'))->update(['read_at' => time()]);
         return response(['data' => true]);
+    }
+
+    public function probes(Request $request)
+    {
+        return response(['data' => DB::table('v2_security_probe')
+            ->select('id', 'name', 'region', 'carrier', 'status', 'last_ip', 'version', 'last_seen_at', 'created_at')
+            ->orderByDesc('created_at')->get()]);
+    }
+
+    public function createProbe(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:96', 'region' => 'required|string|max:32', 'carrier' => 'required|string|max:32']);
+        $secret = Helper::guid() . Helper::guid(); $now = time();
+        $id = DB::table('v2_security_probe')->insertGetId([
+            'name' => $request->input('name'), 'region' => strtoupper($request->input('region')),
+            'carrier' => strtolower($request->input('carrier')), 'secret_hash' => hash('sha256', $secret),
+            'secret_encrypted' => Crypt::encryptString($secret), 'status' => 'active',
+            'created_by' => $request->user['id'], 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        $this->adminLog($request, 'probe.create', 'probe', $id, ['name' => $request->input('name')]);
+        $binaryPath = public_path('downloads/node-security-probe-linux-amd64');
+        $binaryUrl = rtrim(url('/'), '/') . '/downloads/node-security-probe-linux-amd64';
+        $checksum = is_file($binaryPath) ? hash_file('sha256', $binaryPath) : '';
+        $download = 'curl -fsSL ' . escapeshellarg($binaryUrl) . ' -o /tmp/node-security-probe';
+        $verify = $checksum ? ' && echo ' . escapeshellarg($checksum . '  /tmp/node-security-probe') . ' | sha256sum -c -' : '';
+        $install = ' && chmod +x /tmp/node-security-probe && sudo /tmp/node-security-probe install --panel=' . escapeshellarg(rtrim(url('/'), '/')) . ' --id=' . $id . ' --secret=' . escapeshellarg($secret);
+        return response(['data' => [
+            'id' => $id, 'secret' => $secret,
+            'install_command' => $download . $verify . $install,
+        ]]);
+    }
+
+    public function updateProbe(Request $request)
+    {
+        $request->validate(['id' => 'required|integer', 'status' => 'required|in:active,paused,revoked']);
+        DB::table('v2_security_probe')->where('id', $request->input('id'))->update(['status' => $request->input('status'), 'updated_at' => time()]);
+        $this->adminLog($request, 'probe.update', 'probe', $request->input('id'), ['status' => $request->input('status')]);
+        return response(['data' => true]);
+    }
+
+    public function nodeStates(Request $request)
+    {
+        return response(['data' => DB::table('v2_security_node_state')->orderByRaw("FIELD(status, 'suspected_blocked','suspected_outage','carrier_issue','insufficient_probes','unknown','healthy')")->get()]);
+    }
+
+    public function probeResults(Request $request)
+    {
+        $query = DB::table('v2_security_probe_result as r')->leftJoin('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
+            ->select('r.*', 'p.name as probe_name');
+        if ($request->filled('server_type')) $query->where('r.server_type', $request->input('server_type'));
+        if ($request->filled('server_id')) $query->where('r.server_id', $request->input('server_id'));
+        return response(['data' => $query->orderByDesc('r.checked_at')->paginate($this->perPage($request))]);
     }
 
     private function userRankQuery()

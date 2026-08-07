@@ -12,7 +12,7 @@ class RiskService
         $window = max(30, (int)$settings['risk_window_seconds']);
         $early = max(10, (int)$settings['early_window_seconds']);
         $events = DB::table('v2_node_block_event')
-            ->whereIn('status', ['suspected', 'confirmed'])
+            ->where('status', 'confirmed')
             ->where('event_type', 'blocked')->get();
         $scores = [];
         $reset = DB::table('v2_security_user_score');

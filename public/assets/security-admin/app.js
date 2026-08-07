@@ -11,6 +11,7 @@
         pageNo: 1,
         filters: { events: {}, users: {}, logs: {} },
         refreshTimer: null,
+        modalParent: null,
     };
     var labels = {
         dashboard: "安全总览",
@@ -440,10 +441,14 @@
             "</section>"
         );
     }
-    function logTable(rows) {
+    function logTable(rows, options) {
+        options = options || {};
+        var showUaTrust = options.showUaTrust !== false;
         if (!rows.length) return '<div class="empty">暂无访问记录</div>';
         return (
-            "<table><thead><tr><th>时间</th><th>用户</th><th>接口类型</th><th>访问方式</th><th>IP</th><th>原始 UA</th><th>UA 可信度</th><th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
+            "<table><thead><tr><th>时间</th><th>用户</th><th>接口类型</th><th>访问方式</th><th>IP</th><th>原始 UA</th>" +
+            (showUaTrust ? "<th>UA 可信度</th>" : "") +
+            "<th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
             rows
                 .map(function (x) {
                     var endpoint = accessEndpointMeta(x.endpoint);
@@ -467,12 +472,16 @@
                         esc(x.user_agent || "客户端未提供 UA") +
                         '">' +
                         esc(x.user_agent || "客户端未提供 UA") +
-                        "</span></td><td>" +
-                        badge(
-                            uaTrustLabel(x.user_agent),
-                            x.user_agent ? "medium" : "",
-                        ) +
-                        "</td><td>" +
+                        "</span></td>" +
+                        (showUaTrust
+                            ? "<td>" +
+                              badge(
+                                  uaTrustLabel(x.user_agent),
+                                  x.user_agent ? "medium" : "",
+                              ) +
+                              "</td>"
+                            : "") +
+                        "<td>" +
                         esc((x.session_id || "-").slice(0, 10)) +
                         " / " +
                         esc((x.device_hash || "-").slice(0, 10)) +
@@ -990,9 +999,13 @@
             ">下一页</button></div>"
         );
     }
-    function modal(title, body) {
+    function modal(title, body, options) {
+        options = options || {};
+        state.modalParent = options.parent || null;
         state.modal =
-            '<div class="modal"><div class="modal-box"><div class="modal-header"><h2>' +
+            '<div class="modal"><div class="modal-box ' +
+            esc(options.boxClass || "") +
+            '"><div class="modal-header"><h2>' +
             title +
             '</h2><button class="btn modal-close" data-close aria-label="关闭弹窗">关闭</button></div><div class="modal-body">' +
             body +
@@ -1384,7 +1397,8 @@
             };
         root.querySelectorAll("[data-close]").forEach(function (x) {
             x.onclick = function () {
-                state.modal = null;
+                state.modal = state.modalParent;
+                state.modalParent = null;
                 render();
             };
         });
@@ -1487,6 +1501,7 @@
             };
         root.querySelectorAll("[data-user]").forEach(function (x) {
             x.onclick = function () {
+                var parentModal = state.modal;
                 api("user/detail?id=" + x.dataset.user).then(function (d) {
                     modal(
                         "用户风险档案",
@@ -1499,7 +1514,11 @@
                             " · " +
                             esc((d.score || {}).risk_reasons || "暂无原因") +
                             '</p><div class="toolbar"><button class="btn" data-user-action="watch">观察</button><button class="btn" data-user-action="trust">可信</button><button class="btn danger" data-user-action="clear_sessions">清除会话</button><button class="btn danger" data-user-action="ban">封禁</button></div><h3 class="profile-section-title">最近访问与客户端 UA</h3>' +
-                            logTable(d.logs || []),
+                            logTable(d.logs || [], { showUaTrust: false }),
+                        {
+                            boxClass: "modal-profile-wide",
+                            parent: parentModal,
+                        },
                     );
                     setTimeout(function () {
                         root.querySelectorAll("[data-user-action]").forEach(

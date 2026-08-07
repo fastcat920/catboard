@@ -578,7 +578,8 @@ textarea {
         align-items: flex-end;
     }
     .modal-box,
-    .modal-box.modal-wide {
+    .modal-box.modal-wide,
+    .modal-box.modal-profile-wide {
         width: 100vw;
         max-height: 94vh;
         border-radius: 14px 14px 0 0;
@@ -676,6 +677,15 @@ textarea {
     width: min(1180px, 94vw);
     max-height: 92vh;
     overflow: hidden;
+}
+.modal-box.modal-profile-wide {
+    width: min(1080px, 94vw);
+    max-height: 92vh;
+    overflow: hidden;
+}
+.modal-profile-wide .ua-text {
+    min-width: 260px;
+    max-width: 480px;
 }
 .event-overview {
     display: flex;

@@ -30,7 +30,7 @@
    ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
-5. 打开原管理员后台，点击右下角“节点安全”，或访问 `/{secure_path}/security/dashboard`。
+5. 打开原管理员后台，点击右上角主题按钮旁的“节点安全”，或访问 `/{secure_path}/security/dashboard`。
 
 ## 推荐启用顺序
 

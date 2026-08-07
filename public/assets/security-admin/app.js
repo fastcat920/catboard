@@ -802,8 +802,68 @@
                 "可选，用于向外部系统发送告警",
             ],
         ];
+        var groups = [
+            {
+                title: "节点正常判定",
+                description: "控制国内、海外探测结果达到什么条件时判定正常，以及异常和恢复需要持续多少轮。",
+                keys: [
+                    "probe_domestic_min_success",
+                    "probe_overseas_min_success",
+                    "probe_domestic_success_ratio",
+                    "probe_overseas_success_ratio",
+                    "probe_recovery_success_rounds",
+                    "probe_failures_to_event",
+                ],
+            },
+            {
+                title: "私有探测调度",
+                description: "控制探测频率、结果有效期、分析周期和管理页面刷新频率。",
+                keys: [
+                    "probe_interval_seconds",
+                    "health_timeout_seconds",
+                    "probe_result_window_seconds",
+                    "security_analysis_interval_minutes",
+                    "probe_page_refresh_seconds",
+                ],
+            },
+            {
+                title: "访问取证与风险关联",
+                description: "控制访问记录保留、封锁事件关联窗口和多账号特征识别。",
+                keys: [
+                    "retention_days",
+                    "risk_window_seconds",
+                    "early_window_seconds",
+                    "multi_account_ip_threshold",
+                ],
+            },
+            {
+                title: "自动处置与告警",
+                description: "控制原有水印探测告警、自动停止节点下发以及外部通知。",
+                keys: [
+                    "health_failures_to_alert",
+                    "auto_suspend_score",
+                    "alert_webhook_url",
+                ],
+            },
+        ];
+        function renderSettingField(f) {
+            var v = d[f[0]];
+            return (
+                '<label class="setting-field"><span><b>' +
+                f[1] +
+                "</b><small>" +
+                f[3] +
+                '</small></span><input name="' +
+                f[0] +
+                '" type="' +
+                f[2] +
+                '" value="' +
+                esc(v) +
+                '"></label>'
+            );
+        }
         return (
-            '<form id="settings-form"><section class="panel"><h2>功能开关</h2><div class="setting-toggles">' +
+            '<form id="settings-form"><section class="panel settings-switch-panel"><div class="settings-section-head"><div><h2>功能开关</h2><p>集中控制安全审计、自动探测和疑似事件登记。</p></div></div><div class="setting-toggles">' +
             toggles
                 .map(function (f) {
                     var v = d[f[0]];
@@ -820,26 +880,31 @@
                     );
                 })
                 .join("") +
-            '</div></section><section class="panel"><h2>检测与保留规则</h2><div class="settings-grid">' +
-            fields
-                .map(function (f) {
-                    var v = d[f[0]];
+            '</div></section><div class="settings-groups">' +
+            groups
+                .map(function (group) {
                     return (
-                        '<label class="setting-field"><span><b>' +
-                        f[1] +
-                        "</b><small>" +
-                        f[3] +
-                        '</small></span><input name="' +
-                        f[0] +
-                        '" type="' +
-                        f[2] +
-                        '" value="' +
-                        esc(v) +
-                        '"></label>'
+                        '<section class="panel settings-group"><div class="settings-section-head"><div><h2>' +
+                        group.title +
+                        "</h2><p>" +
+                        group.description +
+                        '</p></div><span class="settings-count">' +
+                        group.keys.length +
+                        ' 项</span></div><div class="settings-grid">' +
+                        group.keys
+                            .map(function (key) {
+                                return renderSettingField(
+                                    fields.find(function (f) {
+                                        return f[0] === key;
+                                    }),
+                                );
+                            })
+                            .join("") +
+                        "</div></section>"
                     );
                 })
                 .join("") +
-            '</div><div class="settings-actions"><span class="muted">私有探测自动事件只进入待确认队列，人工确认后才计入风险。</span><button class="btn primary">保存设置</button></div></section></form>'
+            '</div><div class="settings-savebar"><div><b data-settings-status>设置尚未修改</b><span>保存后立即生效，无需重新加载页面。自动事件只进入待确认队列。</span></div><button class="btn primary settings-save-button" data-settings-submit type="submit"><span class="save-spinner" aria-hidden="true"></span><span data-settings-button-text>保存全部设置</span></button></div></form>'
         );
     }
     function pager(p) {
@@ -1629,16 +1694,58 @@
                 });
             };
         var sf = root.querySelector("#settings-form");
-        if (sf)
+        if (sf) {
+            sf.querySelectorAll("input, select, textarea").forEach(function (input) {
+                input.addEventListener("change", function () {
+                    var status = sf.querySelector("[data-settings-status]");
+                    if (status && !status.classList.contains("saving")) {
+                        status.className = "changed";
+                        status.textContent = "● 有未保存的更改";
+                    }
+                });
+            });
             sf.onsubmit = function (e) {
                 e.preventDefault();
                 var d = formData(sf);
+                var button = sf.querySelector("[data-settings-submit]");
+                var buttonText = sf.querySelector("[data-settings-button-text]");
+                var status = sf.querySelector("[data-settings-status]");
                 Object.keys(d).forEach(function (k) {
                     if (sf.elements[k] && sf.elements[k].type === "number")
                         d[k] = Number(d[k]);
                 });
-                post("settings", d, load);
+                button.disabled = true;
+                button.classList.add("saving");
+                buttonText.textContent = "正在保存…";
+                status.className = "saving";
+                status.textContent = "正在保存设置";
+                api("settings", { method: "POST", body: d })
+                    .then(function (saved) {
+                        state.data = saved;
+                        sf.dataset.saved = "1";
+                        state.error = "";
+                        status.className = "success";
+                        status.textContent = "✓ 设置已保存并生效";
+                        buttonText.textContent = "保存成功";
+                        setTimeout(function () {
+                            if (!button.isConnected) return;
+                            buttonText.textContent = "保存全部设置";
+                            status.className = "";
+                            status.textContent = "设置已保存";
+                        }, 2200);
+                    })
+                    .catch(function (error) {
+                        status.className = "failed";
+                        status.textContent = "保存失败：" + error.message;
+                        buttonText.textContent = "重新保存";
+                    })
+                    .finally(function () {
+                        if (!button.isConnected) return;
+                        button.disabled = false;
+                        button.classList.remove("saving");
+                    });
             };
+        }
         var ef = root.querySelector("#event-form");
         if (ef)
             ef.onsubmit = function (e) {

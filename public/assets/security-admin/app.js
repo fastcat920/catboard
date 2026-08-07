@@ -529,7 +529,15 @@
                               (x.status === "active" ? "paused" : "active") +
                               '">' +
                               (x.status === "active" ? "暂停" : "启用") +
-                              '</button> <button class="btn danger" data-delete-probe="' +
+                              '</button> <button class="btn" data-edit-probe="' +
+                              x.id +
+                              '" data-probe-name="' +
+                              esc(x.name) +
+                              '" data-region="' +
+                              esc(x.region) +
+                              '" data-carrier="' +
+                              esc(x.carrier) +
+                              '">编辑</button> <button class="btn danger" data-delete-probe="' +
                               x.id +
                               '" data-probe-name="' +
                               esc(x.name) +
@@ -898,6 +906,36 @@
             '<form id="probe-form" class="form-grid"><label>名称<input name="name" required placeholder="cn-telecom-01"></label><label>地区<select name="region"><option value="CN">中国大陆</option><option value="HK">香港</option><option value="US">美国</option><option value="SG">新加坡</option><option value="JP">日本</option></select></label><label class="span2">运营商<select name="carrier"><option value="telecom">电信</option><option value="unicom">联通</option><option value="mobile">移动</option><option value="overseas">海外</option><option value="unknown">其他</option></select></label><div class="span2"><button class="btn primary">创建并生成安装密钥</button></div></form>',
         );
     }
+    function editProbeForm(probe) {
+        modal(
+            "编辑探测点",
+            '<form id="edit-probe-form" data-id="' +
+                probe.id +
+                '" class="form-grid"><label class="span2">名称<input name="name" required maxlength="96" value="' +
+                esc(probe.name) +
+                '"></label><label>地区<select name="region"><option value="CN"' +
+                selected(probe.region, "CN") +
+                '>中国大陆</option><option value="HK"' +
+                selected(probe.region, "HK") +
+                '>香港</option><option value="US"' +
+                selected(probe.region, "US") +
+                '>美国</option><option value="SG"' +
+                selected(probe.region, "SG") +
+                '>新加坡</option><option value="JP"' +
+                selected(probe.region, "JP") +
+                '>日本</option></select></label><label>运营商<select name="carrier"><option value="telecom"' +
+                selected(probe.carrier, "telecom") +
+                '>电信</option><option value="unicom"' +
+                selected(probe.carrier, "unicom") +
+                '>联通</option><option value="mobile"' +
+                selected(probe.carrier, "mobile") +
+                '>移动</option><option value="overseas"' +
+                selected(probe.carrier, "overseas") +
+                '>海外</option><option value="unknown"' +
+                selected(probe.carrier, "unknown") +
+                '>其他</option></select></label><div class="span2 edit-note">修改会从下一次上报开始生效，不会重写历史探测记录。</div><div class="span2 modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary" type="submit">保存修改</button></div></form>',
+        );
+    }
     function deleteProbeForm(id, name) {
         modal(
             "删除探测点",
@@ -1221,6 +1259,24 @@
                 );
             };
         });
+        root.querySelectorAll("[data-edit-probe]").forEach(function (x) {
+            x.onclick = function () {
+                editProbeForm({
+                    id: Number(x.dataset.editProbe),
+                    name: x.dataset.probeName,
+                    region: x.dataset.region,
+                    carrier: x.dataset.carrier,
+                });
+            };
+        });
+        var epf = root.querySelector("#edit-probe-form");
+        if (epf)
+            epf.onsubmit = function (e) {
+                e.preventDefault();
+                var d = formData(epf);
+                d.id = Number(epf.dataset.id);
+                post("probe/edit", d, load);
+            };
         var df = root.querySelector("#delete-probe-form");
         if (df)
             df.onsubmit = function (e) {

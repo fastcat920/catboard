@@ -320,6 +320,30 @@ class NodeSecurityController extends Controller
         return response(['data' => true]);
     }
 
+    public function editProbe(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer|min:1',
+            'name' => 'required|string|max:96',
+            'region' => 'required|in:CN,HK,US,SG,JP',
+            'carrier' => 'required|in:telecom,unicom,mobile,overseas,unknown',
+        ]);
+        $probe = DB::table('v2_security_probe')->where('id', $request->input('id'))->first();
+        if (!$probe) abort(404, '探测点不存在或已被删除');
+        $data = [
+            'name' => trim($request->input('name')),
+            'region' => strtoupper($request->input('region')),
+            'carrier' => strtolower($request->input('carrier')),
+            'updated_at' => time(),
+        ];
+        DB::table('v2_security_probe')->where('id', $probe->id)->update($data);
+        $this->adminLog($request, 'probe.edit', 'probe', $probe->id, [
+            'before' => ['name' => $probe->name, 'region' => $probe->region, 'carrier' => $probe->carrier],
+            'after' => $data,
+        ]);
+        return response(['data' => true]);
+    }
+
     public function deleteProbe(Request $request)
     {
         $request->validate([

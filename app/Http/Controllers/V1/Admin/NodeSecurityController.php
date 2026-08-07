@@ -71,6 +71,18 @@ class NodeSecurityController extends Controller
         $payload = $request->only('server_type', 'server_id', 'snapshot_id', 'watermark_group_id', 'event_type', 'status', 'first_failed_at', 'confirmed_at', 'evidence', 'remark');
         $payload['event_type'] = $payload['event_type'] ?? 'blocked';
         $payload['status'] = $payload['status'] ?? 'suspected';
+        if (empty($payload['snapshot_id'])) {
+            $snapshotQuery = DB::table('v2_node_snapshot')
+                ->where('server_type', $payload['server_type'])
+                ->where('server_id', $payload['server_id'])
+                ->where('published_at', '<=', $payload['first_failed_at']);
+            if (!empty($payload['watermark_group_id'])) {
+                $snapshotQuery->where('watermark_group_id', $payload['watermark_group_id']);
+            } else {
+                $snapshotQuery->whereNull('watermark_group_id');
+            }
+            $payload['snapshot_id'] = $snapshotQuery->orderByDesc('published_at')->value('id');
+        }
         $payload['created_by'] = $request->user['id'];
         $payload['created_at'] = $now; $payload['updated_at'] = $now;
         $id = DB::table('v2_node_block_event')->insertGetId($payload);

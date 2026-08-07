@@ -25,6 +25,23 @@ class RiskService
 
         foreach ($events as $event) {
             $snapshotId = $event->snapshot_id;
+            if (!$snapshotId) {
+                $snapshotQuery = DB::table('v2_node_snapshot')
+                    ->where('server_type', $event->server_type)
+                    ->where('server_id', $event->server_id)
+                    ->where('published_at', '<=', $event->first_failed_at);
+                if ($event->watermark_group_id) {
+                    $snapshotQuery->where('watermark_group_id', $event->watermark_group_id);
+                } else {
+                    $snapshotQuery->whereNull('watermark_group_id');
+                }
+                $snapshotId = $snapshotQuery->orderByDesc('published_at')->value('id');
+                if ($snapshotId) {
+                    DB::table('v2_node_block_event')->where('id', $event->id)->update([
+                        'snapshot_id' => $snapshotId, 'updated_at' => time(),
+                    ]);
+                }
+            }
             if (!$snapshotId) continue;
             $from = max(0, (int)$event->first_failed_at - $window);
             $logs = DB::table('v2_node_access_log')

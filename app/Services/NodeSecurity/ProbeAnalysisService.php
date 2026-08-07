@@ -11,8 +11,10 @@ class ProbeAnalysisService
         $settings = (new SettingsService())->all();
         $threshold = max(2, (int)($settings['probe_failures_to_event'] ?? 3));
         $since = time() - max(180, (int)($settings['probe_result_window_seconds'] ?? 600));
-        $targets = DB::table('v2_security_probe_result')->where('checked_at', '>=', $since)
-            ->select('server_type', 'server_id')->distinct()->get();
+        $targets = DB::table('v2_security_probe_result as r')
+            ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
+            ->where('p.status', 'active')->where('r.checked_at', '>=', $since)
+            ->select('r.server_type', 'r.server_id')->distinct()->get();
         foreach ($targets as $target) $this->analyzeTarget($target->server_type, $target->server_id, $since, $threshold);
         DB::table('v2_security_probe_result')->where('checked_at', '<', time() - 7 * 86400)->delete();
         return count($targets);
@@ -20,8 +22,11 @@ class ProbeAnalysisService
 
     private function analyzeTarget(string $type, int $id, int $since, int $threshold): void
     {
-        $latest = DB::table('v2_security_probe_result')->where('checked_at', '>=', $since)
-            ->where('server_type', $type)->where('server_id', $id)->orderByDesc('checked_at')->get()
+        $latest = DB::table('v2_security_probe_result as r')
+            ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
+            ->where('p.status', 'active')->where('r.checked_at', '>=', $since)
+            ->where('r.server_type', $type)->where('r.server_id', $id)
+            ->select('r.*')->orderByDesc('r.checked_at')->get()
             ->unique('probe_id')->values();
         $latestCheckedAt = (int)$latest->max('checked_at');
         $existing = DB::table('v2_security_node_state')->where('server_type', $type)->where('server_id', $id)->first();

@@ -320,9 +320,46 @@ class NodeSecurityController extends Controller
         return response(['data' => true]);
     }
 
+    public function deleteProbe(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer|min:1',
+            'name' => 'required|string|max:96',
+            'delete_results' => 'required|boolean',
+        ]);
+        $probe = DB::table('v2_security_probe')->where('id', $request->input('id'))->first();
+        if (!$probe) abort(404, '探测点不存在或已被删除');
+        if ($probe->status !== 'paused') abort(422, '探测点必须先暂停才能删除');
+        if (!hash_equals((string)$probe->name, (string)$request->input('name'))) abort(422, '探测点名称不匹配');
+
+        $deleteResults = $request->boolean('delete_results');
+        DB::transaction(function () use ($probe, $deleteResults) {
+            if ($deleteResults) {
+                DB::table('v2_security_probe_result')->where('probe_id', $probe->id)->delete();
+            } else {
+                DB::table('v2_security_probe_result')->where('probe_id', $probe->id)->update(['probe_id' => null]);
+            }
+            DB::table('v2_security_probe')->where('id', $probe->id)->delete();
+        });
+        $this->adminLog($request, 'probe.delete', 'probe', $probe->id, [
+            'name' => $probe->name,
+            'delete_results' => $deleteResults,
+        ]);
+        return response(['data' => true]);
+    }
+
     public function nodeStates(Request $request)
     {
-        return response(['data' => DB::table('v2_security_node_state')->orderByRaw("FIELD(status, 'suspected_blocked','suspected_outage','carrier_issue','insufficient_probes','unknown','healthy')")->get()]);
+        $names = collect((new \App\Services\ServerService())->getAllServers())->mapWithKeys(function ($server) {
+            return [($server['type'] ?? '') . ':' . ($server['id'] ?? '') => $server['name'] ?? '未命名节点'];
+        });
+        $states = DB::table('v2_security_node_state')
+            ->orderByRaw("FIELD(status, 'suspected_blocked','suspected_outage','carrier_issue','insufficient_probes','unknown','healthy')")
+            ->get()->map(function ($state) use ($names) {
+                $state->server_name = $names->get($state->server_type . ':' . $state->server_id, '节点已删除');
+                return $state;
+            });
+        return response(['data' => $states]);
     }
 
     public function probeResults(Request $request)

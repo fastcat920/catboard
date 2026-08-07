@@ -89,6 +89,20 @@
     function risk(v) {
         return badge(v, v >= 70 ? "high" : v >= 40 ? "medium" : "ok");
     }
+    function nodeStatusLabel(status) {
+        return (
+            {
+                healthy: "正常",
+                suspected_blocked: "疑似被封锁",
+                suspected_outage: "疑似节点故障",
+                carrier_issue: "疑似运营商线路异常",
+                insufficient_probes: "探测点不足",
+                unknown: "等待判断",
+            }[status] ||
+            status ||
+            "未知"
+        );
+    }
     function shell(content) {
         return (
             '<div class="layout"><aside class="side"><div class="brand">节点安全中心<small>泄露追踪 · 水印定位 · 自动风控</small></div><nav class="nav">' +
@@ -496,7 +510,9 @@
                                       ? online
                                           ? "在线"
                                           : "离线"
-                                      : x.status,
+                                      : x.status === "paused"
+                                        ? "已暂停"
+                                        : "已撤销",
                                   online
                                       ? "ok"
                                       : x.status === "active"
@@ -513,7 +529,15 @@
                               (x.status === "active" ? "paused" : "active") +
                               '">' +
                               (x.status === "active" ? "暂停" : "启用") +
-                              "</button></td></tr>"
+                              '</button> <button class="btn danger" data-delete-probe="' +
+                              x.id +
+                              '" data-probe-name="' +
+                              esc(x.name) +
+                              '" ' +
+                              (x.status !== "paused"
+                                  ? 'disabled title="请先暂停探测点"'
+                                  : "") +
+                              ">删除</button></td></tr>"
                           );
                       })
                       .join("") +
@@ -521,7 +545,7 @@
                 : '<div class="empty">还没有探测点，创建后在其他服务器运行安装命令</div>') +
             '</section><section class="panel"><h2>节点监控状态</h2>' +
             (states.length
-                ? "<table><thead><tr><th>节点</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th></tr></thead><tbody>" +
+                ? "<table><thead><tr><th>节点</th><th>名称</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th></tr></thead><tbody>" +
                   states
                       .map(function (x) {
                           return (
@@ -530,8 +554,10 @@
                               " / " +
                               x.server_id +
                               "</td><td>" +
+                              esc(x.server_name || "未命名节点") +
+                              "</td><td>" +
                               badge(
-                                  x.status,
+                                  nodeStatusLabel(x.status),
                                   x.status === "healthy"
                                       ? "ok"
                                       : x.status === "suspected_blocked"
@@ -872,6 +898,18 @@
             '<form id="probe-form" class="form-grid"><label>名称<input name="name" required placeholder="cn-telecom-01"></label><label>地区<select name="region"><option value="CN">中国大陆</option><option value="HK">香港</option><option value="US">美国</option><option value="SG">新加坡</option><option value="JP">日本</option></select></label><label class="span2">运营商<select name="carrier"><option value="telecom">电信</option><option value="unicom">联通</option><option value="mobile">移动</option><option value="overseas">海外</option><option value="unknown">其他</option></select></label><div class="span2"><button class="btn primary">创建并生成安装密钥</button></div></form>',
         );
     }
+    function deleteProbeForm(id, name) {
+        modal(
+            "删除探测点",
+            '<div class="delete-warning"><b>删除后，此探测点的安装密钥将永久失效。</b><p>探测服务器上的程序不会自动卸载，请在服务器上另行停止服务。</p></div><form id="delete-probe-form" data-id="' +
+                id +
+                '" data-name="' +
+                esc(name) +
+                '"><div id="delete-probe-error" class="form-error" hidden></div><label class="confirm-name">输入探测点名称 <b>' +
+                esc(name) +
+                '</b> 进行确认<input name="name" autocomplete="off" required placeholder="请输入完整名称"></label><div class="delete-options"><label><input type="radio" name="delete_results" value="0" checked><span><b>仅删除探测点</b><small>保留历史探测记录，记录将不再关联已删除的探测点</small></span></label><label><input type="radio" name="delete_results" value="1"><span><b>同时删除历史记录</b><small>永久删除该探测点上报的全部历史结果，无法恢复</small></span></label></div><div class="modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn danger" type="submit">确认删除</button></div></form>',
+        );
+    }
     function load(extra) {
         state.loading = true;
         state.error = "";
@@ -1174,6 +1212,39 @@
                 );
             };
         });
+        root.querySelectorAll("[data-delete-probe]").forEach(function (x) {
+            x.onclick = function () {
+                if (x.disabled) return;
+                deleteProbeForm(
+                    Number(x.dataset.deleteProbe),
+                    x.dataset.probeName,
+                );
+            };
+        });
+        var df = root.querySelector("#delete-probe-form");
+        if (df)
+            df.onsubmit = function (e) {
+                e.preventDefault();
+                var d = formData(df);
+                if (d.name !== df.dataset.name) {
+                    var deleteError = root.querySelector("#delete-probe-error");
+                    deleteError.textContent =
+                        "探测点名称不匹配，请输入完整名称";
+                    deleteError.hidden = false;
+                    return;
+                }
+                if (!confirm("这是最后一次确认：确定永久删除该探测点？"))
+                    return;
+                post(
+                    "probe/delete",
+                    {
+                        id: Number(df.dataset.id),
+                        name: d.name,
+                        delete_results: d.delete_results === "1",
+                    },
+                    load,
+                );
+            };
         var pf = root.querySelector("#probe-form");
         if (pf)
             pf.onsubmit = function (e) {

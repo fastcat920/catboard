@@ -193,6 +193,7 @@ class AdminRoute
             $router->get ('/security/probes', 'V1\\Admin\\NodeSecurityController@probes');
             $router->post('/security/probe/create', 'V1\\Admin\\NodeSecurityController@createProbe');
             $router->post('/security/probe/update', 'V1\\Admin\\NodeSecurityController@updateProbe');
+            $router->post('/security/probe/delete', 'V1\\Admin\\NodeSecurityController@deleteProbe');
             $router->get ('/security/node-states', 'V1\\Admin\\NodeSecurityController@nodeStates');
             $router->get ('/security/probe-results', 'V1\\Admin\\NodeSecurityController@probeResults');
         });

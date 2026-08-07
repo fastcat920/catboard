@@ -21,6 +21,7 @@ class SettingsService
         'probe_interval_seconds' => 300,
         'probe_failures_to_event' => 3,
         'probe_result_window_seconds' => 600,
+        'probe_page_refresh_seconds' => 30,
     ];
 
     public function all(): array
@@ -45,6 +46,10 @@ class SettingsService
     public function save(array $values): array
     {
         $allowed = array_intersect_key($values, self::DEFAULTS);
+        if (array_key_exists('probe_page_refresh_seconds', $allowed)) {
+            $refresh = (int)$allowed['probe_page_refresh_seconds'];
+            $allowed['probe_page_refresh_seconds'] = $refresh <= 0 ? 0 : max(5, min(3600, $refresh));
+        }
         foreach ($allowed as $key => $value) {
             DB::table('v2_security_setting')->updateOrInsert(
                 ['key' => $key],

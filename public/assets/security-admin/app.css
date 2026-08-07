@@ -702,6 +702,17 @@ tr[hidden] {
     width: 17px;
     height: 17px;
 }
+.server-address {
+    display: inline-block;
+    max-width: 260px;
+    padding: 4px 7px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #f2f4f7;
+    color: #344054;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .target-picker-tools,
 .picker-summary {
     display: flex;

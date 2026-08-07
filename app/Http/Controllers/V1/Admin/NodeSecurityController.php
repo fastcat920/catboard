@@ -51,6 +51,8 @@ class NodeSecurityController extends Controller
     {
         $event = DB::table('v2_node_block_event')->where('id', $request->input('id'))->first();
         if (!$event) abort(404, '事件不存在');
+        $eventEvidence = json_decode($event->evidence ?? '', true) ?: [];
+        $event->detected_at = isset($eventEvidence['detected_at']) ? (int)$eventEvidence['detected_at'] : null;
         $snapshot = $event->snapshot_id
             ? DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'published_at')->where('id', $event->snapshot_id)->first()
             : null;
@@ -390,6 +392,9 @@ class NodeSecurityController extends Controller
                 'server_type' => $target->server_type,
                 'server_id' => $target->server_id,
                 'server_name' => $server['name'] ?? '源节点已删除',
+                'server_address' => $server
+                    ? $this->formatServerAddress((string)($server['host'] ?? ''), (string)($server['port'] ?? ''))
+                    : '-',
                 'source_available' => (bool)$server,
                 'status' => $state->status ?? 'waiting_first_probe',
                 'domestic_ok' => $state->domestic_ok ?? 0,
@@ -486,6 +491,13 @@ class NodeSecurityController extends Controller
         if (($server['type'] ?? '') === 'v2node' && in_array($server['protocol'] ?? '', ['tuic', 'hysteria'], true)) return false;
         $port = (string)$server['port'];
         return strpos($port, '-') === false && ctype_digit($port);
+    }
+
+    private function formatServerAddress(string $host, string $port): string
+    {
+        if ($host === '') return '-';
+        if (strpos($host, ':') !== false && substr($host, 0, 1) !== '[') $host = '[' . $host . ']';
+        return $port === '' ? $host : $host . ':' . $port;
     }
 
     private function from(Request $request): int { return time() - max(1, min(90, (int)$request->input('days', 7))) * 86400; }

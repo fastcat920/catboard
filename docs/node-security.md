@@ -22,6 +22,12 @@
    ```bash
    php artisan migrate --path=database/migrations/2026_08_07_000003_create_security_probe_targets.php --force
    ```
+
+   若需要区分首次探测失败时间和达到连续失败阈值的时间，再执行：
+
+   ```bash
+   php artisan migrate --path=database/migrations/2026_08_08_000004_add_probe_failure_started_at.php --force
+   ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右下角“节点安全”，或访问 `/{secure_path}/security/dashboard`。

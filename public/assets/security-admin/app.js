@@ -10,6 +10,7 @@
         modal: null,
         pageNo: 1,
         filters: { events: {}, users: {}, logs: {} },
+        refreshTimer: null,
     };
     var labels = {
         dashboard: "安全总览",
@@ -487,6 +488,9 @@
     function probes(d) {
         var rows = d.probes || [],
             states = d.states || [],
+            refreshSeconds = Number(
+                (d.settings || {}).probe_page_refresh_seconds || 0,
+            ),
             activeTargets = states.filter(function (x) {
                 return x.target_status === "active";
             }).length;
@@ -555,13 +559,17 @@
                       .join("") +
                   "</tbody></table>"
                 : '<div class="empty">还没有探测点，创建后在其他服务器运行安装命令</div>') +
-            '</section><section class="panel"><div class="monitor-header"><div><h2>节点监控状态</h2><span class="muted">仅检测手动加入监控池的节点，不会自动检测全部节点</span></div><div class="toolbar"><span class="monitor-count">监控中 ' +
+            '</section><section class="panel"><div class="monitor-header"><div><h2>节点监控状态</h2><span class="muted">仅检测手动加入监控池的节点，不会自动检测全部节点 · ' +
+            (refreshSeconds > 0
+                ? "每 " + Math.max(5, refreshSeconds) + " 秒自动刷新"
+                : "自动刷新已关闭") +
+            '</span></div><div class="toolbar"><span class="monitor-count">监控中 ' +
             activeTargets +
             " / " +
             states.length +
             '</span><button class="btn primary" data-add-target>添加监控节点</button></div></div>' +
             (states.length
-                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
+                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
                   states
                       .map(function (x) {
                           return (
@@ -576,6 +584,9 @@
                               "</td><td>" +
                               esc(x.server_name || "未命名节点") +
                               "</td><td>" +
+                              '<code class="server-address">' +
+                              esc(x.server_address || "-") +
+                              "</code></td><td>" +
                               badge(
                                   x.target_status === "active"
                                       ? "监控中"
@@ -713,6 +724,12 @@
                 "探测结果窗口（秒）",
                 "number",
                 "只使用窗口内各探测点的最新结果",
+            ],
+            [
+                "probe_page_refresh_seconds",
+                "探测页面刷新间隔（秒）",
+                "number",
+                "最小 5 秒；设置为 0 可关闭自动刷新",
             ],
             [
                 "health_timeout_seconds",
@@ -888,6 +905,7 @@
                 e.server_id +
                 '</span></div><div class="muted">首次失败：' +
                 time(e.first_failed_at) +
+                (e.detected_at ? " · 达到阈值：" + time(e.detected_at) : "") +
                 " · 快照：" +
                 esc(snapshot.version || e.snapshot_id || "未关联") +
                 "</div></div><div>" +
@@ -1056,6 +1074,10 @@
         );
     }
     function load(extra) {
+        if (state.refreshTimer) {
+            clearTimeout(state.refreshTimer);
+            state.refreshTimer = null;
+        }
         state.loading = true;
         state.error = "";
         render();
@@ -1064,15 +1086,20 @@
                 api("probes"),
                 api("node-states"),
                 api("probe-targets/candidates"),
+                api("settings"),
             ])
                 .then(function (x) {
                     state.data = {
                         probes: x[0],
                         states: x[1],
                         candidates: x[2],
+                        settings: x[3],
                     };
                     state.loading = false;
                     render();
+                    scheduleProbeRefresh(
+                        Number(x[3].probe_page_refresh_seconds || 0),
+                    );
                 })
                 .catch(function (e) {
                     state.error = e.message;
@@ -1106,11 +1133,22 @@
                 render();
             });
     }
+    function scheduleProbeRefresh(seconds) {
+        if (state.refreshTimer) clearTimeout(state.refreshTimer);
+        if (!seconds || seconds < 0) return;
+        seconds = Math.max(5, seconds);
+        state.refreshTimer = setTimeout(function () {
+            state.refreshTimer = null;
+            if (state.page === "probes" && !state.modal) load();
+            else if (state.page === "probes") scheduleProbeRefresh(seconds);
+        }, seconds * 1000);
+    }
     function post(path, body, done) {
         api(path, { method: "POST", body: body })
             .then(function (d) {
                 state.modal = null;
-                (done || load)(d);
+                if (!done || done === load) load();
+                else done(d);
             })
             .catch(function (e) {
                 state.error = e.message;

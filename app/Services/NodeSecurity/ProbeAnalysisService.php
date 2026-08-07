@@ -52,9 +52,19 @@ class ProbeAnalysisService
         elseif ($domesticFailed === 1 && $domesticOk >= 1) $status = 'carrier_issue';
         $actionable = in_array($status, ['suspected_blocked', 'suspected_outage', 'carrier_issue'], true);
         $failure = $actionable ? (int)($existing->consecutive_failures ?? 0) + 1 : 0;
+        $failureStartedAt = $actionable
+            ? ((int)($existing->consecutive_failures ?? 0) > 0 && !empty($existing->failure_started_at)
+                ? (int)$existing->failure_started_at
+                : $latestCheckedAt)
+            : null;
         $success = $status === 'healthy' ? (int)($existing->consecutive_successes ?? 0) + 1 : 0;
         $activeEventId = $existing->active_event_id ?? null;
-        if ($failure >= $threshold && !$activeEventId) $activeEventId = $this->createEvent($type, $id, $status, compact('domesticOk', 'domesticFailed', 'overseasOk', 'overseasFailed'));
+        if ($failure >= $threshold && !$activeEventId) {
+            $activeEventId = $this->createEvent(
+                $type, $id, $status, $failureStartedAt, $latestCheckedAt, $failure,
+                compact('domesticOk', 'domesticFailed', 'overseasOk', 'overseasFailed')
+            );
+        }
         if ($success >= 3 && $activeEventId) {
             DB::table('v2_node_block_event')->where('id', $activeEventId)->where('status', 'suspected')->update(['status' => 'resolved', 'updated_at' => time()]);
             $activeEventId = null;
@@ -62,6 +72,7 @@ class ProbeAnalysisService
         $now = time();
         DB::table('v2_security_node_state')->updateOrInsert(['server_type' => $type, 'server_id' => $id], [
             'status' => $status, 'consecutive_failures' => $failure, 'consecutive_successes' => $success,
+            'failure_started_at' => $failureStartedAt,
             'domestic_ok' => $domesticOk, 'domestic_failed' => $domesticFailed,
             'overseas_ok' => $overseasOk, 'overseas_failed' => $overseasFailed,
             'active_event_id' => $activeEventId, 'last_checked_at' => $latestCheckedAt,
@@ -70,7 +81,7 @@ class ProbeAnalysisService
         ]);
     }
 
-    private function createEvent(string $type, int $id, string $state, array $evidence): int
+    private function createEvent(string $type, int $id, string $state, int $firstFailedAt, int $detectedAt, int $failureRounds, array $evidence): int
     {
         $now = time();
         $snapshot = DB::table('v2_node_snapshot')->where('server_type', $type)->where('server_id', $id)
@@ -78,8 +89,10 @@ class ProbeAnalysisService
         $eventType = $state === 'suspected_blocked' ? 'blocked' : ($state === 'suspected_outage' ? 'outage' : 'carrier');
         $eventId = DB::table('v2_node_block_event')->insertGetId([
             'server_type' => $type, 'server_id' => $id, 'snapshot_id' => $snapshot->id ?? null,
-            'event_type' => $eventType, 'status' => 'suspected', 'first_failed_at' => $now,
-            'evidence' => json_encode(array_merge(['source' => 'private_probe'], $evidence)),
+            'event_type' => $eventType, 'status' => 'suspected', 'first_failed_at' => $firstFailedAt,
+            'evidence' => json_encode(array_merge([
+                'source' => 'private_probe', 'detected_at' => $detectedAt, 'failure_rounds' => $failureRounds,
+            ], $evidence)),
             'remark' => '私有探测点连续异常，等待管理员核实', 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('v2_security_alert')->insert([

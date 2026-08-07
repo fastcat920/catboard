@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Services\NodeSecurity;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class AuditService
+{
+    public function prepare(Request $request, array $servers, string $endpoint): array
+    {
+        try {
+            $settings = (new SettingsService())->all();
+            if (!$settings['enabled']) return $servers;
+            $score = DB::table('v2_security_user_score')->where('user_id', (int)$request->user['id'])->first();
+            $autoThreshold = (int)($settings['auto_suspend_score'] ?? 0);
+            if ($score && ($score->status === 'suspended' || ($score->status !== 'trusted' && $autoThreshold > 0 && $score->risk_score >= $autoThreshold))) {
+                $request->attributes->set('node_security_denied', true);
+                $servers = [];
+            }
+            $servers = (new WatermarkService())->apply((int)$request->user['id'], $servers);
+            $request->attributes->set('node_security_started_at', microtime(true));
+            $request->attributes->set('node_security_endpoint', $endpoint);
+            $request->attributes->set('node_security_snapshot_ids', (new SnapshotService())->capture($servers));
+            foreach ($servers as &$server) unset($server['_watermark_group_id']);
+            unset($server);
+        } catch (\Throwable $e) {
+            Log::warning('Node security prepare failed: ' . $e->getMessage());
+        }
+        return $servers;
+    }
+
+    public function record(Request $request, $response): void
+    {
+        $snapshotIds = $request->attributes->get('node_security_snapshot_ids');
+        if (!is_array($snapshotIds)) return;
+        try {
+            $now = time();
+            $ua = mb_substr((string)$request->userAgent(), 0, 512);
+            $ip = (string)$request->ip();
+            $started = (float)$request->attributes->get('node_security_started_at', microtime(true));
+            $content = method_exists($response, 'getContent') ? (string)$response->getContent() : '';
+            DB::table('v2_node_access_log')->insert([
+                'user_id' => (int)$request->user['id'],
+                'session_id' => mb_substr((string)($request->user['auth_session'] ?? ''), 0, 64) ?: null,
+                'snapshot_ids' => json_encode($snapshotIds),
+                'snapshot_set_hash' => hash('sha256', implode(',', $snapshotIds)),
+                'endpoint' => $request->attributes->get('node_security_endpoint', 'unknown'),
+                'request_ip' => mb_substr($ip, 0, 64),
+                'ip_hash' => hash('sha256', $ip),
+                'user_agent' => $ua ?: null,
+                'device_hash' => hash('sha256', strtolower($ua) . '|' . $ip),
+                'etag' => mb_substr((string)$response->headers->get('ETag'), 0, 64) ?: null,
+                'response_status' => (int)$response->getStatusCode(),
+                'response_bytes' => strlen($content),
+                'duration_ms' => max(0, (int)round((microtime(true) - $started) * 1000)),
+                'requested_at' => $now,
+                'created_at' => $now,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Node security record failed: ' . $e->getMessage());
+        }
+    }
+}

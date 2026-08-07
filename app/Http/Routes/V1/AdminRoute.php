@@ -171,6 +171,25 @@ class AdminRoute
             $router->get ('/theme/getThemes', 'V1\\Admin\\ThemeController@getThemes');
             $router->post('/theme/saveThemeConfig', 'V1\\Admin\\ThemeController@saveThemeConfig');
             $router->post('/theme/getThemeConfig', 'V1\\Admin\\ThemeController@getThemeConfig');
+            // Node security
+            $router->get ('/security/dashboard', 'V1\\Admin\\NodeSecurityController@dashboard');
+            $router->get ('/security/events', 'V1\\Admin\\NodeSecurityController@events');
+            $router->get ('/security/event/detail', 'V1\\Admin\\NodeSecurityController@eventDetail');
+            $router->post('/security/event/save', 'V1\\Admin\\NodeSecurityController@saveEvent');
+            $router->post('/security/event/update', 'V1\\Admin\\NodeSecurityController@updateEvent');
+            $router->get ('/security/users', 'V1\\Admin\\NodeSecurityController@users');
+            $router->get ('/security/user/detail', 'V1\\Admin\\NodeSecurityController@userDetail');
+            $router->post('/security/user/action', 'V1\\Admin\\NodeSecurityController@userAction');
+            $router->get ('/security/access-logs', 'V1\\Admin\\NodeSecurityController@accessLogs');
+            $router->get ('/security/snapshots', 'V1\\Admin\\NodeSecurityController@snapshots');
+            $router->get ('/security/experiments', 'V1\\Admin\\NodeSecurityController@experiments');
+            $router->post('/security/experiment/create', 'V1\\Admin\\NodeSecurityController@createExperiment');
+            $router->post('/security/experiment/split', 'V1\\Admin\\NodeSecurityController@splitExperiment');
+            $router->post('/security/experiment/update', 'V1\\Admin\\NodeSecurityController@updateExperiment');
+            $router->get ('/security/settings', 'V1\\Admin\\NodeSecurityController@settings');
+            $router->post('/security/settings', 'V1\\Admin\\NodeSecurityController@saveSettings');
+            $router->get ('/security/alerts', 'V1\\Admin\\NodeSecurityController@alerts');
+            $router->post('/security/alert/read', 'V1\\Admin\\NodeSecurityController@readAlert');
         });
     }
 }

@@ -20,6 +20,16 @@ func TestClassifyNetworkErrors(t *testing.T) {
 	}
 }
 
+func TestProtocolTaskRejectsMissingConfiguration(t *testing.T) {
+	result := check(taskWire{CheckType: "protocol", ServerType: "v2node", ServerID: 7})
+	if result.Success || result.CheckType != "protocol" {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+	if result.ErrorStage != "configuration" || result.ErrorCode != "missing_config" {
+		t.Fatalf("unexpected layered error: %s/%s", result.ErrorStage, result.ErrorCode)
+	}
+}
+
 type fakeTimeout struct{}
 
 func (fakeTimeout) Error() string   { return "timeout" }

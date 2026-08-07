@@ -13,7 +13,7 @@ class ProbeController extends Controller
     {
         $probe = (new ProbeAuthService())->authenticate($request);
         if (!$probe) abort(401, 'probe authentication failed');
-        return response(['data' => ['server_time' => time(), 'tasks' => (new ProbeService())->tasks()]]);
+        return response(['data' => ['server_time' => time(), 'tasks' => (new ProbeService())->tasks($probe)]]);
     }
 
     public function results(Request $request)
@@ -22,5 +22,10 @@ class ProbeController extends Controller
         if (!$probe) abort(401, 'probe authentication failed');
         $request->validate(['results' => 'required|array|max:500']);
         return response(['data' => ['accepted' => (new ProbeService())->storeResults($probe, $request->input('results'))]]);
+    }
+
+    public function connectivity()
+    {
+        return response('', 204)->header('X-Node-Security-Probe', 'ok');
     }
 }

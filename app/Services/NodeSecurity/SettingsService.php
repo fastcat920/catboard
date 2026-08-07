@@ -20,6 +20,7 @@ class SettingsService
         'alert_webhook_url' => '',
         'probe_interval_seconds' => 300,
         'probe_failures_to_event' => 3,
+        'protocol_failures_to_event' => 3,
         'probe_result_window_seconds' => 600,
         'probe_page_refresh_seconds' => 30,
         'security_analysis_interval_minutes' => 1,

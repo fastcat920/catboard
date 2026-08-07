@@ -22,10 +22,12 @@ class ProbeAuthService
         $message = strtoupper($request->method()) . "\n" . $request->getPathInfo() . "\n{$timestamp}\n{$nonce}\n{$bodyHash}";
         $expected = hash_hmac('sha256', $message, Crypt::decryptString($probe->secret_encrypted));
         if (!hash_equals($expected, $signature)) return null;
+        $version = mb_substr((string)$request->header('X-Probe-Version'), 0, 32);
         DB::table('v2_security_probe')->where('id', $id)->update([
             'last_ip' => $request->ip(), 'last_seen_at' => time(),
-            'version' => mb_substr((string)$request->header('X-Probe-Version'), 0, 32), 'updated_at' => time(),
+            'version' => $version, 'updated_at' => time(),
         ]);
+        $probe->version = $version;
         return $probe;
     }
 }

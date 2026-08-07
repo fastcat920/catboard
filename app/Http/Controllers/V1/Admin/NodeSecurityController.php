@@ -8,6 +8,7 @@ use App\Services\AuthService;
 use App\Services\NodeSecurity\ExperimentService;
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
+use App\Services\NodeSecurity\ProtocolConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
@@ -286,9 +287,22 @@ class NodeSecurityController extends Controller
 
     public function probes(Request $request)
     {
-        return response(['data' => DB::table('v2_security_probe')
+        $binaryPath = public_path('downloads/node-security-probe-linux-amd64');
+        $binaryUrl = rtrim(url('/'), '/') . '/downloads/node-security-probe-linux-amd64';
+        $checksum = is_file($binaryPath) ? hash_file('sha256', $binaryPath) : '';
+        $upgrade = 'curl -fsSL ' . escapeshellarg($binaryUrl) . ' -o /tmp/node-security-probe-new';
+        if ($checksum) $upgrade .= ' && echo ' . escapeshellarg($checksum . '  /tmp/node-security-probe-new') . ' | sha256sum -c -';
+        $upgrade .= ' && chmod +x /tmp/node-security-probe-new && sudo /tmp/node-security-probe-new install-runtime'
+            . ' && sudo systemctl stop node-security-probe && sudo install -m 0755 /tmp/node-security-probe-new /usr/local/bin/node-security-probe'
+            . ' && sudo systemctl start node-security-probe && /usr/local/bin/node-security-probe --help >/dev/null';
+        $probes = DB::table('v2_security_probe')
             ->select('id', 'name', 'region', 'carrier', 'status', 'last_ip', 'version', 'last_seen_at', 'created_at')
-            ->orderByDesc('created_at')->get()]);
+            ->orderByDesc('created_at')->get()->map(function ($probe) use ($upgrade) {
+                $probe->protocol_supported = version_compare((string)($probe->version ?? '0'), '1.1.0', '>=');
+                $probe->upgrade_command = $upgrade;
+                return $probe;
+            });
+        return response(['data' => $probes]);
     }
 
     public function createProbe(Request $request)
@@ -389,6 +403,10 @@ class NodeSecurityController extends Controller
             return (object)[
                 'target_id' => $target->id,
                 'target_status' => $target->status,
+                'protocol_check_enabled' => (bool)($target->protocol_check_enabled ?? false),
+                'protocol_type' => $target->protocol_type ?? null,
+                'protocol_configured' => !empty($target->protocol_share_encrypted),
+                'protocol_interval_seconds' => (int)($target->protocol_interval_seconds ?? 300),
                 'server_type' => $target->server_type,
                 'server_id' => $target->server_id,
                 'server_name' => $server['name'] ?? '源节点已删除',
@@ -403,6 +421,14 @@ class NodeSecurityController extends Controller
                 'overseas_failed' => $state->overseas_failed ?? 0,
                 'consecutive_failures' => $state->consecutive_failures ?? 0,
                 'last_checked_at' => $state->last_checked_at ?? null,
+                'protocol_status' => empty($target->protocol_check_enabled)
+                    ? (!empty($target->protocol_share_encrypted) ? 'disabled' : 'unconfigured')
+                    : ($state->protocol_status ?? 'waiting'),
+                'protocol_error_stage' => $state->protocol_error_stage ?? null,
+                'protocol_error_code' => $state->protocol_error_code ?? null,
+                'protocol_latency_ms' => $state->protocol_latency_ms ?? null,
+                'protocol_last_checked_at' => $state->protocol_last_checked_at ?? null,
+                'protocol_consecutive_failures' => $state->protocol_consecutive_failures ?? 0,
             ];
         });
         return response(['data' => $targets]);
@@ -467,6 +493,60 @@ class NodeSecurityController extends Controller
         });
         $this->adminLog($request, 'probe_target.' . $action, 'probe_target', null, ['targets' => $targets->all()]);
         return response(['data' => ['affected' => $targets->count()]]);
+    }
+
+    public function saveProbeTargetProtocol(Request $request)
+    {
+        $request->validate([
+            'server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1',
+            'enabled' => 'required|boolean', 'protocol_uri' => 'nullable|string|max:8192',
+            'interval_seconds' => 'required|integer|min:60|max:3600',
+        ]);
+        $target = DB::table('v2_security_probe_target')
+            ->where('server_type', $request->input('server_type'))->where('server_id', $request->input('server_id'))->first();
+        if (!$target) abort(404, '监控目标不存在');
+        $enabled = $request->boolean('enabled');
+        $uri = trim((string)$request->input('protocol_uri', ''));
+        $data = [
+            'protocol_check_enabled' => $enabled ? 1 : 0,
+            'protocol_interval_seconds' => (int)$request->input('interval_seconds'),
+            'protocol_updated_at' => time(), 'updated_at' => time(),
+        ];
+        if ($uri !== '') {
+            $scheme = strtolower((string)parse_url($uri, PHP_URL_SCHEME));
+            if (!in_array($scheme, ['vmess', 'vless', 'trojan', 'ss'], true)) abort(422, '仅支持 VMess、VLESS、Trojan 和 Shadowsocks 分享链接');
+            try {
+                (new ProtocolConfigService())->outbound($uri);
+            } catch (\InvalidArgumentException $e) {
+                abort(422, '分享链接格式无效或包含暂不支持的参数');
+            }
+            $data['protocol_type'] = $scheme;
+            $data['protocol_share_encrypted'] = Crypt::encryptString($uri);
+            $data['protocol_config_hash'] = hash('sha256', $uri);
+        } elseif ($enabled && empty($target->protocol_share_encrypted)) {
+            abort(422, '首次启用协议探测必须填写专用测试分享链接');
+        }
+        DB::table('v2_security_probe_target')->where('id', $target->id)->update($data);
+        $this->adminLog($request, 'probe_target.protocol.update', 'probe_target', $target->id, [
+            'enabled' => $enabled, 'protocol_type' => $data['protocol_type'] ?? $target->protocol_type,
+            'config_changed' => $uri !== '', 'interval_seconds' => $data['protocol_interval_seconds'],
+        ]);
+        return response(['data' => true]);
+    }
+
+    public function runProbeTargetProtocol(Request $request)
+    {
+        $request->validate(['server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1']);
+        $target = DB::table('v2_security_probe_target')
+            ->where('server_type', $request->input('server_type'))->where('server_id', $request->input('server_id'))->first();
+        if (!$target) abort(404, '监控目标不存在');
+        if ($target->status !== 'active') abort(422, '请先恢复节点监控');
+        if (empty($target->protocol_check_enabled) || empty($target->protocol_share_encrypted)) abort(422, '请先启用并配置协议探测');
+        DB::table('v2_security_probe_target')->where('id', $target->id)->update([
+            'protocol_run_requested_at' => time(), 'updated_at' => time(),
+        ]);
+        $this->adminLog($request, 'probe_target.protocol.run', 'probe_target', $target->id, []);
+        return response(['data' => true]);
     }
 
     public function probeResults(Request $request)

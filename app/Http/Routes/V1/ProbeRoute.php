@@ -11,6 +11,7 @@ class ProbeRoute
         $router->group(['prefix' => 'security/probe'], function ($router) {
             $router->get('/tasks', 'V1\\ProbeController@tasks');
             $router->post('/results', 'V1\\ProbeController@results');
+            $router->get('/connectivity', 'V1\\ProbeController@connectivity');
         });
     }
 }

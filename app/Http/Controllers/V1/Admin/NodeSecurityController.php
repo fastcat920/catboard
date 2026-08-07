@@ -57,15 +57,18 @@ class NodeSecurityController extends Controller
             ? DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'published_at')->where('id', $event->snapshot_id)->first()
             : null;
         $window = (int)(new SettingsService())->get('risk_window_seconds', 300);
-        $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
-            ->whereBetween('l.requested_at', [max(0, $event->first_failed_at - $window), $event->first_failed_at])
-            ->select('l.*', 'u.email')->orderBy('l.requested_at')->get()
-            ->filter(function ($log) use ($event) {
-                return !$event->snapshot_id || in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
-            })->values()->map(function ($log) use ($event) {
-                $log->seconds_before_failure = max(0, (int)$event->first_failed_at - (int)$log->requested_at);
-                return $log;
-            });
+        $logs = collect();
+        if ($event->snapshot_id) {
+            $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
+                ->whereBetween('l.requested_at', [max(0, $event->first_failed_at - $window), $event->first_failed_at])
+                ->select('l.*', 'u.email')->orderBy('l.requested_at')->get()
+                ->filter(function ($log) use ($event) {
+                    return in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
+                })->values()->map(function ($log) use ($event) {
+                    $log->seconds_before_failure = max(0, (int)$event->first_failed_at - (int)$log->requested_at);
+                    return $log;
+                });
+        }
         $candidates = $logs->groupBy('user_id')->map(function ($items) {
             $closest = $items->sortBy('seconds_before_failure')->first();
             return [
@@ -82,6 +85,13 @@ class NodeSecurityController extends Controller
         return response(['data' => [
             'event' => $event,
             'snapshot' => $snapshot,
+            'evidence' => [
+                'snapshot_linked' => !empty($event->snapshot_id),
+                'level' => $event->snapshot_id ? 'exact_snapshot' : 'network_only',
+                'message' => $event->snapshot_id
+                    ? '候选用户仅包含访问记录中精确命中该节点快照的用户'
+                    : '事件未关联节点下发快照，无法证明任何用户获取过该节点',
+            ],
             'summary' => [
                 'window_seconds' => $window,
                 'access_count' => $logs->count(),

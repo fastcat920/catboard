@@ -597,6 +597,35 @@ textarea {
 .filter-actions .muted {
     margin-left: auto;
 }
+.access-log-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 11px 13px;
+    border: 1px solid #dbe7ff;
+    border-radius: 9px;
+    background: #f5f8ff;
+    color: #344054;
+    font-size: 12px;
+}
+.access-log-notice b {
+    flex: none;
+    color: #175cd3;
+}
+.ua-text {
+    display: inline-block;
+    max-width: 360px;
+    color: #344054;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.profile-section-title {
+    margin: 18px 0 10px;
+    font-size: 14px;
+}
 .table-wrap {
     overflow-x: auto;
 }
@@ -625,6 +654,30 @@ textarea {
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     margin: 14px 0;
+}
+.event-evidence {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 14px 0;
+    padding: 12px 14px;
+    border: 1px solid;
+    border-radius: 10px;
+    font-size: 13px;
+}
+.event-evidence.verified {
+    border-color: #abefc6;
+    background: #ecfdf3;
+    color: #067647;
+}
+.event-evidence.missing {
+    border-color: #fedf89;
+    background: #fffaeb;
+    color: #b54708;
+}
+.event-evidence span {
+    color: #475467;
+    line-height: 1.5;
 }
 .event-summary > div {
     display: flex;

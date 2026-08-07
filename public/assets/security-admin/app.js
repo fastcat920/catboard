@@ -406,7 +406,7 @@
             selected(f.sort_order || "desc", "desc") +
             '>从新到旧 / 从高到低</option><option value="asc"' +
             selected(f.sort_order, "asc") +
-            '>从旧到新 / 从低到高</option></select></label></div><div class="filter-actions"><button class="btn primary" data-filter-logs>应用筛选</button><button class="btn" data-reset-logs>重置</button><span class="muted">共 ' +
+            '>从旧到新 / 从低到高</option></select></label></div><div class="access-log-notice"><b>访问记录说明</b><span>记录表示用户请求过自己的节点列表，不代表获取了所有节点；是否获得特定节点以事件快照命中为准。</span></div><div class="filter-actions"><button class="btn primary" data-filter-logs>应用筛选</button><button class="btn" data-reset-logs>重置</button><span class="muted">共 ' +
             esc(p.total || 0) +
             ' 条记录</span></div></section><section class="panel table-wrap">' +
             logTable(p.data || []) +
@@ -417,7 +417,7 @@
     function logTable(rows) {
         if (!rows.length) return '<div class="empty">暂无访问记录</div>';
         return (
-            "<table><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>IP</th><th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
+            "<table><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>IP</th><th>客户端 UA</th><th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
             rows
                 .map(function (x) {
                     return (
@@ -429,9 +429,11 @@
                         esc(x.endpoint) +
                         "</td><td>" +
                         esc(x.request_ip) +
-                        '</td><td title="' +
-                        esc(x.user_agent) +
+                        '</td><td><span class="ua-text" title="' +
+                        esc(x.user_agent || "客户端未提供 UA") +
                         '">' +
+                        esc(x.user_agent || "客户端未提供 UA") +
+                        "</span></td><td>" +
                         esc((x.session_id || "-").slice(0, 10)) +
                         " / " +
                         esc((x.device_hash || "-").slice(0, 10)) +
@@ -962,6 +964,7 @@
         var e = d.event || {},
             s = d.summary || {},
             snapshot = d.snapshot || {},
+            evidence = d.evidence || {},
             candidates = d.candidates || [],
             logs = d.access_logs || [];
         var candidateRows = candidates.length
@@ -986,7 +989,11 @@
                       );
                   })
                   .join("")
-            : '<tr><td colspan="5" class="empty">关联窗口内没有匹配的访问用户</td></tr>';
+            : '<tr><td colspan="5" class="empty">' +
+              (evidence.snapshot_linked
+                  ? "关联窗口内没有用户命中该节点快照"
+                  : "事件未关联节点快照，不展示候选用户") +
+              "</td></tr>";
         var logRows = logs.length
             ? logs
                   .map(function (l) {
@@ -1015,8 +1022,13 @@
                           esc(l.endpoint) +
                           "</td><td>" +
                           esc(l.request_ip) +
-                          "</td><td>" +
+                          '</td><td><span class="ua-text" title="' +
+                          esc(l.user_agent || "客户端未提供 UA") +
+                          '">' +
+                          esc(l.user_agent || "客户端未提供 UA") +
+                          '</span><br><span class="muted">设备 ' +
                           esc((l.device_hash || "-").slice(0, 12)) +
+                          "</span>" +
                           "</td><td>" +
                           l.response_status +
                           " / " +
@@ -1041,7 +1053,13 @@
                 badge(eventTypeLabel(e.event_type), e.event_type) +
                 " " +
                 badge(eventStatusLabel(e.status), e.status) +
-                '</div></div><div class="event-summary"><div><b>' +
+                '</div></div><div class="event-evidence ' +
+                (evidence.snapshot_linked ? "verified" : "missing") +
+                '"><b>' +
+                (evidence.snapshot_linked ? "精确快照证据" : "仅有网络异常证据") +
+                "</b><span>" +
+                esc(evidence.message || "暂无证据说明") +
+                '</span></div><div class="event-summary"><div><b>' +
                 esc(s.user_count || 0) +
                 "</b><span>候选用户</span></div><div><b>" +
                 esc(s.access_count || 0) +
@@ -1057,7 +1075,7 @@
                 e.id +
                 '">标记已恢复</button></div><section class="timeline-section"><h3>候选用户（按接近失败时间排序）</h3><div class="table-wrap"><table><thead><tr><th>用户</th><th>访问</th><th>IP / 设备</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' +
                 candidateRows +
-                '</tbody></table></div></section><section class="timeline-section"><div class="timeline-heading"><h3>完整访问时间线</h3><div class="timeline-tools"><input id="timeline-search" placeholder="搜索邮箱、ID、IP、接口"><label class="check"><input id="timeline-near" type="checkbox"> 仅看封锁前 60 秒</label></div></div><div class="table-wrap timeline-table"><table><thead><tr><th>访问时间</th><th>用户</th><th>接口</th><th>IP</th><th>设备摘要</th><th>响应</th></tr></thead><tbody>' +
+                '</tbody></table></div></section><section class="timeline-section"><div class="timeline-heading"><h3>完整访问时间线</h3><div class="timeline-tools"><input id="timeline-search" placeholder="搜索邮箱、ID、IP、接口"><label class="check"><input id="timeline-near" type="checkbox"> 仅看封锁前 60 秒</label></div></div><div class="table-wrap timeline-table"><table><thead><tr><th>访问时间</th><th>用户</th><th>接口</th><th>IP</th><th>客户端 / 设备</th><th>响应</th></tr></thead><tbody>' +
                 logRows +
                 "</tbody></table></div></section>",
         );
@@ -1430,7 +1448,7 @@
                             risk((d.score || {}).risk_score || 0) +
                             " · " +
                             esc((d.score || {}).risk_reasons || "暂无原因") +
-                            '</p><div class="toolbar"><button class="btn" data-user-action="watch">观察</button><button class="btn" data-user-action="trust">可信</button><button class="btn danger" data-user-action="clear_sessions">清除会话</button><button class="btn danger" data-user-action="ban">封禁</button></div>' +
+                            '</p><div class="toolbar"><button class="btn" data-user-action="watch">观察</button><button class="btn" data-user-action="trust">可信</button><button class="btn danger" data-user-action="clear_sessions">清除会话</button><button class="btn danger" data-user-action="ban">封禁</button></div><h3 class="profile-section-title">最近访问与客户端 UA</h3>' +
                             logTable(d.logs || []),
                     );
                     setTimeout(function () {

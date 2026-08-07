@@ -953,11 +953,11 @@
     }
     function modal(title, body) {
         state.modal =
-            '<div class="modal"><div class="modal-box"><div class="toolbar"><h2 style="flex:1;margin:0">' +
+            '<div class="modal"><div class="modal-box"><div class="modal-header"><h2>' +
             title +
-            '</h2><button class="btn" data-close>关闭</button></div>' +
+            '</h2><button class="btn modal-close" data-close aria-label="关闭弹窗">关闭</button></div><div class="modal-body">' +
             body +
-            "</div></div>";
+            "</div></div></div>";
         render();
     }
     function eventDetailModal(d) {

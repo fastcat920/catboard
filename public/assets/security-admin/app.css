@@ -212,10 +212,38 @@ textarea {
 .modal-box {
     width: min(720px, 92vw);
     max-height: 88vh;
-    overflow: auto;
+    overflow: hidden;
     background: #fff;
     border-radius: 13px;
+    box-shadow: 0 20px 48px rgba(16, 24, 40, 0.24);
+    display: flex;
+    flex-direction: column;
+}
+.modal-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 22px;
+    border-bottom: 1px solid #eaecf0;
+    background: #fff;
+    z-index: 2;
+}
+.modal-header h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.4;
+}
+.modal-close {
+    flex: none;
+}
+.modal-body {
+    min-height: 0;
+    overflow: auto;
     padding: 22px;
+    overscroll-behavior: contain;
 }
 .form-grid {
     display: grid;
@@ -546,6 +574,21 @@ textarea {
     .form-grid {
         grid-template-columns: 1fr;
     }
+    .modal {
+        align-items: flex-end;
+    }
+    .modal-box,
+    .modal-box.modal-wide {
+        width: 100vw;
+        max-height: 94vh;
+        border-radius: 14px 14px 0 0;
+    }
+    .modal-header {
+        padding: 13px 16px;
+    }
+    .modal-body {
+        padding: 16px;
+    }
     .span2 {
         grid-column: auto;
     }
@@ -632,7 +675,7 @@ textarea {
 .modal-box.modal-wide {
     width: min(1180px, 94vw);
     max-height: 92vh;
-    overflow: auto;
+    overflow: hidden;
 }
 .event-overview {
     display: flex;

@@ -93,29 +93,13 @@
     function nodeStatusLabel(status) {
         return (
             {
-                healthy: "TCP端口正常",
+                healthy: "正常",
                 suspected_blocked: "疑似被封锁",
                 suspected_outage: "疑似节点故障",
                 carrier_issue: "疑似运营商线路异常",
                 insufficient_probes: "探测点不足",
                 unknown: "等待判断",
                 waiting_first_probe: "等待首次检测",
-            }[status] ||
-            status ||
-            "未知"
-        );
-    }
-    function protocolStatusLabel(status) {
-        return (
-            {
-                unconfigured: "未配置",
-                disabled: "协议检测已关闭",
-                waiting: "等待协议检测",
-                usable: "代理完全可用",
-                protocol_blocked: "疑似协议层封锁",
-                protocol_outage: "疑似协议服务故障",
-                protocol_partial: "部分线路协议异常",
-                protocol_insufficient: "协议探测点不足",
             }[status] ||
             status ||
             "未知"
@@ -547,9 +531,6 @@
                               time(x.last_seen_at) +
                               "</td><td>" +
                               esc(x.version || "-") +
-                              (!x.protocol_supported
-                                  ? '<br><span class="muted">需升级至 1.1.0+</span>'
-                                  : "") +
                               '</td><td><button class="btn" data-probe-toggle="' +
                               x.id +
                               '" data-status="' +
@@ -564,11 +545,7 @@
                               esc(x.region) +
                               '" data-carrier="' +
                               esc(x.carrier) +
-                              '">编辑</button> ' +
-                              (!x.protocol_supported
-                                  ? '<button class="btn" data-upgrade-probe data-command="' + esc(x.upgrade_command || "") + '">升级程序</button> '
-                                  : "") +
-                              '<button class="btn danger" data-delete-probe="' +
+                              '">编辑</button> <button class="btn danger" data-delete-probe="' +
                               x.id +
                               '" data-probe-name="' +
                               esc(x.name) +
@@ -592,7 +569,7 @@
             states.length +
             '</span><button class="btn primary" data-add-target>添加监控节点</button></div></div>' +
             (states.length
-                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>TCP判断</th><th>协议状态</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
+                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
                   states
                       .map(function (x) {
                           return (
@@ -628,24 +605,6 @@
                                         : "warning",
                               ) +
                               "</td><td>" +
-                              badge(
-                                  protocolStatusLabel(x.protocol_status),
-                                  x.protocol_status === "usable"
-                                      ? "ok"
-                                      : x.protocol_status === "unconfigured"
-                                        ? ""
-                                        : "warning",
-                              ) +
-                              (x.protocol_last_checked_at
-                                  ? '<br><span class="muted">' +
-                                    time(x.protocol_last_checked_at) +
-                                    (x.protocol_latency_ms != null ? " · " + x.protocol_latency_ms + "ms" : "") +
-                                    "</span>"
-                                  : "") +
-                              (x.protocol_error_stage || x.protocol_error_code
-                                  ? '<br><span class="muted">' + esc([x.protocol_error_stage, x.protocol_error_code].filter(Boolean).join(" / ")) + "</span>"
-                                  : "") +
-                              "</td><td>" +
                               x.domestic_ok +
                               " / " +
                               x.domestic_failed +
@@ -654,8 +613,7 @@
                               " / " +
                               x.overseas_failed +
                               "</td><td>" +
-                              "TCP " + x.consecutive_failures +
-                              " / 协议 " + (x.protocol_consecutive_failures || 0) +
+                              x.consecutive_failures +
                               "</td><td>" +
                               time(x.last_checked_at) +
                               '</td><td><button class="btn" data-single-target="' +
@@ -668,30 +626,7 @@
                               x.server_id +
                               '">' +
                               (x.target_status === "active" ? "暂停" : "恢复") +
-                              '</button> <button class="btn" data-protocol-config data-type="' +
-                              esc(x.server_type) +
-                              '" data-id="' +
-                              x.server_id +
-                              '" data-name="' +
-                              esc(x.server_name) +
-                              '" data-enabled="' +
-                              (x.protocol_check_enabled ? "1" : "0") +
-                              '" data-configured="' +
-                              (x.protocol_configured ? "1" : "0") +
-                              '" data-protocol="' +
-                              esc(x.protocol_type || "") +
-                              '" data-interval="' +
-                              (x.protocol_interval_seconds || 300) +
-                              '">协议配置</button> <button class="btn" data-protocol-run data-type="' +
-                              esc(x.server_type) +
-                              '" data-id="' +
-                              x.server_id +
-                              '" ' +
-                              (!x.protocol_check_enabled ||
-                              x.target_status !== "active"
-                                  ? "disabled"
-                                  : "") +
-                              '>立即检测</button> <button class="btn danger" data-single-target="remove" data-type="' +
+                              '</button> <button class="btn danger" data-single-target="remove" data-type="' +
                               esc(x.server_type) +
                               '" data-id="' +
                               x.server_id +
@@ -783,12 +718,6 @@
                 "异常事件失败轮数",
                 "number",
                 "连续达到轮数后自动建立待确认事件",
-            ],
-            [
-                "protocol_failures_to_event",
-                "协议异常事件失败轮数",
-                "number",
-                "协议层连续达到轮数后建立待确认事件",
             ],
             [
                 "probe_result_window_seconds",
@@ -1137,24 +1066,6 @@
         );
         var box = root.querySelector(".modal-box");
         if (box) box.classList.add("modal-wide");
-    }
-    function protocolConfigForm(target) {
-        modal(
-            "协议探测配置 · " + esc(target.name),
-            '<div class="protocol-warning">请使用专门创建的测试账号分享链接，不要填写普通用户或管理员的生产凭据。链接将使用面板 APP_KEY 加密保存，保存后不再回显。</div><form id="protocol-config-form" data-type="' +
-                esc(target.serverType) +
-                '" data-id="' +
-                target.serverId +
-                '"><div class="form-grid"><label class="span2 protocol-enable"><input type="checkbox" name="enabled" ' +
-                (target.enabled ? "checked" : "") +
-                '> 启用协议级可用性检测</label><label>当前协议<input value="' +
-                esc(target.protocol || "未配置") +
-                '" readonly></label><label>检测间隔（秒）<input name="interval_seconds" type="number" min="60" max="3600" value="' +
-                esc(target.interval || 300) +
-                '"></label><label class="span2">专用测试分享链接<textarea name="protocol_uri" placeholder="支持 vmess://、vless://、trojan://、ss://；留空表示保持原配置不变"></textarea><small>当前状态：' +
-                (target.configured ? "已安全配置" : "尚未配置") +
-                '</small></label><div class="span2 modal-actions"><button type="button" class="btn" data-close>取消</button><button class="btn primary" type="submit">保存协议配置</button></div></div></form>',
-        );
     }
     function deleteProbeForm(id, name) {
         modal(
@@ -1555,48 +1466,6 @@
                 ]);
             };
         });
-        root.querySelectorAll("[data-protocol-config]").forEach(function (x) {
-            x.onclick = function () {
-                protocolConfigForm({
-                    serverType: x.dataset.type,
-                    serverId: Number(x.dataset.id),
-                    name: x.dataset.name,
-                    enabled: x.dataset.enabled === "1",
-                    configured: x.dataset.configured === "1",
-                    protocol: x.dataset.protocol,
-                    interval: Number(x.dataset.interval),
-                });
-            };
-        });
-        var protocolForm = root.querySelector("#protocol-config-form");
-        if (protocolForm)
-            protocolForm.onsubmit = function (e) {
-                e.preventDefault();
-                var d = formData(protocolForm);
-                post(
-                    "probe-targets/protocol",
-                    {
-                        server_type: protocolForm.dataset.type,
-                        server_id: Number(protocolForm.dataset.id),
-                        enabled: !!d.enabled,
-                        protocol_uri: d.protocol_uri,
-                        interval_seconds: Number(d.interval_seconds),
-                    },
-                    load,
-                );
-            };
-        root.querySelectorAll("[data-protocol-run]").forEach(function (x) {
-            x.onclick = function () {
-                post(
-                    "probe-targets/protocol/run",
-                    {
-                        server_type: x.dataset.type,
-                        server_id: Number(x.dataset.id),
-                    },
-                    load,
-                );
-            };
-        });
         function updateCandidateSelection() {
             var selected = checkedTargets("[data-candidate-check]");
             var label = root.querySelector("[data-candidate-selected]");
@@ -1656,16 +1525,6 @@
                         status: x.dataset.status,
                     },
                     load,
-                );
-            };
-        });
-        root.querySelectorAll("[data-upgrade-probe]").forEach(function (x) {
-            x.onclick = function () {
-                modal(
-                    "升级探测程序",
-                    '<div class="protocol-warning">请在对应的 Linux 探测服务器上执行。命令会校验程序、安装 sing-box，然后重启探测服务。</div><label>升级命令<textarea readonly style="min-height:150px">' +
-                        esc(x.dataset.command || "") +
-                        '</textarea></label><p class="muted">升级后等待约 30 秒，版本显示为 1.1.0 或更高即可进行协议检测。</p>',
                 );
             };
         });

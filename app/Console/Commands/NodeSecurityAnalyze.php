@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
 use App\Services\NodeSecurity\ProbeAnalysisService;
-use App\Services\NodeSecurity\ProtocolProbeAnalysisService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
@@ -28,7 +27,6 @@ class NodeSecurityAnalyze extends Command
             if ($this->option('scheduled') && !$this->option('force') && time() - (int)Cache::get($lastRunKey, 0) < $interval * 60) return 0;
             (new RiskService())->recompute();
             (new ProbeAnalysisService())->analyze();
-            (new ProtocolProbeAnalysisService())->analyze();
             $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
             $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
             DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();

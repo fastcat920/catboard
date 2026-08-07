@@ -198,8 +198,6 @@ class AdminRoute
             $router->get ('/security/node-states', 'V1\\Admin\\NodeSecurityController@nodeStates');
             $router->get ('/security/probe-targets/candidates', 'V1\\Admin\\NodeSecurityController@probeTargetCandidates');
             $router->post('/security/probe-targets/batch', 'V1\\Admin\\NodeSecurityController@batchProbeTargets');
-            $router->post('/security/probe-targets/protocol', 'V1\\Admin\\NodeSecurityController@saveProbeTargetProtocol');
-            $router->post('/security/probe-targets/protocol/run', 'V1\\Admin\\NodeSecurityController@runProbeTargetProtocol');
             $router->get ('/security/probe-results', 'V1\\Admin\\NodeSecurityController@probeResults');
         });
     }

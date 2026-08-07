@@ -28,12 +28,6 @@
    ```bash
    php artisan migrate --path=database/migrations/2026_08_08_000004_add_probe_failure_started_at.php --force
    ```
-
-   若需要协议级检测，再执行：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_08_000005_add_protocol_probe_support.php --force
-   ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右下角“节点安全”，或访问 `/{secure_path}/security/dashboard`。
@@ -77,7 +71,7 @@ php artisan test --filter NodeSecurityTest
 3. 如使用 ARM64，可在有 Go 1.20+ 的机器进入 `probe-agent` 自行编译：
 
    ```bash
-   CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o node-security-probe .
+   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o node-security-probe .
    ```
 
 4. Agent 只需要主动访问面板 HTTPS 和被监控节点端口，无需开放入站端口。
@@ -87,15 +81,5 @@ php artisan test --filter NodeSecurityTest
 监控目标支持单个或批量暂停、恢复和移除。移除只停止探测，不会删除面板节点，历史结果继续按照系统保留策略保存。
 
 Agent 每个请求都使用独立密钥进行 HMAC-SHA256 签名，并包含时间戳和一次性 nonce。暂停或吊销探测点后，其密钥立即失效。当前自动 TCP 检测跳过 TUIC、Hysteria 及相应 V2Node UDP 协议，避免用 TCP 结果误判 UDP 节点。
-
-## 协议级探测
-
-1. 先为监控节点创建权限受限、流量受限的专用测试账号，不要使用管理员或普通用户凭据。
-2. 在“节点监控状态 → 协议配置”保存 `vmess://`、`vless://`、`trojan://` 或 `ss://` 分享链接。链接由 Laravel `APP_KEY` 加密，后台只显示是否已配置，不回显明文。
-3. 新建探测点会自动安装 sing-box；已有探测点点击“升级程序”，在对应 Linux 服务器执行升级命令。只有 1.1.0 及以上 Agent 会收到协议任务。
-4. 点击“立即检测”会改变任务版本，使各在线探测点在下一次轮询时立即执行。自动检测按照节点单独设置的协议间隔运行。
-5. TCP 与协议结果独立显示。协议层状态包括“代理完全可用”“部分线路协议异常”“疑似协议层封锁”“疑似协议服务故障”和“协议探测点不足”。连续异常达到风控设置阈值后建立待确认事件；连续三轮恢复会自动关闭尚未人工确认的事件。
-
-协议分享链接只会下发给已认证且版本支持的私有探测点，但探测服务器仍能在内存中取得测试凭据，因此应将探测服务器视为受信基础设施，并定期轮换专用测试账号。
 
 若尚未执行迁移，审计模块会 fail-open，不影响正常节点下发，但安全后台接口会因数据表不存在而报错。

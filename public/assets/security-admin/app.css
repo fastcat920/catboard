@@ -741,29 +741,6 @@ tr[hidden] {
     top: 0;
     z-index: 1;
 }
-.protocol-warning {
-    padding: 13px 15px;
-    margin: 12px 0 18px;
-    border: 1px solid #fedf89;
-    border-radius: 9px;
-    background: #fffaeb;
-    color: #93370d;
-    font-size: 13px;
-}
-.protocol-enable {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center;
-    gap: 9px;
-    padding: 12px;
-    border-radius: 8px;
-    background: #f2f4f7;
-}
-.protocol-enable input {
-    min-width: 18px;
-    width: 18px;
-    height: 18px;
-}
 @media (max-width: 1100px) {
     .filter-grid {
         grid-template-columns: repeat(3, 1fr);

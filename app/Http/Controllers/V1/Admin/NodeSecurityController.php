@@ -51,14 +51,46 @@ class NodeSecurityController extends Controller
     {
         $event = DB::table('v2_node_block_event')->where('id', $request->input('id'))->first();
         if (!$event) abort(404, '事件不存在');
+        $snapshot = $event->snapshot_id
+            ? DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'published_at')->where('id', $event->snapshot_id)->first()
+            : null;
         $window = (int)(new SettingsService())->get('risk_window_seconds', 300);
         $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
             ->whereBetween('l.requested_at', [max(0, $event->first_failed_at - $window), $event->first_failed_at])
             ->select('l.*', 'u.email')->orderBy('l.requested_at')->get()
             ->filter(function ($log) use ($event) {
                 return !$event->snapshot_id || in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
-            })->values();
-        return response(['data' => ['event' => $event, 'access_logs' => $logs]]);
+            })->values()->map(function ($log) use ($event) {
+                $log->seconds_before_failure = max(0, (int)$event->first_failed_at - (int)$log->requested_at);
+                return $log;
+            });
+        $candidates = $logs->groupBy('user_id')->map(function ($items) {
+            $closest = $items->sortBy('seconds_before_failure')->first();
+            return [
+                'user_id' => (int)$closest->user_id,
+                'email' => $closest->email,
+                'access_count' => $items->count(),
+                'first_access_at' => (int)$items->min('requested_at'),
+                'last_access_at' => (int)$items->max('requested_at'),
+                'closest_seconds' => (int)$items->min('seconds_before_failure'),
+                'unique_ips' => $items->pluck('request_ip')->filter()->unique()->count(),
+                'unique_devices' => $items->pluck('device_hash')->filter()->unique()->count(),
+            ];
+        })->sortBy('closest_seconds')->values();
+        return response(['data' => [
+            'event' => $event,
+            'snapshot' => $snapshot,
+            'summary' => [
+                'window_seconds' => $window,
+                'access_count' => $logs->count(),
+                'user_count' => $logs->pluck('user_id')->unique()->count(),
+                'unique_ips' => $logs->pluck('request_ip')->filter()->unique()->count(),
+                'first_access_at' => $logs->count() ? (int)$logs->min('requested_at') : null,
+                'last_access_at' => $logs->count() ? (int)$logs->max('requested_at') : null,
+            ],
+            'candidates' => $candidates,
+            'access_logs' => $logs,
+        ]]);
     }
 
     public function saveEvent(Request $request)
@@ -110,9 +142,21 @@ class NodeSecurityController extends Controller
     {
         $query = $this->userRankQuery();
         if ($request->filled('risk_min')) $query->where('s.risk_score', '>=', (int)$request->input('risk_min'));
+        if ($request->filled('risk_max')) $query->where('s.risk_score', '<=', (int)$request->input('risk_max'));
         if ($request->filled('status')) $query->where('s.status', $request->input('status'));
         if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
-        return response(['data' => $query->orderByDesc('s.risk_score')->paginate($this->perPage($request))]);
+        if ($request->filled('event_hits_min')) $query->where('s.event_hits', '>=', (int)$request->input('event_hits_min'));
+        if ($request->filled('watermark_hits_min')) $query->where('s.watermark_hits', '>=', (int)$request->input('watermark_hits_min'));
+        if ($request->filled('banned')) $query->where('u.banned', (int)$request->boolean('banned'));
+        if ($request->filled('plan_id')) $query->where('u.plan_id', (int)$request->input('plan_id'));
+        $sorts = [
+            'risk_score' => 's.risk_score', 'event_hits' => 's.event_hits', 'early_access_hits' => 's.early_access_hits',
+            'watermark_hits' => 's.watermark_hits', 'unique_ips' => 's.unique_ips', 'unique_devices' => 's.unique_devices',
+            'last_risk_at' => 's.last_risk_at', 'registered_at' => 'u.created_at',
+        ];
+        $sort = $sorts[$request->input('sort_by')] ?? 's.risk_score';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+        return response(['data' => $query->orderBy($sort, $direction)->orderByDesc('s.user_id')->paginate($this->perPage($request))]);
     }
 
     public function userDetail(Request $request)
@@ -154,9 +198,21 @@ class NodeSecurityController extends Controller
     {
         $query = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')->select('l.*', 'u.email');
         if ($request->filled('user_id')) $query->where('l.user_id', $request->input('user_id'));
+        if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
         if ($request->filled('endpoint')) $query->where('l.endpoint', $request->input('endpoint'));
         if ($request->filled('ip')) $query->where('l.request_ip', $request->input('ip'));
-        return response(['data' => $query->orderByDesc('l.requested_at')->paginate($this->perPage($request))]);
+        if ($request->filled('response_status')) $query->where('l.response_status', (int)$request->input('response_status'));
+        if ($request->filled('duration_min')) $query->where('l.duration_ms', '>=', (int)$request->input('duration_min'));
+        if ($request->filled('duration_max')) $query->where('l.duration_ms', '<=', (int)$request->input('duration_max'));
+        if ($request->filled('date_from')) $query->where('l.requested_at', '>=', (int)$request->input('date_from'));
+        if ($request->filled('date_to')) $query->where('l.requested_at', '<=', (int)$request->input('date_to'));
+        $sorts = [
+            'requested_at' => 'l.requested_at', 'duration_ms' => 'l.duration_ms', 'response_bytes' => 'l.response_bytes',
+            'response_status' => 'l.response_status', 'user_id' => 'l.user_id',
+        ];
+        $sort = $sorts[$request->input('sort_by')] ?? 'l.requested_at';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+        return response(['data' => $query->orderBy($sort, $direction)->orderByDesc('l.id')->paginate($this->perPage($request))]);
     }
 
     public function snapshots(Request $request)

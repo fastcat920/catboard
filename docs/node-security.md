@@ -62,6 +62,8 @@ php artisan route:list | grep security
 php artisan test --filter NodeSecurityTest
 ```
 
+计划任务每分钟触发 `security:analyze --scheduled`，命令内部按照“安全分析间隔（分钟）”决定是否实际运行，默认 1 分钟。管理员手动执行 `php artisan security:analyze` 或添加 `--force` 时会立即分析，不受间隔限制。
+
 ## 私有探测点
 
 1. 在“节点安全 → 探测点”分别创建国内不同运营商和海外探测点。

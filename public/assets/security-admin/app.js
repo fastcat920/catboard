@@ -732,6 +732,12 @@
                 "最小 5 秒；设置为 0 可关闭自动刷新",
             ],
             [
+                "security_analysis_interval_minutes",
+                "安全分析间隔（分钟）",
+                "number",
+                "每分钟触发检查，按此间隔更新状态和风险；范围 1～60",
+            ],
+            [
                 "health_timeout_seconds",
                 "探测超时（秒）",
                 "number",

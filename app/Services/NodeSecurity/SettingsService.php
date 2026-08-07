@@ -22,6 +22,7 @@ class SettingsService
         'probe_failures_to_event' => 3,
         'probe_result_window_seconds' => 600,
         'probe_page_refresh_seconds' => 30,
+        'security_analysis_interval_minutes' => 1,
     ];
 
     public function all(): array
@@ -49,6 +50,9 @@ class SettingsService
         if (array_key_exists('probe_page_refresh_seconds', $allowed)) {
             $refresh = (int)$allowed['probe_page_refresh_seconds'];
             $allowed['probe_page_refresh_seconds'] = $refresh <= 0 ? 0 : max(5, min(3600, $refresh));
+        }
+        if (array_key_exists('security_analysis_interval_minutes', $allowed)) {
+            $allowed['security_analysis_interval_minutes'] = max(1, min(60, (int)$allowed['security_analysis_interval_minutes']));
         }
         foreach ($allowed as $key => $value) {
             DB::table('v2_security_setting')->updateOrInsert(

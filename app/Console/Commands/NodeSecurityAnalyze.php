@@ -7,21 +7,34 @@ use App\Services\NodeSecurity\SettingsService;
 use App\Services\NodeSecurity\ProbeAnalysisService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class NodeSecurityAnalyze extends Command
 {
-    protected $signature = 'security:analyze';
+    protected $signature = 'security:analyze {--scheduled : Respect the configured analysis interval} {--force : Run immediately regardless of interval}';
     protected $description = 'Recompute node security risks, detect related accounts and prune audit logs';
 
     public function handle()
     {
         $settings = (new SettingsService())->all();
-        (new RiskService())->recompute();
-        (new ProbeAnalysisService())->analyze();
-        $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
-        $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
-        DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();
-        return 0;
+        $interval = max(1, min(60, (int)($settings['security_analysis_interval_minutes'] ?? 1)));
+        $lastRunKey = 'node_security_analysis_last_at';
+        if ($this->option('scheduled') && !$this->option('force') && time() - (int)Cache::get($lastRunKey, 0) < $interval * 60) return 0;
+
+        $lock = Cache::lock('node_security_analysis_lock', 300);
+        if (!$lock->get()) return 0;
+        try {
+            if ($this->option('scheduled') && !$this->option('force') && time() - (int)Cache::get($lastRunKey, 0) < $interval * 60) return 0;
+            (new RiskService())->recompute();
+            (new ProbeAnalysisService())->analyze();
+            $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
+            $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
+            DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();
+            Cache::forever($lastRunKey, time());
+            return 0;
+        } finally {
+            $lock->release();
+        }
     }
 
     private function detectSharedIps(int $threshold): void

@@ -44,7 +44,7 @@ class Kernel extends ConsoleKernel
         // horizon metrics
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
         $schedule->command('security:node-health')->everyMinute()->withoutOverlapping();
-        $schedule->command('security:analyze')->everyFiveMinutes()->withoutOverlapping();
+        $schedule->command('security:analyze --scheduled')->everyMinute()->withoutOverlapping();
     }
 
     /**

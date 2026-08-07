@@ -107,6 +107,30 @@
             "未知"
         );
     }
+    function eventTypeLabel(type) {
+        return (
+            {
+                blocked: "节点封锁",
+                outage: "节点故障",
+                carrier: "运营商线路异常",
+                excluded: "已排除事件",
+            }[type] ||
+            type ||
+            "未知类型"
+        );
+    }
+    function eventStatusLabel(status) {
+        return (
+            {
+                suspected: "待确认",
+                confirmed: "已确认",
+                excluded: "已排除",
+                resolved: "已恢复",
+            }[status] ||
+            status ||
+            "未知状态"
+        );
+    }
     function shell(content) {
         return (
             '<div class="layout"><aside class="side"><div class="brand">节点安全中心<small>泄露追踪 · 水印定位 · 自动风控</small></div><nav class="nav">' +
@@ -241,9 +265,9 @@
                                 x.server_id,
                         ) +
                         "</td><td>" +
-                        esc(x.event_type) +
+                        esc(eventTypeLabel(x.event_type)) +
                         "</td><td>" +
-                        badge(x.status, x.status) +
+                        badge(eventStatusLabel(x.status), x.status) +
                         "</td><td>" +
                         time(x.first_failed_at) +
                         '</td><td><button class="btn" data-event="' +
@@ -1014,9 +1038,9 @@
                 " · 快照：" +
                 esc(snapshot.version || e.snapshot_id || "未关联") +
                 "</div></div><div>" +
-                badge(e.event_type, e.event_type) +
+                badge(eventTypeLabel(e.event_type), e.event_type) +
                 " " +
-                badge(e.status, e.status) +
+                badge(eventStatusLabel(e.status), e.status) +
                 '</div></div><div class="event-summary"><div><b>' +
                 esc(s.user_count || 0) +
                 "</b><span>候选用户</span></div><div><b>" +

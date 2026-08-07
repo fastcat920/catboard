@@ -9,6 +9,7 @@ use App\Protocols\Singbox\SingboxOld;
 use App\Protocols\ClashMeta;
 use App\Services\ServerService;
 use App\Services\UserService;
+use App\Services\NodeSecurity\AuditService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 
@@ -25,6 +26,8 @@ class ClientController extends Controller
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
+            $audit = new AuditService();
+            $servers = $audit->prepare($request, $servers, 'client.subscribe');
             if($flag) {
                 if (!strpos($flag, 'sing')) {
                     $this->setSubscribeInfoToServers($servers, $user);
@@ -32,7 +35,7 @@ class ClientController extends Controller
                         $file = 'App\\Protocols\\' . basename($file, '.php');
                         $class = new $file($user, $servers);
                         if (strpos($flag, $class->flag) !== false) {
-                            return $class->handle();
+                            return $this->auditedResponse($audit, $request, $class->handle());
                         }
                     }
                 }
@@ -46,12 +49,18 @@ class ClientController extends Controller
                     } else {
                         $class = new SingboxOld($user, $servers);
                     }
-                    return $class->handle();
+                    return $this->auditedResponse($audit, $request, $class->handle());
                 }
             }
             $class = new General($user, $servers);
-            return $class->handle();
+            return $this->auditedResponse($audit, $request, $class->handle());
         }
+    }
+
+    private function auditedResponse(AuditService $audit, Request $request, $response)
+    {
+        $audit->record($request, $response);
+        return $response;
     }
 
     private function setSubscribeInfoToServers(&$servers, $user)

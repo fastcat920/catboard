@@ -131,6 +131,30 @@
             "未知状态"
         );
     }
+    function accessEndpointMeta(endpoint) {
+        return (
+            {
+                "user.server.fetch": {
+                    label: "用户节点列表",
+                    client: "登录客户端",
+                },
+                "client.app.config": {
+                    label: "客户端配置",
+                    client: "订阅客户端",
+                },
+                "client.subscribe": {
+                    label: "订阅内容",
+                    client: "订阅客户端",
+                },
+            }[endpoint] || {
+                label: endpoint || "未知接口",
+                client: "其他客户端",
+            }
+        );
+    }
+    function uaTrustLabel(userAgent) {
+        return userAgent ? "低可信（客户端声明）" : "无 UA（不可识别）";
+    }
     function shell(content) {
         return (
             '<div class="layout"><aside class="side"><div class="brand">节点安全中心<small>泄露追踪 · 水印定位 · 自动风控</small></div><nav class="nav">' +
@@ -386,7 +410,9 @@
             selected(f.endpoint, "user.server.fetch") +
             '>用户节点列表</option><option value="client.app.config"' +
             selected(f.endpoint, "client.app.config") +
-            '>客户端配置</option></select></label><label>响应状态<input id="log-status" type="number" placeholder="例如 200" value="' +
+            '>客户端配置</option><option value="client.subscribe"' +
+            selected(f.endpoint, "client.subscribe") +
+            '>订阅内容</option></select></label><label>响应状态<input id="log-status" type="number" placeholder="例如 200" value="' +
             esc(f.response_status || "") +
             '"></label><label>开始时间<input id="log-from" type="datetime-local" value="' +
             esc(f.date_from_text || "") +
@@ -417,16 +443,24 @@
     function logTable(rows) {
         if (!rows.length) return '<div class="empty">暂无访问记录</div>';
         return (
-            "<table><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>IP</th><th>客户端 UA</th><th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
+            "<table><thead><tr><th>时间</th><th>用户</th><th>接口类型</th><th>访问方式</th><th>IP</th><th>原始 UA</th><th>UA 可信度</th><th>会话/设备</th><th>状态</th><th>大小</th><th>耗时</th></tr></thead><tbody>" +
             rows
                 .map(function (x) {
+                    var endpoint = accessEndpointMeta(x.endpoint);
                     return (
                         "<tr><td>" +
                         time(x.requested_at) +
                         "</td><td>" +
                         esc(x.email || x.user_id) +
                         "</td><td>" +
+                        esc(endpoint.label) +
+                        '<br><span class="muted">' +
                         esc(x.endpoint) +
+                        "</span></td><td>" +
+                        badge(
+                            endpoint.client,
+                            endpoint.client === "订阅客户端" ? "medium" : "ok",
+                        ) +
                         "</td><td>" +
                         esc(x.request_ip) +
                         '</td><td><span class="ua-text" title="' +
@@ -434,6 +468,11 @@
                         '">' +
                         esc(x.user_agent || "客户端未提供 UA") +
                         "</span></td><td>" +
+                        badge(
+                            uaTrustLabel(x.user_agent),
+                            x.user_agent ? "medium" : "",
+                        ) +
+                        "</td><td>" +
                         esc((x.session_id || "-").slice(0, 10)) +
                         " / " +
                         esc((x.device_hash || "-").slice(0, 10)) +
@@ -997,11 +1036,15 @@
         var logRows = logs.length
             ? logs
                   .map(function (l) {
+                      var endpoint = accessEndpointMeta(l.endpoint);
                       var search = [
                           l.email,
                           l.user_id,
                           l.request_ip,
                           l.endpoint,
+                          endpoint.label,
+                          endpoint.client,
+                          l.user_agent,
                       ]
                           .join(" ")
                           .toLowerCase();
@@ -1019,14 +1062,21 @@
                           '<br><span class="muted">ID ' +
                           l.user_id +
                           "</span></td><td>" +
+                          esc(endpoint.label) +
+                          '<br><span class="muted">' +
                           esc(l.endpoint) +
+                          " · " +
+                          esc(endpoint.client) +
+                          "</span>" +
                           "</td><td>" +
                           esc(l.request_ip) +
                           '</td><td><span class="ua-text" title="' +
                           esc(l.user_agent || "客户端未提供 UA") +
                           '">' +
                           esc(l.user_agent || "客户端未提供 UA") +
-                          '</span><br><span class="muted">设备 ' +
+                          '</span><br><span class="muted">' +
+                          esc(uaTrustLabel(l.user_agent)) +
+                          " · 设备 " +
                           esc((l.device_hash || "-").slice(0, 12)) +
                           "</span>" +
                           "</td><td>" +

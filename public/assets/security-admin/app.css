@@ -471,12 +471,17 @@ textarea {
 .settings-savebar b.failed {
     color: #b42318;
 }
-.settings-savebar span {
+.settings-savebar > div > span {
     color: #667085;
     font-size: 12px;
 }
 .settings-save-button {
     min-width: 148px;
+    color: #fff;
+}
+.settings-save-button [data-settings-button-text] {
+    color: inherit;
+    font-size: inherit;
 }
 .save-spinner {
     display: none;

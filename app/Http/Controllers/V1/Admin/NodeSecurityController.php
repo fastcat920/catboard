@@ -284,6 +284,13 @@ class NodeSecurityController extends Controller
         return response(['data' => true]);
     }
 
+    public function readAllAlerts(Request $request)
+    {
+        $affected = DB::table('v2_security_alert')->whereNull('read_at')->update(['read_at' => time()]);
+        $this->adminLog($request, 'alert.read_all', 'security_alert', null, ['affected' => $affected]);
+        return response(['data' => ['affected' => $affected]]);
+    }
+
     public function probes(Request $request)
     {
         return response(['data' => DB::table('v2_security_probe')

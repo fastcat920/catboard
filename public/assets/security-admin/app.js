@@ -670,7 +670,7 @@
     function alerts(d) {
         var p = d || {};
         return (
-            '<section class="panel">' +
+            '<div class="toolbar"><button class="btn primary" data-read-all-alerts>全部标为已读</button><span class="muted">一次性将所有未读安全告警设为已读</span></div><section class="panel">' +
             alertTable(p.data || []) +
             pager(p) +
             "</section>"
@@ -1518,6 +1518,25 @@
                 post("alert/read", { id: Number(x.dataset.readAlert) }, load);
             };
         });
+        var readAllAlerts = root.querySelector("[data-read-all-alerts]");
+        if (readAllAlerts)
+            readAllAlerts.onclick = function () {
+                readAllAlerts.disabled = true;
+                readAllAlerts.textContent = "正在处理…";
+                api("alerts/read-all", { method: "POST", body: {} })
+                    .then(function (result) {
+                        readAllAlerts.textContent =
+                            result.affected > 0
+                                ? "已读取 " + result.affected + " 条"
+                                : "没有未读告警";
+                        setTimeout(load, 700);
+                    })
+                    .catch(function (error) {
+                        readAllAlerts.disabled = false;
+                        readAllAlerts.textContent = "重试全部标为已读";
+                        state.error = error.message;
+                    });
+            };
         var np = root.querySelector("[data-new-probe]");
         if (np) np.onclick = probeForm;
         var addTarget = root.querySelector("[data-add-target]");

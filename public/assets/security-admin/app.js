@@ -93,7 +93,9 @@
     function nodeStatusLabel(status) {
         return (
             {
-                healthy: "正常",
+                healthy: "TCP双向正常",
+                suspected_domestic_blocked: "疑似国内方向被封锁",
+                suspected_overseas_blocked: "疑似海外方向被封锁",
                 suspected_blocked: "疑似被封锁",
                 suspected_outage: "疑似节点故障",
                 carrier_issue: "疑似运营商线路异常",
@@ -600,7 +602,9 @@
                                       : "暂停期间不判断",
                                   x.status === "healthy"
                                       ? "ok"
-                                      : x.status === "suspected_blocked"
+                                      : x.status === "suspected_blocked" ||
+                                          x.status === "suspected_domestic_blocked" ||
+                                          x.status === "suspected_overseas_blocked"
                                         ? "high"
                                         : "warning",
                               ) +
@@ -718,6 +722,36 @@
                 "异常事件失败轮数",
                 "number",
                 "连续达到轮数后自动建立待确认事件",
+            ],
+            [
+                "probe_domestic_min_success",
+                "国内最少成功探测点",
+                "number",
+                "达到此数量并同时满足国内成功比例，国内方向才算正常",
+            ],
+            [
+                "probe_overseas_min_success",
+                "海外最少成功探测点",
+                "number",
+                "达到此数量并同时满足海外成功比例，海外方向才算正常",
+            ],
+            [
+                "probe_domestic_success_ratio",
+                "国内成功比例（%）",
+                "number",
+                "国内成功数 ÷ 国内有效探测点数，范围 1～100",
+            ],
+            [
+                "probe_overseas_success_ratio",
+                "海外成功比例（%）",
+                "number",
+                "海外成功数 ÷ 海外有效探测点数，范围 1～100",
+            ],
+            [
+                "probe_recovery_success_rounds",
+                "恢复正常轮数",
+                "number",
+                "连续满足国内和海外正常条件后恢复；设置 1 表示立即恢复",
             ],
             [
                 "probe_result_window_seconds",

@@ -20,6 +20,11 @@ class SettingsService
         'alert_webhook_url' => '',
         'probe_interval_seconds' => 300,
         'probe_failures_to_event' => 3,
+        'probe_domestic_min_success' => 1,
+        'probe_overseas_min_success' => 1,
+        'probe_domestic_success_ratio' => 50,
+        'probe_overseas_success_ratio' => 50,
+        'probe_recovery_success_rounds' => 1,
         'probe_result_window_seconds' => 600,
         'probe_page_refresh_seconds' => 30,
         'security_analysis_interval_minutes' => 1,
@@ -53,6 +58,18 @@ class SettingsService
         }
         if (array_key_exists('security_analysis_interval_minutes', $allowed)) {
             $allowed['security_analysis_interval_minutes'] = max(1, min(60, (int)$allowed['security_analysis_interval_minutes']));
+        }
+        foreach (['probe_domestic_min_success', 'probe_overseas_min_success'] as $key) {
+            if (array_key_exists($key, $allowed)) $allowed[$key] = max(1, min(100, (int)$allowed[$key]));
+        }
+        foreach (['probe_domestic_success_ratio', 'probe_overseas_success_ratio'] as $key) {
+            if (array_key_exists($key, $allowed)) $allowed[$key] = max(1, min(100, (int)$allowed[$key]));
+        }
+        if (array_key_exists('probe_recovery_success_rounds', $allowed)) {
+            $allowed['probe_recovery_success_rounds'] = max(1, min(20, (int)$allowed['probe_recovery_success_rounds']));
+        }
+        if (array_key_exists('probe_failures_to_event', $allowed)) {
+            $allowed['probe_failures_to_event'] = max(1, min(100, (int)$allowed['probe_failures_to_event']));
         }
         foreach ($allowed as $key => $value) {
             DB::table('v2_security_setting')->updateOrInsert(

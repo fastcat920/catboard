@@ -398,6 +398,9 @@
         var f = state.filters.logs;
         var mode = f.view || "details";
         var result = mode === "users" ? logUserTable(p.data || []) : mode === "clients" ? clientProfileTable(p.data || []) : logTable(p.data || []);
+        var sortOptions = mode === "details"
+            ? '<option value="requested_at"' + selected(f.sort_by || "requested_at", "requested_at") + '>访问时间</option><option value="duration_ms"' + selected(f.sort_by, "duration_ms") + '>耗时</option><option value="response_bytes"' + selected(f.sort_by, "response_bytes") + '>响应大小</option><option value="response_status"' + selected(f.sort_by, "response_status") + '>状态码</option><option value="user_id"' + selected(f.sort_by, "user_id") + '>用户 ID</option>'
+            : '<option value="access_count"' + selected(f.sort_by || "access_count", "access_count") + '>访问次数</option><option value="last_access_at"' + selected(f.sort_by, "last_access_at") + '>最近访问时间</option>';
         return (
             '<section class="filter-panel"><div class="filter-grid"><label>显示方式<select id="log-view"><option value="details"' + selected(mode, "details") + '>访问明细</option><option value="users"' + selected(mode, "users") + '>关联用户</option><option value="clients"' + selected(mode, "clients") + '>客户端分类</option></select></label><label>用户 ID<input id="log-user" type="number" placeholder="用户 ID" value="' +
             esc(f.user_id || "") +
@@ -417,17 +420,7 @@
             esc(f.date_from_text || "") +
             '"></label><label>结束时间<input id="log-to" type="datetime-local" value="' +
             esc(f.date_to_text || "") +
-            '"></label><label>排序字段<select id="log-sort"><option value="requested_at"' +
-            selected(f.sort_by || "requested_at", "requested_at") +
-            '>访问时间</option><option value="duration_ms"' +
-            selected(f.sort_by, "duration_ms") +
-            '>耗时</option><option value="response_bytes"' +
-            selected(f.sort_by, "response_bytes") +
-            '>响应大小</option><option value="response_status"' +
-            selected(f.sort_by, "response_status") +
-            '>状态码</option><option value="user_id"' +
-            selected(f.sort_by, "user_id") +
-            '>用户 ID</option></select></label><label>顺序<select id="log-order"><option value="desc"' +
+            '"></label><label>排序字段<select id="log-sort">' + sortOptions + '</select></label><label>顺序<select id="log-order"><option value="desc"' +
             selected(f.sort_order || "desc", "desc") +
             '>从新到旧 / 从高到低</option><option value="asc"' +
             selected(f.sort_order, "asc") +

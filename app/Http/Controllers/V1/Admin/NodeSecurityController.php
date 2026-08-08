@@ -219,6 +219,8 @@ class NodeSecurityController extends Controller
         $this->applyAccessLogFilters($query, $request);
 
         if ($request->input('view') === 'users') {
+            $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+            $sort = $request->input('sort_by') === 'access_count' ? 'access_count' : 'last_access_at';
             return response(['data' => $query->select(
                 'l.user_id', 'u.email',
                 DB::raw('COUNT(*) as access_count'),
@@ -228,10 +230,12 @@ class NodeSecurityController extends Controller
                 DB::raw('MAX(l.requested_at) as last_access_at'),
                 DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_family, '未分类') ORDER BY l.client_family SEPARATOR '、') as client_families"),
                 DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_platform, '未知') ORDER BY l.client_platform SEPARATOR '、') as client_platforms")
-            )->groupBy('l.user_id', 'u.email')->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
+            )->groupBy('l.user_id', 'u.email')->orderBy($sort, $direction)->orderByDesc('l.user_id')->paginate($this->perPage($request))]);
         }
 
         if ($request->input('view') === 'clients') {
+            $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+            $sort = $request->input('sort_by') === 'last_access_at' ? 'last_access_at' : 'access_count';
             return response(['data' => $query->select(
                 'l.client_family', 'l.client_version', 'l.client_platform',
                 DB::raw('COUNT(*) as access_count'),
@@ -239,7 +243,7 @@ class NodeSecurityController extends Controller
                 DB::raw('MIN(l.requested_at) as first_access_at'),
                 DB::raw('MAX(l.requested_at) as last_access_at')
             )->groupBy('l.client_family', 'l.client_version', 'l.client_platform')
-                ->orderByDesc('access_count')->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
+                ->orderBy($sort, $direction)->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
         }
 
         $query->select('l.*', 'u.email');

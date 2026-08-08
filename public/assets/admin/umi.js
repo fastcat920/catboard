@@ -71081,6 +71081,17 @@
                             value: e.id
                         }))]
                     }, {
+                        key: "group_id",
+                        title: "\u6743\u9650\u7ec4",
+                        condition: ["="],
+                        type: "select",
+                        options:[{
+                            key: "\u65e0\u6743\u9650\u7ec4",
+                            value: "null" }, ...M.map(e=>({
+                            key: e.name,
+                            value: e.id
+                        }))]
+                    }, {
                         key: "transfer_enable",
                         title: "\u6d41\u91cf",
                         condition: [">=", ">", "<", "<="]

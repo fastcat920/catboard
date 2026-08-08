@@ -58,6 +58,10 @@ class UserController extends Controller
                     $builder->whereNull('plan_id');
                     continue;
                 }
+                if ($filter['key'] === 'group_id' && $filter['value'] == 'null') {
+                    $builder->whereNull('group_id');
+                    continue;
+                }
                 $builder->where($filter['key'], $filter['condition'], $filter['value']);
             }
         }
@@ -167,7 +171,7 @@ class UserController extends Controller
         $filterRequest = Request::create('/', 'GET', ['filter' => $params['filter'] ?? []]);
         validator($filterRequest->all(), [
             'filter' => 'nullable|array|max:30',
-            'filter.*.key' => 'required|in:id,email,transfer_enable,device_limit,d,expired_at,uuid,token,invite_by_email,invite_user_id,plan_id,banned,remarks,is_admin',
+            'filter.*.key' => 'required|in:id,email,transfer_enable,device_limit,d,expired_at,uuid,token,invite_by_email,invite_user_id,plan_id,group_id,banned,remarks,is_admin',
             'filter.*.condition' => 'required|in:>,<,=,>=,<=,模糊,!=',
             'filter.*.value' => 'required',
         ])->validate();

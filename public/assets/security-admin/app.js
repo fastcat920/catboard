@@ -279,6 +279,14 @@
         entry = entry || {};
         return '<form class="form-grid entry-form" data-entry-id="' + (entry.id || '') + '" data-type="' + esc(node.server_type) + '" data-server-id="' + node.server_id + '"><label>入口名称<input name="name" required value="' + esc(entry.name || '') + '" placeholder="例如：备用入口1"></label><label>优先级<input name="priority" type="number" min="1" value="' + esc(entry.priority || 100) + '"></label><label>地址 / 域名<input name="host" required value="' + esc(entry.host || '') + '"></label><label>端口<input name="port" type="number" min="1" max="65535" required value="' + esc(entry.port || '') + '"></label><label class="check"><input name="is_primary" type="checkbox" ' + (entry.is_primary ? 'checked' : '') + '> 设为主入口</label><label class="check"><input name="enabled" type="checkbox" ' + (entry.id && !entry.enabled ? '' : 'checked') + '> 启用并参与下发/探测</label><div class="span2"><button class="btn primary" type="submit">' + (entry.id ? '保存入口' : '添加入口') + '</button></div></form>';
     }
+    function refreshEntryPoolModal(type, id) {
+        return api("entry-pools").then(function (rows) {
+            state.data = rows;
+            var node = rows.find(function (item) { return item.server_type === type && Number(item.server_id) === Number(id); });
+            if (node) entryPoolModal(node);
+            else { state.modal = null; render(); }
+        });
+    }
     function events(d) {
         var p = d || {};
         var f = state.filters.events;
@@ -1593,7 +1601,9 @@
             data.server_type = entrySettingForm.dataset.type;
             data.server_id = Number(entrySettingForm.dataset.id);
             data.check_interval = Number(data.check_interval);
-            post("entry-setting/save", data, load);
+            api("entry-setting/save", { method: "POST", body: data })
+                .then(function () { return refreshEntryPoolModal(data.server_type, data.server_id); })
+                .catch(function (error) { state.error = error.message; render(); });
         };
         root.querySelectorAll(".entry-form").forEach(function (form) {
             form.onsubmit = function (event) {
@@ -1604,20 +1614,25 @@
                 data.server_id = Number(form.dataset.serverId);
                 data.port = Number(data.port);
                 data.priority = Number(data.priority);
-                post("entry/save", data, load);
+                api("entry/save", { method: "POST", body: data })
+                    .then(function () { return refreshEntryPoolModal(data.server_type, data.server_id); })
+                    .catch(function (error) { state.error = error.message; render(); });
             };
         });
         root.querySelectorAll("[data-edit-entry]").forEach(function (button) {
             button.onclick = function () {
                 var node = (state.data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.editEntry); }); });
                 var entry = node && node.entries.find(function (item) { return Number(item.id) === Number(button.dataset.editEntry); });
-                if (node && entry) modal("编辑入口 · " + node.server_name, entryFormHtml(node, entry));
+                if (node && entry) modal("编辑入口 · " + node.server_name, entryFormHtml(node, entry), { parent: state.modal });
             };
         });
         root.querySelectorAll("[data-delete-entry]").forEach(function (button) {
             button.onclick = function () {
                 if (!confirm("确认删除这个入口？已下载到客户端的旧配置不会被远程删除。")) return;
-                post("entry/delete", { id: Number(button.dataset.deleteEntry) }, load);
+                var node = (state.data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.deleteEntry); }); });
+                api("entry/delete", { method: "POST", body: { id: Number(button.dataset.deleteEntry) } })
+                    .then(function () { return node ? refreshEntryPoolModal(node.server_type, node.server_id) : load(); })
+                    .catch(function (error) { state.error = error.message; render(); });
             };
         });
         var fl = root.querySelector("[data-filter-logs]");

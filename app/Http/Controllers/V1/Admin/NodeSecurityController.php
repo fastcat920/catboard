@@ -597,15 +597,19 @@ class NodeSecurityController extends Controller
             'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
             'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
         ]);
-        $this->ensureServerExists($request->input('server_type'), (int)$request->input('server_id'));
+        $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
         $now = time();
-        DB::table('v2_node_entry_setting')->updateOrInsert(
-            ['server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id')],
-            ['delivery_mode' => $request->input('delivery_mode'), 'check_url' => $request->input('check_url'),
-                'check_interval' => (int)$request->input('check_interval'), 'created_at' => $now, 'updated_at' => $now]
-        );
+        $settingWhere = ['server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id')];
+        $imported = false;
+        DB::transaction(function () use ($request, $server, $settingWhere, $now, &$imported) {
+            DB::table('v2_node_entry_setting')->updateOrInsert($settingWhere,
+                ['delivery_mode' => $request->input('delivery_mode'), 'check_url' => $request->input('check_url'),
+                    'check_interval' => (int)$request->input('check_interval'), 'created_at' => $now, 'updated_at' => $now]
+            );
+            $imported = $this->importOriginalEntryIfEmpty($server, $settingWhere, $now);
+        });
         $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'check_interval'));
-        return response(['data' => true]);
+        return response(['data' => ['saved' => true, 'original_entry_imported' => $imported]]);
     }
 
     public function saveEntry(Request $request)
@@ -615,7 +619,7 @@ class NodeSecurityController extends Controller
             'name' => 'required|string|max:96', 'host' => 'required|string|max:255', 'port' => 'required|integer|min:1|max:65535',
             'priority' => 'required|integer|min:1|max:10000', 'is_primary' => 'required|boolean', 'enabled' => 'required|boolean',
         ]);
-        $this->ensureServerExists($request->input('server_type'), (int)$request->input('server_id'));
+        $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
         $where = ['id' => (int)$request->input('id')];
         if ($request->filled('id') && !DB::table('v2_node_entry_pool')->where($where)->exists()) abort(404, '入口不存在');
         $now = time();
@@ -626,13 +630,23 @@ class NodeSecurityController extends Controller
             'priority' => (int)$request->input('priority'), 'is_primary' => $request->boolean('is_primary'),
             'enabled' => $request->boolean('enabled'), 'updated_at' => $now,
         ];
-        DB::transaction(function () use ($request, $where, $payload, $now) {
+        if (!$request->filled('id') && !DB::table('v2_node_entry_pool')->where('server_type', $payload['server_type'])->where('server_id', $payload['server_id'])->exists()) {
+            $originalHost = trim((string)($server['host'] ?? ''));
+            $originalPort = (string)($server['port'] ?? '');
+            if ($originalHost !== '' && ctype_digit($originalPort) && hash('sha256', strtolower($originalHost)) === $payload['host_hash'] && (int)$originalPort === $payload['port']) {
+                $payload['is_primary'] = true;
+            }
+        }
+        DB::transaction(function () use ($request, $where, $payload, $server, $now) {
             $settingWhere = ['server_type' => $payload['server_type'], 'server_id' => $payload['server_id']];
             if (!DB::table('v2_node_entry_setting')->where($settingWhere)->exists()) {
                 DB::table('v2_node_entry_setting')->insert($settingWhere + [
                     'delivery_mode' => 'primary_only', 'check_url' => 'http://www.gstatic.com/generate_204',
                     'check_interval' => 60, 'created_at' => $now, 'updated_at' => $now,
                 ]);
+            }
+            if (!$request->filled('id')) {
+                $this->importOriginalEntryIfEmpty($server, $settingWhere, $now, $payload['host_hash'], $payload['port']);
             }
             if ($payload['is_primary']) DB::table('v2_node_entry_pool')->where('server_type', $payload['server_type'])->where('server_id', $payload['server_id'])->update(['is_primary' => 0, 'updated_at' => $now]);
             if ($request->filled('id')) DB::table('v2_node_entry_pool')->where($where)->update($payload);
@@ -654,10 +668,33 @@ class NodeSecurityController extends Controller
 
     private function ensureServerExists(string $type, int $id): void
     {
-        $exists = collect((new \App\Services\ServerService())->getAllServers())->contains(function ($server) use ($type, $id) {
+        $this->findServer($type, $id);
+    }
+
+    private function findServer(string $type, int $id): array
+    {
+        $server = collect((new \App\Services\ServerService())->getAllServers())->first(function ($server) use ($type, $id) {
             return ($server['type'] ?? '') === $type && (int)($server['id'] ?? 0) === $id;
         });
-        if (!$exists) abort(422, '节点不存在');
+        if (!$server) abort(422, '节点不存在');
+        return $server;
+    }
+
+    private function importOriginalEntryIfEmpty(array $server, array $where, int $now, ?string $candidateHash = null, ?int $candidatePort = null): bool
+    {
+        if (DB::table('v2_node_entry_pool')->where($where)->exists()) return false;
+        $host = trim((string)($server['host'] ?? ''));
+        $port = (string)($server['port'] ?? '');
+        if ($host === '' || !ctype_digit($port) || (int)$port < 1 || (int)$port > 65535) return false;
+        $hostHash = hash('sha256', strtolower($host));
+        if ($candidateHash === $hostHash && $candidatePort === (int)$port) return false;
+        DB::table('v2_node_entry_pool')->insert($where + [
+            'name' => '原始主入口', 'host_encrypted' => Crypt::encryptString($host),
+            'host_hash' => $hostHash, 'port' => (int)$port, 'priority' => 1,
+            'is_primary' => 1, 'enabled' => 1, 'health_status' => 'waiting',
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+        return true;
     }
 
     private function userRankQuery()

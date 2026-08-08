@@ -43,7 +43,8 @@ class RiskService
                 }
             }
             if (!$snapshotId) continue;
-            $from = max(0, (int)$event->first_failed_at - $window);
+            $eventWindow = (new EventWindowService())->calculate($event, $window);
+            $from = $eventWindow['start_at'];
             $logs = DB::table('v2_node_access_log')
                 ->whereBetween('requested_at', [$from, (int)$event->first_failed_at])
                 ->when($onlyUserId, function ($query) use ($onlyUserId) { return $query->where('user_id', $onlyUserId); })

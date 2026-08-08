@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuthService;
 use App\Services\NodeSecurity\ExperimentService;
+use App\Services\NodeSecurity\EventWindowService;
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
 use Illuminate\Http\Request;
@@ -57,10 +58,11 @@ class NodeSecurityController extends Controller
             ? DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'published_at')->where('id', $event->snapshot_id)->first()
             : null;
         $window = (int)(new SettingsService())->get('risk_window_seconds', 300);
+        $eventWindow = (new EventWindowService())->calculate($event, $window);
         $logs = collect();
         if ($event->snapshot_id) {
             $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
-                ->whereBetween('l.requested_at', [max(0, $event->first_failed_at - $window), $event->first_failed_at])
+                ->whereBetween('l.requested_at', [$eventWindow['start_at'], $eventWindow['end_at']])
                 ->select('l.*', 'u.email')->orderBy('l.requested_at')->get()
                 ->filter(function ($log) use ($event) {
                     return in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
@@ -93,7 +95,12 @@ class NodeSecurityController extends Controller
                     : '事件未关联节点下发快照，无法证明任何用户获取过该节点',
             ],
             'summary' => [
-                'window_seconds' => $window,
+                'window_seconds' => $eventWindow['effective_seconds'],
+                'configured_window_seconds' => $eventWindow['configured_seconds'],
+                'window_start_at' => $eventWindow['start_at'],
+                'window_end_at' => $eventWindow['end_at'],
+                'window_source' => $eventWindow['source'],
+                'has_monitoring_baseline' => $eventWindow['has_baseline'],
                 'access_count' => $logs->count(),
                 'user_count' => $logs->pluck('user_id')->unique()->count(),
                 'unique_ips' => $logs->pluck('request_ip')->filter()->unique()->count(),
@@ -419,6 +426,7 @@ class NodeSecurityController extends Controller
                 'overseas_ok' => $state->overseas_ok ?? 0,
                 'overseas_failed' => $state->overseas_failed ?? 0,
                 'consecutive_failures' => $state->consecutive_failures ?? 0,
+                'first_healthy_at' => $state->first_healthy_at ?? null,
                 'last_checked_at' => $state->last_checked_at ?? null,
             ];
         });
@@ -475,6 +483,7 @@ class NodeSecurityController extends Controller
                     ]);
                 } elseif ($action === 'remove') {
                     DB::table('v2_security_probe_target')->where($where)->delete();
+                    DB::table('v2_security_node_state')->where($where)->delete();
                 } else {
                     DB::table('v2_security_probe_target')->where($where)->update([
                         'status' => $action === 'pause' ? 'paused' : 'active', 'updated_at' => $now,

@@ -86,9 +86,11 @@ class ProbeAnalysisService
                 : $latestCheckedAt)
             : null;
         $activeEventId = $existing->active_event_id ?? null;
-        if ($rules['auto_create_event'] && $failure >= $threshold && !$activeEventId) {
+        $firstHealthyAt = (int)($existing->first_healthy_at ?? 0) ?: null;
+        if ($status === 'healthy' && !$firstHealthyAt) $firstHealthyAt = $latestCheckedAt;
+        if ($rules['auto_create_event'] && $firstHealthyAt && $failure >= $threshold && !$activeEventId) {
             $activeEventId = $this->createEvent(
-                $type, $id, $status, $failureStartedAt, $latestCheckedAt, $failure,
+                $type, $id, $status, $failureStartedAt, $latestCheckedAt, $failure, $firstHealthyAt,
                 array_merge(compact('domesticOk', 'domesticFailed', 'overseasOk', 'overseasFailed', 'domesticRatio', 'overseasRatio'), [
                     'domestic_min_success' => $rules['domestic_min_success'],
                     'overseas_min_success' => $rules['overseas_min_success'],
@@ -104,7 +106,7 @@ class ProbeAnalysisService
         $now = time();
         DB::table('v2_security_node_state')->updateOrInsert(['server_type' => $type, 'server_id' => $id], [
             'status' => $status, 'consecutive_failures' => $failure, 'consecutive_successes' => $success,
-            'failure_started_at' => $failureStartedAt,
+            'failure_started_at' => $failureStartedAt, 'first_healthy_at' => $firstHealthyAt,
             'domestic_ok' => $domesticOk, 'domestic_failed' => $domesticFailed,
             'overseas_ok' => $overseasOk, 'overseas_failed' => $overseasFailed,
             'active_event_id' => $activeEventId, 'last_checked_at' => $latestCheckedAt,
@@ -118,7 +120,7 @@ class ProbeAnalysisService
         return ['suspected_domestic_blocked', 'suspected_overseas_blocked', 'suspected_blocked', 'suspected_outage', 'carrier_issue'];
     }
 
-    private function createEvent(string $type, int $id, string $state, int $firstFailedAt, int $detectedAt, int $failureRounds, array $evidence): int
+    private function createEvent(string $type, int $id, string $state, int $firstFailedAt, int $detectedAt, int $failureRounds, int $firstHealthyAt, array $evidence): int
     {
         $now = time();
         $snapshot = DB::table('v2_node_snapshot')->where('server_type', $type)->where('server_id', $id)
@@ -128,6 +130,7 @@ class ProbeAnalysisService
         $eventId = DB::table('v2_node_block_event')->insertGetId([
             'server_type' => $type, 'server_id' => $id, 'snapshot_id' => $snapshot->id ?? null,
             'event_type' => $eventType, 'status' => 'suspected', 'first_failed_at' => $firstFailedAt,
+            'monitoring_first_healthy_at' => $firstHealthyAt,
             'evidence' => json_encode(array_merge([
                 'source' => 'private_probe', 'detected_at' => $detectedAt, 'failure_rounds' => $failureRounds,
             ], $evidence)),

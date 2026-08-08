@@ -645,7 +645,7 @@
             states.length +
             '</span><button class="btn primary" data-add-target>添加监控节点</button></div></div>' +
             (states.length
-                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
+                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>首次监控正常</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
                   states
                       .map(function (x) {
                           return (
@@ -690,6 +690,10 @@
                               x.overseas_ok +
                               " / " +
                               x.overseas_failed +
+                              "</td><td>" +
+                              (x.first_healthy_at
+                                  ? time(x.first_healthy_at)
+                                  : '<span class="muted">未建立基线<br>不自动创建事件</span>') +
                               "</td><td>" +
                               x.consecutive_failures +
                               "</td><td>" +
@@ -1107,12 +1111,22 @@
                 esc(snapshot.server_name || e.server_type) +
                 ' <span class="muted">#' +
                 e.server_id +
-                '</span></div><div class="muted">首次失败：' +
+                '</span></div><div class="muted">首次监控正常：' +
+                time(e.monitoring_first_healthy_at) +
+                " · 首次失败：" +
                 time(e.first_failed_at) +
                 (e.detected_at ? " · 达到阈值：" + time(e.detected_at) : "") +
                 " · 快照：" +
                 esc(snapshot.version || e.snapshot_id || "未关联") +
-                "</div></div><div>" +
+                "</div><div class=\"muted\">候选范围：" +
+                time(s.window_start_at) +
+                " ～ " +
+                time(s.window_end_at) +
+                " · 后台窗口：" +
+                esc(s.configured_window_seconds || 0) +
+                " 秒 · 本次有效窗口：" +
+                esc(s.window_seconds || 0) +
+                " 秒</div></div><div>" +
                 badge(eventTypeLabel(e.event_type), e.event_type) +
                 " " +
                 badge(eventStatusLabel(e.status), e.status) +

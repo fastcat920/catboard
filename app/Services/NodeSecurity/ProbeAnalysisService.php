@@ -116,9 +116,18 @@ class ProbeAnalysisService
             : null;
         $activeEventId = $existing->active_event_id ?? null;
         $firstHealthyAt = (int)($existing->first_healthy_at ?? 0) ?: null;
-        // An initially unhealthy target has no trusted baseline. The first
-        // effective recovery round becomes the monitoring baseline.
-        if ($status === 'healthy' && !$firstHealthyAt) $firstHealthyAt = $latestCheckedAt;
+        // Establish the first baseline, or move it to the completed recovery
+        // round after an actionable abnormal state. Consecutive healthy rounds
+        // keep the same baseline.
+        $recoveredFromAbnormal = $status === 'healthy' && $existing
+            && in_array($existing->status, $this->actionableStatuses(), true);
+        $recoveredBeforeUpgrade = $status === 'healthy' && $existing && $firstHealthyAt
+            && (int)($existing->last_changed_at ?? 0) > $firstHealthyAt;
+        if ($recoveredBeforeUpgrade) {
+            $firstHealthyAt = (int)$existing->last_changed_at;
+        } elseif ($status === 'healthy' && (!$firstHealthyAt || $recoveredFromAbnormal)) {
+            $firstHealthyAt = $latestCheckedAt;
+        }
         if ($rules['auto_create_event'] && $firstHealthyAt && $failure >= $threshold && !$activeEventId) {
             $activeEventId = $this->createEvent(
                 $type, $id, $status, $failureStartedAt, $latestCheckedAt, $failure, $firstHealthyAt,

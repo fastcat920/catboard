@@ -3,12 +3,32 @@
 namespace App\Services\NodeSecurity;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ProbeAnalysisService
 {
     public function analyze(): int
     {
         $settings = (new SettingsService())->all();
+        $since = time() - max(180, (int)($settings['probe_result_window_seconds'] ?? 600));
+        $targets = DB::table('v2_security_probe_result as r')
+            ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
+            ->join('v2_security_probe_target as t', function ($join) {
+                $join->on('t.server_type', '=', 'r.server_type')->on('t.server_id', '=', 'r.server_id');
+            })
+            ->where('p.status', 'active')->where('t.status', 'active')->where('r.checked_at', '>=', $since)
+            ->select('r.server_type', 'r.server_id')->distinct()->get()
+            ->map(function ($target) {
+                return ['server_type' => $target->server_type, 'server_id' => (int)$target->server_id];
+            })->all();
+        $count = $this->analyzeTargets($targets, $settings, $since);
+        DB::table('v2_security_probe_result')->where('checked_at', '<', time() - 7 * 86400)->delete();
+        return $count;
+    }
+
+    public function analyzeTargets(array $targets, ?array $settings = null, ?int $since = null): int
+    {
+        $settings = $settings ?: (new SettingsService())->all();
         $threshold = max(1, (int)($settings['probe_failures_to_event'] ?? 3));
         $rules = [
             'domestic_min_success' => max(1, (int)($settings['probe_domestic_min_success'] ?? 1)),
@@ -18,17 +38,26 @@ class ProbeAnalysisService
             'recovery_success_rounds' => max(1, (int)($settings['probe_recovery_success_rounds'] ?? 1)),
             'auto_create_event' => !empty($settings['auto_create_event']),
         ];
-        $since = time() - max(180, (int)($settings['probe_result_window_seconds'] ?? 600));
-        $targets = DB::table('v2_security_probe_result as r')
-            ->join('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
-            ->join('v2_security_probe_target as t', function ($join) {
-                $join->on('t.server_type', '=', 'r.server_type')->on('t.server_id', '=', 'r.server_id');
-            })
-            ->where('p.status', 'active')->where('t.status', 'active')->where('r.checked_at', '>=', $since)
-            ->select('r.server_type', 'r.server_id')->distinct()->get();
-        foreach ($targets as $target) $this->analyzeTarget($target->server_type, $target->server_id, $since, $threshold, $rules);
-        DB::table('v2_security_probe_result')->where('checked_at', '<', time() - 7 * 86400)->delete();
-        return count($targets);
+        $since = $since ?: time() - max(180, (int)($settings['probe_result_window_seconds'] ?? 600));
+        $unique = collect($targets)->filter(function ($target) {
+            return !empty($target['server_type']) && !empty($target['server_id']);
+        })->unique(function ($target) {
+            return $target['server_type'] . ':' . (int)$target['server_id'];
+        })->values();
+        $analyzed = 0;
+        foreach ($unique as $target) {
+            $type = mb_substr((string)$target['server_type'], 0, 32);
+            $id = (int)$target['server_id'];
+            $lock = Cache::lock('node_security_probe_target:' . $type . ':' . $id, 30);
+            if (!$lock->get()) continue;
+            try {
+                $this->analyzeTarget($type, $id, $since, $threshold, $rules);
+                $analyzed++;
+            } finally {
+                $lock->release();
+            }
+        }
+        return $analyzed;
     }
 
     private function analyzeTarget(string $type, int $id, int $since, int $threshold, array $rules): void
@@ -87,6 +116,8 @@ class ProbeAnalysisService
             : null;
         $activeEventId = $existing->active_event_id ?? null;
         $firstHealthyAt = (int)($existing->first_healthy_at ?? 0) ?: null;
+        // An initially unhealthy target has no trusted baseline. The first
+        // effective recovery round becomes the monitoring baseline.
         if ($status === 'healthy' && !$firstHealthyAt) $firstHealthyAt = $latestCheckedAt;
         if ($rules['auto_create_event'] && $firstHealthyAt && $failure >= $threshold && !$activeEventId) {
             $activeEventId = $this->createEvent(

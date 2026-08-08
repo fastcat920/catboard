@@ -428,6 +428,7 @@ class NodeSecurityController extends Controller
                 'consecutive_failures' => $state->consecutive_failures ?? 0,
                 'first_healthy_at' => $state->first_healthy_at ?? null,
                 'last_checked_at' => $state->last_checked_at ?? null,
+                'last_analyzed_at' => $state->updated_at ?? null,
             ];
         });
         return response(['data' => $targets]);

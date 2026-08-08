@@ -18,19 +18,20 @@ class NodeSecurityAnalyze extends Command
     {
         $settings = (new SettingsService())->all();
         $interval = max(1, min(60, (int)($settings['security_analysis_interval_minutes'] ?? 1)));
-        $lastRunKey = 'node_security_analysis_last_at';
-        if ($this->option('scheduled') && !$this->option('force') && time() - (int)Cache::get($lastRunKey, 0) < $interval * 60) return 0;
+        $lastRunKey = 'node_security_analysis_last_bucket';
+        $currentBucket = (int)floor(time() / ($interval * 60));
+        if ($this->option('scheduled') && !$this->option('force') && (int)Cache::get($lastRunKey, -1) === $currentBucket) return 0;
 
         $lock = Cache::lock('node_security_analysis_lock', 300);
         if (!$lock->get()) return 0;
         try {
-            if ($this->option('scheduled') && !$this->option('force') && time() - (int)Cache::get($lastRunKey, 0) < $interval * 60) return 0;
+            if ($this->option('scheduled') && !$this->option('force') && (int)Cache::get($lastRunKey, -1) === $currentBucket) return 0;
             (new RiskService())->recompute();
             (new ProbeAnalysisService())->analyze();
             $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
             $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
             DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();
-            Cache::forever($lastRunKey, time());
+            Cache::forever($lastRunKey, $currentBucket);
             return 0;
         } finally {
             $lock->release();

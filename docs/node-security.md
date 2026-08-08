@@ -35,7 +35,7 @@
    php artisan migrate --path=database/migrations/2026_08_08_000005_add_probe_first_healthy_at.php --force
    ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
-4. 确认队列、Redis 和 `APP_KEY` 正常；节点地址使用 `APP_KEY` 加密，变更密钥会导致历史水印地址无法解密。
+4. 确认 Horizon 队列、Redis 和 `APP_KEY` 正常；`node_security` 队列用于探测结果上报后的快速分析，变更 `APP_KEY` 会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右上角主题按钮旁的“节点安全”，或访问 `/{secure_path}/security/dashboard`。
 
 ## 推荐启用顺序
@@ -71,6 +71,8 @@ php artisan test --filter NodeSecurityTest
 ```
 
 计划任务每分钟触发 `security:analyze --scheduled`，命令内部按照“安全分析间隔（分钟）”决定是否实际运行，默认 1 分钟。管理员手动执行 `php artisan security:analyze` 或添加 `--force` 时会立即分析，不受间隔限制。
+
+探测结果写入后会先聚合 5 秒，再通过 `node_security` 队列只分析发生变化的节点；同一节点使用独立分布式锁，避免重复判断和重复创建事件。每分钟的 `security:analyze --scheduled` 仍执行全量补偿，即使队列短暂停止也不会永久遗漏。节点监控界面分别显示探测点实际检测时间和面板完成综合判断的时间。
 
 ## 私有探测点
 

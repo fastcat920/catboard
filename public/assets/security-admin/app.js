@@ -645,7 +645,7 @@
             states.length +
             '</span><button class="btn primary" data-add-target>添加监控节点</button></div></div>' +
             (states.length
-                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>首次监控正常</th><th>连续异常</th><th>最后检查</th><th>操作</th></tr></thead><tbody>' +
+                ? '<div class="batch-toolbar"><label class="check"><input type="checkbox" data-select-targets> 全选</label><span data-target-selected>已选择 0 个</span><button class="btn" data-target-batch="pause" disabled>批量暂停</button><button class="btn" data-target-batch="resume" disabled>批量恢复</button><button class="btn danger" data-target-batch="remove" disabled>批量移除</button></div><div class="table-wrap"><table><thead><tr><th></th><th>节点</th><th>名称</th><th>地址 / 端口</th><th>监控状态</th><th>判断</th><th>国内成功/失败</th><th>海外成功/失败</th><th>首次监控正常</th><th>连续异常</th><th>最后探测 / 分析</th><th>操作</th></tr></thead><tbody>' +
                   states
                       .map(function (x) {
                           return (
@@ -698,6 +698,9 @@
                               x.consecutive_failures +
                               "</td><td>" +
                               time(x.last_checked_at) +
+                              '<br><span class="muted">分析 ' +
+                              time(x.last_analyzed_at) +
+                              "</span>" +
                               '</td><td><button class="btn" data-single-target="' +
                               (x.target_status === "active"
                                   ? "pause"

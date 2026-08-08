@@ -2,8 +2,10 @@
 
 namespace App\Services\NodeSecurity;
 
+use App\Jobs\AnalyzeProbeTargetsJob;
 use App\Services\ServerService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ProbeService
 {
@@ -56,7 +58,20 @@ class ProbeService
                 'checked_at' => $checkedAt, 'created_at' => $now,
             ];
         }
-        if ($rows) DB::table('v2_security_probe_result')->insert($rows);
+        if ($rows) {
+            DB::table('v2_security_probe_result')->insert($rows);
+            $targets = collect($rows)->map(function ($row) {
+                return ['server_type' => $row['server_type'], 'server_id' => $row['server_id']];
+            })->unique(function ($target) {
+                return $target['server_type'] . ':' . $target['server_id'];
+            })->sortBy(function ($target) {
+                return $target['server_type'] . ':' . $target['server_id'];
+            })->values()->all();
+            $dedupeKey = 'node_security_probe_dispatch:' . hash('sha256', json_encode($targets));
+            if (Cache::add($dedupeKey, 1, 15)) {
+                AnalyzeProbeTargetsJob::dispatch($targets, $dedupeKey)->delay(now()->addSeconds(5));
+            }
+        }
         return count($rows);
     }
 }

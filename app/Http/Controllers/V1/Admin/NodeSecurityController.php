@@ -586,8 +586,23 @@ class NodeSecurityController extends Controller
                 ];
             })->values();
             return $server;
-        })->sortBy('server_name')->values();
-        return response(['data' => $data]);
+        })->sortBy(function ($server) {
+            return sprintf('%010d:%s', (int)$server['server_id'], $server['server_type']);
+        })->values();
+        $perPage = $this->perPage($request);
+        $currentPage = max(1, (int)$request->input('page', 1));
+        $total = $data->count();
+        $lastPage = max(1, (int)ceil($total / $perPage));
+        if ($currentPage > $lastPage) $currentPage = $lastPage;
+        return response(['data' => [
+            'current_page' => $currentPage,
+            'data' => $data->forPage($currentPage, $perPage)->values(),
+            'from' => $total ? (($currentPage - 1) * $perPage + 1) : null,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'to' => $total ? min($currentPage * $perPage, $total) : null,
+            'total' => $total,
+        ]]);
     }
 
     public function saveEntrySetting(Request $request)

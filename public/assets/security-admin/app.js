@@ -261,14 +261,14 @@
     function entryHealthLabel(status) {
         return ({ healthy: "双向正常", domestic_blocked: "国内方向异常", overseas_blocked: "海外方向异常", unreachable: "全部不可达", insufficient_probes: "探测点不足", waiting: "等待探测" })[status] || status || "等待探测";
     }
-    function entryPools(rows) {
-        rows = rows || [];
+    function entryPools(payload) {
+        var page = payload || {}, rows = page.data || [];
         if (!rows.length) return '<div class="panel empty">暂无可配置节点；执行入口池迁移后刷新。</div>';
-        return '<section class="panel table-wrap"><table><thead><tr><th>节点</th><th>原始地址</th><th>下发模式</th><th>入口数量</th><th>健康入口</th><th>操作</th></tr></thead><tbody>' + rows.map(function (x, index) {
+        return '<section class="panel table-wrap"><table><thead><tr><th>节点 ID</th><th>节点</th><th>原始地址</th><th>下发模式</th><th>入口数量</th><th>健康入口</th><th>操作</th></tr></thead><tbody>' + rows.map(function (x, index) {
             var mode = { primary_only: "仅主入口", manual_backup: "主入口＋备用入口", auto_fallback: "自动故障转移" }[x.delivery_mode] || x.delivery_mode;
             var healthy = (x.entries || []).filter(function (e) { return e.health_status === "healthy"; }).length;
-            return '<tr><td><b>' + esc(x.server_name) + '</b><br><span class="muted">' + esc(x.server_type) + ' / ' + x.server_id + '</span></td><td>' + esc(x.original_address) + '</td><td>' + badge(mode, x.delivery_mode === "auto_fallback" ? "ok" : "") + '</td><td>' + (x.entries || []).length + '</td><td>' + healthy + '</td><td><button class="btn" data-manage-entry="' + index + '">管理入口</button></td></tr>';
-        }).join("") + '</tbody></table></section>';
+            return '<tr><td><b>' + x.server_id + '</b></td><td><b>' + esc(x.server_name) + '</b><br><span class="muted">' + esc(x.server_type) + '</span></td><td>' + esc(x.original_address) + '</td><td>' + badge(mode, x.delivery_mode === "auto_fallback" ? "ok" : "") + '</td><td>' + (x.entries || []).length + '</td><td>' + healthy + '</td><td><button class="btn" data-manage-entry="' + index + '">管理入口</button></td></tr>';
+        }).join("") + '</tbody></table>' + pager(page) + '</section>';
     }
     function entryPoolModal(node) {
         var list = node.entries || [];
@@ -280,8 +280,9 @@
         return '<form class="form-grid entry-form" data-entry-id="' + (entry.id || '') + '" data-type="' + esc(node.server_type) + '" data-server-id="' + node.server_id + '"><label>入口名称<input name="name" required value="' + esc(entry.name || '') + '" placeholder="例如：备用入口1"></label><label>优先级<input name="priority" type="number" min="1" value="' + esc(entry.priority || 100) + '"></label><label>地址 / 域名<input name="host" required value="' + esc(entry.host || '') + '"></label><label>端口<input name="port" type="number" min="1" max="65535" required value="' + esc(entry.port || '') + '"></label><label class="check"><input name="is_primary" type="checkbox" ' + (entry.is_primary ? 'checked' : '') + '> 设为主入口</label><label class="check"><input name="enabled" type="checkbox" ' + (entry.id && !entry.enabled ? '' : 'checked') + '> 启用并参与下发/探测</label><div class="span2"><button class="btn primary" type="submit">' + (entry.id ? '保存入口' : '添加入口') + '</button></div></form>';
     }
     function refreshEntryPoolModal(type, id) {
-        return api("entry-pools").then(function (rows) {
-            state.data = rows;
+        return api("entry-pools?page=" + state.pageNo).then(function (payload) {
+            state.data = payload;
+            var rows = payload.data || [];
             var node = rows.find(function (item) { return item.server_type === type && Number(item.server_id) === Number(id); });
             if (node) entryPoolModal(node);
             else { state.modal = null; render(); }
@@ -1369,7 +1370,7 @@
                 users: "users?page=" + state.pageNo,
                 logs: "access-logs?page=" + state.pageNo,
                 watermarks: "experiments",
-                entries: "entry-pools",
+                entries: "entry-pools?page=" + state.pageNo,
                 alerts: "alerts?page=" + state.pageNo,
                 settings: "settings",
             }[state.page] +
@@ -1592,7 +1593,7 @@
             };
         });
         root.querySelectorAll("[data-manage-entry]").forEach(function (x) {
-            x.onclick = function () { entryPoolModal((state.data || [])[Number(x.dataset.manageEntry)]); };
+            x.onclick = function () { entryPoolModal(((state.data || {}).data || [])[Number(x.dataset.manageEntry)]); };
         });
         var entrySettingForm = root.querySelector("#entry-setting-form");
         if (entrySettingForm) entrySettingForm.onsubmit = function (event) {
@@ -1621,7 +1622,7 @@
         });
         root.querySelectorAll("[data-edit-entry]").forEach(function (button) {
             button.onclick = function () {
-                var node = (state.data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.editEntry); }); });
+                var node = ((state.data || {}).data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.editEntry); }); });
                 var entry = node && node.entries.find(function (item) { return Number(item.id) === Number(button.dataset.editEntry); });
                 if (node && entry) modal("编辑入口 · " + node.server_name, entryFormHtml(node, entry), { parent: state.modal });
             };
@@ -1629,7 +1630,7 @@
         root.querySelectorAll("[data-delete-entry]").forEach(function (button) {
             button.onclick = function () {
                 if (!confirm("确认删除这个入口？已下载到客户端的旧配置不会被远程删除。")) return;
-                var node = (state.data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.deleteEntry); }); });
+                var node = ((state.data || {}).data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.deleteEntry); }); });
                 api("entry/delete", { method: "POST", body: { id: Number(button.dataset.deleteEntry) } })
                     .then(function () { return node ? refreshEntryPoolModal(node.server_type, node.server_id) : load(); })
                     .catch(function (error) { state.error = error.message; render(); });

@@ -54,14 +54,15 @@
     }
 
     function recoverUserFetch() {
-        if (lastUserFetch || !window.performance) return;
+        if (!window.performance) return;
         var entries = performance.getEntriesByType("resource").filter(function (entry) {
             try { return /\/user\/fetch$/.test(new URL(entry.name).pathname); } catch (e) { return false; }
         });
         if (!entries.length) return;
         var url = new URL(entries[entries.length - 1].name);
-        lastUserFetch = { sourceQuery: url.search.replace(/^\?/, ""), total: null };
-        mountBatchGroup();
+        var sourceQuery = url.search.replace(/^\?/, "");
+        if (lastUserFetch && lastUserFetch.sourceQuery === sourceQuery) return;
+        lastUserFetch = { sourceQuery: sourceQuery, total: null };
     }
 
     function isUserPage() {
@@ -74,8 +75,10 @@
             if (old) old.remove();
             return;
         }
+        var actionHost = document.querySelector(".v2board-table-action") || document.body;
         if (old) {
             old.querySelector("span").textContent = lastUserFetch.total == null ? "批量加入权限组" : "批量加入权限组（" + lastUserFetch.total + "人）";
+            if (old.parentNode !== actionHost) actionHost.appendChild(old);
             return;
         }
         var button = document.createElement("button");
@@ -84,7 +87,7 @@
         button.innerHTML = "<span>" + (lastUserFetch.total == null ? "批量加入权限组" : "批量加入权限组（" + lastUserFetch.total + "人）") + "</span>";
         button.title = "将当前全部筛选结果修改到指定权限组";
         button.onclick = openBatchGroupModal;
-        document.body.appendChild(button);
+        actionHost.appendChild(button);
     }
 
     function closeBatchGroupModal() {
@@ -203,6 +206,7 @@
             host.appendChild(link);
             mounting = false;
         }
+        recoverUserFetch();
         mountBatchGroup();
     }
 

@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\UserFetch;
 use App\Http\Requests\Admin\UserGenerate;
 use App\Http\Requests\Admin\UserSendMail;
 use App\Http\Requests\Admin\UserUpdate;
+use App\Http\Requests\Admin\UserBatchGroup;
 use App\Jobs\SendEmailJob;
 use App\Models\InviteCode;
 use App\Models\Ticket;
@@ -14,6 +15,7 @@ use App\Models\Order;
 use App\Models\Plan;
 use App\Models\TicketMessage;
 use App\Models\User;
+use App\Models\ServerGroup;
 use App\Services\AuthService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
@@ -106,6 +108,72 @@ class UserController extends Controller
             'data' => $res,
             'total' => $total
         ]);
+    }
+
+    public function batchGroupPreview(UserBatchGroup $request)
+    {
+        $group = ServerGroup::findOrFail((int)$request->input('group_id'));
+        $builder = $this->batchGroupBuilder($request);
+        $total = (clone $builder)->count();
+        $samples = (clone $builder)->select('id', 'email', 'plan_id', 'group_id')->orderBy('id')->limit(20)->get();
+        $currentGroups = (clone $builder)
+            ->select('group_id', DB::raw('COUNT(*) as user_count'))
+            ->groupBy('group_id')->orderByDesc('user_count')->get();
+
+        return response(['data' => [
+            'group' => ['id' => $group->id, 'name' => $group->name],
+            'total' => $total,
+            'samples' => $samples,
+            'current_groups' => $currentGroups,
+        ]]);
+    }
+
+    public function batchGroup(UserBatchGroup $request)
+    {
+        $group = ServerGroup::findOrFail((int)$request->input('group_id'));
+        if (!hash_equals((string)$group->name, (string)$request->input('confirm_name', ''))) {
+            abort(422, '请输入完整的权限组名称进行确认');
+        }
+
+        $builder = $this->batchGroupBuilder($request);
+        $total = (clone $builder)->count();
+        if ($total < 1) abort(422, '当前筛选条件没有匹配用户');
+
+        DB::beginTransaction();
+        try {
+            $affected = $builder->update(['group_id' => $group->id, 'updated_at' => time()]);
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            abort(500, '批量修改权限组失败');
+        }
+
+        logger()->info('管理员批量修改用户权限组', [
+            'admin_id' => (int)($request->user['id'] ?? 0),
+            'target_group_id' => $group->id,
+            'target_group_name' => $group->name,
+            'matched_users' => $total,
+            'affected_users' => $affected,
+            'source_query_hash' => hash('sha256', (string)$request->input('source_query', '')),
+        ]);
+
+        return response(['data' => ['matched' => $total, 'affected' => $affected]]);
+    }
+
+    private function batchGroupBuilder(Request $request)
+    {
+        $params = [];
+        parse_str((string)$request->input('source_query', ''), $params);
+        $filterRequest = Request::create('/', 'GET', ['filter' => $params['filter'] ?? []]);
+        validator($filterRequest->all(), [
+            'filter' => 'nullable|array|max:30',
+            'filter.*.key' => 'required|in:id,email,transfer_enable,device_limit,d,expired_at,uuid,token,invite_by_email,invite_user_id,plan_id,banned,remarks,is_admin',
+            'filter.*.condition' => 'required|in:>,<,=,>=,<=,模糊,!=',
+            'filter.*.value' => 'required',
+        ])->validate();
+        $builder = User::query();
+        $this->filter($filterRequest, $builder);
+        return $builder;
     }
 
     public function getUserInfoById(Request $request)

@@ -115,6 +115,8 @@ class AdminRoute
             $router->post('/user/resetSecret', 'V1\\Admin\\UserController@resetSecret');
             $router->post('/user/delUser', 'V1\\Admin\\UserController@delUser');
             $router->post('/user/allDel', 'V1\\Admin\\UserController@allDel');
+            $router->post('/user/batchGroupPreview', 'V1\\Admin\\UserController@batchGroupPreview');
+            $router->post('/user/batchGroup', 'V1\\Admin\\UserController@batchGroup');
             $router->post('/user/setInviteUser', 'V1\\Admin\\UserController@setInviteUser');
             // Stat
             $router->get ('/stat/getStat', 'V1\\Admin\\StatController@getStat');

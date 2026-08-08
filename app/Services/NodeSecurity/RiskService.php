@@ -10,7 +10,6 @@ class RiskService
     {
         $settings = (new SettingsService())->all();
         $window = max(30, (int)$settings['risk_window_seconds']);
-        $early = max(10, (int)$settings['early_window_seconds']);
         $events = DB::table('v2_node_block_event')
             ->where('status', 'confirmed')
             ->where('event_type', 'blocked')->get();
@@ -53,9 +52,8 @@ class RiskService
                 });
             foreach ($logs as $log) {
                 $uid = (int)$log->user_id;
-                if (!isset($scores[$uid])) $scores[$uid] = ['events' => [], 'early' => 0, 'ips' => [], 'devices' => []];
+                if (!isset($scores[$uid])) $scores[$uid] = ['events' => [], 'ips' => [], 'devices' => []];
                 $scores[$uid]['events'][$event->id] = true;
-                if ((int)$event->first_failed_at - (int)$log->requested_at <= $early) $scores[$uid]['early']++;
                 if ($log->ip_hash) $scores[$uid]['ips'][$log->ip_hash] = true;
                 if ($log->device_hash) $scores[$uid]['devices'][$log->device_hash] = true;
             }
@@ -68,23 +66,22 @@ class RiskService
             ->select('gu.user_id', DB::raw('COUNT(DISTINCT e.id) as hits'))->groupBy('gu.user_id')->get();
         foreach ($watermarkHits as $hit) {
             $uid = (int)$hit->user_id;
-            if (!isset($scores[$uid])) $scores[$uid] = ['events' => [], 'early' => 0, 'ips' => [], 'devices' => []];
+            if (!isset($scores[$uid])) $scores[$uid] = ['events' => [], 'ips' => [], 'devices' => []];
             $scores[$uid]['watermark'] = (int)$hit->hits;
         }
 
         foreach ($scores as $uid => $data) {
             $eventHits = count($data['events']);
             $watermark = $data['watermark'] ?? 0;
-            $score = $this->calculateScore($eventHits, $data['early'], $watermark);
+            $score = $this->calculateScore($eventHits, $watermark);
             $reasons = [];
             if ($eventHits) $reasons[] = "命中{$eventHits}次封锁事件";
-            if ($data['early']) $reasons[] = "{$data['early']}次在早期窗口获取";
             if ($watermark) $reasons[] = "命中{$watermark}次水印";
             $now = time();
             DB::table('v2_security_user_score')->updateOrInsert(['user_id' => $uid], [
                 'risk_score' => $score,
                 'event_hits' => $eventHits,
-                'early_access_hits' => $data['early'],
+                'early_access_hits' => 0,
                 'watermark_hits' => $watermark,
                 'unique_ips' => count($data['ips']),
                 'unique_devices' => count($data['devices']),
@@ -97,8 +94,8 @@ class RiskService
         return count($scores);
     }
 
-    public function calculateScore(int $eventHits, int $earlyHits, int $watermarkHits): int
+    public function calculateScore(int $eventHits, int $watermarkHits): int
     {
-        return min(100, max(0, $eventHits) * 15 + min(30, max(0, $earlyHits) * 8) + min(40, max(0, $watermarkHits) * 25));
+        return min(100, max(0, $eventHits) * 15 + min(40, max(0, $watermarkHits) * 25));
     }
 }

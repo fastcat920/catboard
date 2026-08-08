@@ -169,7 +169,7 @@ class NodeSecurityController extends Controller
         if ($request->filled('banned')) $query->where('u.banned', (int)$request->boolean('banned'));
         if ($request->filled('plan_id')) $query->where('u.plan_id', (int)$request->input('plan_id'));
         $sorts = [
-            'risk_score' => 's.risk_score', 'event_hits' => 's.event_hits', 'early_access_hits' => 's.early_access_hits',
+            'risk_score' => 's.risk_score', 'event_hits' => 's.event_hits',
             'watermark_hits' => 's.watermark_hits', 'unique_ips' => 's.unique_ips', 'unique_devices' => 's.unique_devices',
             'last_risk_at' => 's.last_risk_at', 'registered_at' => 'u.created_at',
         ];
@@ -215,16 +215,34 @@ class NodeSecurityController extends Controller
 
     public function accessLogs(Request $request)
     {
-        $query = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')->select('l.*', 'u.email');
-        if ($request->filled('user_id')) $query->where('l.user_id', $request->input('user_id'));
-        if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
-        if ($request->filled('endpoint')) $query->where('l.endpoint', $request->input('endpoint'));
-        if ($request->filled('ip')) $query->where('l.request_ip', $request->input('ip'));
-        if ($request->filled('response_status')) $query->where('l.response_status', (int)$request->input('response_status'));
-        if ($request->filled('duration_min')) $query->where('l.duration_ms', '>=', (int)$request->input('duration_min'));
-        if ($request->filled('duration_max')) $query->where('l.duration_ms', '<=', (int)$request->input('duration_max'));
-        if ($request->filled('date_from')) $query->where('l.requested_at', '>=', (int)$request->input('date_from'));
-        if ($request->filled('date_to')) $query->where('l.requested_at', '<=', (int)$request->input('date_to'));
+        $query = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id');
+        $this->applyAccessLogFilters($query, $request);
+
+        if ($request->input('view') === 'users') {
+            return response(['data' => $query->select(
+                'l.user_id', 'u.email',
+                DB::raw('COUNT(*) as access_count'),
+                DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'),
+                DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
+                DB::raw('MIN(l.requested_at) as first_access_at'),
+                DB::raw('MAX(l.requested_at) as last_access_at'),
+                DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_family, '未分类') ORDER BY l.client_family SEPARATOR '、') as client_families"),
+                DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_platform, '未知') ORDER BY l.client_platform SEPARATOR '、') as client_platforms")
+            )->groupBy('l.user_id', 'u.email')->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
+        }
+
+        if ($request->input('view') === 'clients') {
+            return response(['data' => $query->select(
+                'l.client_family', 'l.client_version', 'l.client_platform',
+                DB::raw('COUNT(*) as access_count'),
+                DB::raw('COUNT(DISTINCT l.user_id) as user_count'),
+                DB::raw('MIN(l.requested_at) as first_access_at'),
+                DB::raw('MAX(l.requested_at) as last_access_at')
+            )->groupBy('l.client_family', 'l.client_version', 'l.client_platform')
+                ->orderByDesc('access_count')->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
+        }
+
+        $query->select('l.*', 'u.email');
         $sorts = [
             'requested_at' => 'l.requested_at', 'duration_ms' => 'l.duration_ms', 'response_bytes' => 'l.response_bytes',
             'response_status' => 'l.response_status', 'user_id' => 'l.user_id',
@@ -232,6 +250,35 @@ class NodeSecurityController extends Controller
         $sort = $sorts[$request->input('sort_by')] ?? 'l.requested_at';
         $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
         return response(['data' => $query->orderBy($sort, $direction)->orderByDesc('l.id')->paginate($this->perPage($request))]);
+    }
+
+    private function applyAccessLogFilters($query, Request $request): void
+    {
+        if ($request->filled('user_id')) $query->where('l.user_id', $request->input('user_id'));
+        if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
+        if ($request->filled('endpoint')) $query->where('l.endpoint', $request->input('endpoint'));
+        if ($request->filled('ip')) $query->where('l.request_ip', $request->input('ip'));
+        if ($request->filled('client_family')) $query->where('l.client_family', $request->input('client_family'));
+        if ($request->filled('client_version')) $query->where('l.client_version', 'like', '%' . $request->input('client_version') . '%');
+        if ($request->filled('client_platform')) $query->where('l.client_platform', $request->input('client_platform'));
+        if ($request->filled('ua')) {
+            $ua = $request->input('ua');
+            $mode = $request->input('ua_match', 'contains');
+            if ($mode === 'exact') {
+                $query->where('l.user_agent', $ua);
+            } elseif ($mode === 'exclude') {
+                $query->where(function ($nested) use ($ua) {
+                    $nested->whereNull('l.user_agent')->orWhere('l.user_agent', 'not like', '%' . $ua . '%');
+                });
+            } else {
+                $query->where('l.user_agent', 'like', '%' . $ua . '%');
+            }
+        }
+        if ($request->filled('response_status')) $query->where('l.response_status', (int)$request->input('response_status'));
+        if ($request->filled('duration_min')) $query->where('l.duration_ms', '>=', (int)$request->input('duration_min'));
+        if ($request->filled('duration_max')) $query->where('l.duration_ms', '<=', (int)$request->input('duration_max'));
+        if ($request->filled('date_from')) $query->where('l.requested_at', '>=', (int)$request->input('date_from'));
+        if ($request->filled('date_to')) $query->where('l.requested_at', '<=', (int)$request->input('date_to'));
     }
 
     public function snapshots(Request $request)

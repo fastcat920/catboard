@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Services\NodeSecurity\ExperimentService;
 use App\Services\NodeSecurity\EventWindowService;
 use App\Services\NodeSecurity\RiskService;
+use App\Services\NodeSecurity\UaClassifierService;
 use PHPUnit\Framework\TestCase;
 
 class NodeSecurityTest extends TestCase
@@ -21,9 +22,21 @@ class NodeSecurityTest extends TestCase
     public function testRiskScoreRewardsRepeatedAndWatermarkEvidenceAndCapsAtOneHundred()
     {
         $service = new RiskService();
-        $this->assertSame(0, $service->calculateScore(0, 0, 0));
-        $this->assertSame(48, $service->calculateScore(1, 1, 1));
-        $this->assertSame(100, $service->calculateScore(20, 20, 20));
+        $this->assertSame(0, $service->calculateScore(0, 0));
+        $this->assertSame(40, $service->calculateScore(1, 1));
+        $this->assertSame(100, $service->calculateScore(20, 20));
+    }
+
+    public function testUserAgentClassificationSupportsCommonClients()
+    {
+        $service = new UaClassifierService();
+        $fastcat = $service->classify('fastcat/3.1.0 clash-verge Platform/windows');
+        $flclash = $service->classify('FlClash/v0.8.84 clash-verge Platform/android');
+        $this->assertSame('FastCat', $fastcat['client_family']);
+        $this->assertSame('3.1.0', $fastcat['client_version']);
+        $this->assertSame('Windows', $fastcat['client_platform']);
+        $this->assertSame('FlClash', $flclash['client_family']);
+        $this->assertSame('Android', $flclash['client_platform']);
     }
 
     public function testEventWindowUsesMonitoringBaselineWhenItIsMoreRecent()

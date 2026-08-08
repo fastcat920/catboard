@@ -34,6 +34,13 @@
    ```bash
    php artisan migrate --path=database/migrations/2026_08_08_000005_add_probe_first_healthy_at.php --force
    ```
+
+   若需要按 UA 查找关联用户和客户端分类，再执行：
+
+   ```bash
+   php artisan migrate --path=database/migrations/2026_08_08_000006_add_access_log_ua_classification.php --force
+   php artisan security:backfill-ua
+   ```
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认 Horizon 队列、Redis 和 `APP_KEY` 正常；`node_security` 队列用于探测结果上报后的快速分析，变更 `APP_KEY` 会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右上角主题按钮旁的“节点安全”，或访问 `/{secure_path}/security/dashboard`。
@@ -66,9 +73,14 @@
 ```bash
 php artisan security:node-health
 php artisan security:analyze
+php artisan security:backfill-ua
 php artisan route:list | grep security
 php artisan test --filter NodeSecurityTest
 ```
+
+访问记录支持按原始 UA、客户端、版本和平台筛选，并可切换为“关联用户”或“客户端分类”视图。升级并执行 UA 分类迁移后，运行 `php artisan security:backfill-ua` 可为历史访问记录补齐分类；新记录会在写入时自动分类。
+
+风险分不再根据访问距离封锁时间的远近加权。“早期获取窗口”设置已移除，风险依据保留为封锁事件命中和水印命中；旧数据库中的 `early_access_hits` 字段仅为升级兼容保留，并在重新分析时清零。
 
 计划任务每分钟触发 `security:analyze --scheduled`，命令内部按照“安全分析间隔（分钟）”决定是否实际运行，默认 1 分钟。管理员手动执行 `php artisan security:analyze` 或添加 `--force` 时会立即分析，不受间隔限制。
 

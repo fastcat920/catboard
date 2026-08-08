@@ -10,7 +10,6 @@ class SettingsService
         'enabled' => true,
         'retention_days' => 30,
         'risk_window_seconds' => 300,
-        'early_window_seconds' => 60,
         'health_enabled' => false,
         'health_timeout_seconds' => 3,
         'health_failures_to_alert' => 3,
@@ -35,7 +34,9 @@ class SettingsService
         $values = self::DEFAULTS;
         try {
             foreach (DB::table('v2_security_setting')->get() as $row) {
-                $values[$row->key] = json_decode($row->value, true);
+                if (array_key_exists($row->key, self::DEFAULTS)) {
+                    $values[$row->key] = json_decode($row->value, true);
+                }
             }
         } catch (\Throwable $e) {
             // Migration may not have run yet; security instrumentation must fail open.

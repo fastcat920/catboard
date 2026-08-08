@@ -338,9 +338,7 @@
             selected(f.sort_by || "risk_score", "risk_score") +
             '>风险分</option><option value="event_hits"' +
             selected(f.sort_by, "event_hits") +
-            '>事件命中</option><option value="early_access_hits"' +
-            selected(f.sort_by, "early_access_hits") +
-            '>早期获取</option><option value="watermark_hits"' +
+            '>事件命中</option><option value="watermark_hits"' +
             selected(f.sort_by, "watermark_hits") +
             '>水印命中</option><option value="unique_ips"' +
             selected(f.sort_by, "unique_ips") +
@@ -362,7 +360,7 @@
         if (!rows.length)
             return '<div class="empty">暂无风险用户；登记并确认事件后会生成排行</div>';
         return (
-            "<table><thead><tr><th>用户</th><th>风险</th><th>事件命中</th><th>早期获取</th><th>水印</th><th>IP / 设备</th>" +
+            "<table><thead><tr><th>用户</th><th>风险</th><th>事件命中</th><th>水印</th><th>IP / 设备</th>" +
             (action ? "<th>操作</th>" : "") +
             "</tr></thead><tbody>" +
             rows
@@ -376,8 +374,6 @@
                         risk(x.risk_score) +
                         "</td><td>" +
                         x.event_hits +
-                        "</td><td>" +
-                        x.early_access_hits +
                         "</td><td>" +
                         x.watermark_hits +
                         "</td><td>" +
@@ -400,14 +396,16 @@
     function logs(d) {
         var p = d || {};
         var f = state.filters.logs;
+        var mode = f.view || "details";
+        var result = mode === "users" ? logUserTable(p.data || []) : mode === "clients" ? clientProfileTable(p.data || []) : logTable(p.data || []);
         return (
-            '<section class="filter-panel"><div class="filter-grid"><label>用户 ID<input id="log-user" type="number" placeholder="用户 ID" value="' +
+            '<section class="filter-panel"><div class="filter-grid"><label>显示方式<select id="log-view"><option value="details"' + selected(mode, "details") + '>访问明细</option><option value="users"' + selected(mode, "users") + '>关联用户</option><option value="clients"' + selected(mode, "clients") + '>客户端分类</option></select></label><label>用户 ID<input id="log-user" type="number" placeholder="用户 ID" value="' +
             esc(f.user_id || "") +
             '"></label><label>邮箱<input id="log-search" placeholder="搜索邮箱" value="' +
             esc(f.search || "") +
             '"></label><label>访问 IP<input id="log-ip" placeholder="精确 IP" value="' +
             esc(f.ip || "") +
-            '"></label><label>接口<select id="log-endpoint"><option value="">全部接口</option><option value="user.server.fetch"' +
+            '"></label><label>原始 UA<input id="log-ua" placeholder="输入完整或部分 UA" value="' + esc(f.ua || "") + '"></label><label>UA 匹配<select id="log-ua-match"><option value="contains"' + selected(f.ua_match || "contains", "contains") + '>包含</option><option value="exact"' + selected(f.ua_match, "exact") + '>完全一致</option><option value="exclude"' + selected(f.ua_match, "exclude") + '>不包含</option></select></label><label>客户端<select id="log-family"><option value="">全部客户端</option>' + ["FastCat", "FlClash", "Digilink", "Clash Verge", "Clash Meta / Mihomo", "Shadowrocket", "Stash", "Surge", "v2rayN", "v2rayNG", "sing-box", "浏览器", "脚本 / HTTP 工具", "其他 / 未识别", "未提供"].map(function (x) { return '<option value="' + esc(x) + '"' + selected(f.client_family, x) + '>' + esc(x) + '</option>'; }).join("") + '</select></label><label>版本<input id="log-version" placeholder="例如 3.1.0" value="' + esc(f.client_version || "") + '"></label><label>平台<select id="log-platform"><option value="">全部平台</option>' + ["Windows", "macOS", "Android", "iOS", "Linux", "未知"].map(function (x) { return '<option value="' + esc(x) + '"' + selected(f.client_platform, x) + '>' + esc(x) + '</option>'; }).join("") + '</select></label><label>接口<select id="log-endpoint"><option value="">全部接口</option><option value="user.server.fetch"' +
             selected(f.endpoint, "user.server.fetch") +
             '>用户节点列表</option><option value="client.app.config"' +
             selected(f.endpoint, "client.app.config") +
@@ -435,11 +433,23 @@
             selected(f.sort_order, "asc") +
             '>从旧到新 / 从低到高</option></select></label></div><div class="access-log-notice"><b>访问记录说明</b><span>记录表示用户请求过自己的节点列表，不代表获取了所有节点；是否获得特定节点以事件快照命中为准。</span></div><div class="filter-actions"><button class="btn primary" data-filter-logs>应用筛选</button><button class="btn" data-reset-logs>重置</button><span class="muted">共 ' +
             esc(p.total || 0) +
-            ' 条记录</span></div></section><section class="panel table-wrap">' +
-            logTable(p.data || []) +
+            (mode === "users" ? ' 名关联用户' : mode === "clients" ? ' 个客户端分类' : ' 条记录') + '</span></div></section><section class="panel table-wrap">' +
+            result +
             pager(p) +
             "</section>"
         );
+    }
+    function logUserTable(rows) {
+        if (!rows.length) return '<div class="empty">没有找到使用该 UA 的用户</div>';
+        return '<table><thead><tr><th>用户</th><th>访问次数</th><th>客户端 / 平台</th><th>IP / 设备</th><th>首次访问</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' + rows.map(function (x) {
+            return '<tr><td>' + esc(x.email) + '<br><span class="muted">ID ' + x.user_id + '</span></td><td>' + x.access_count + '</td><td>' + esc(x.client_families || "未分类") + '<br><span class="muted">' + esc(x.client_platforms || "未知") + '</span></td><td>' + x.unique_ips + ' / ' + x.unique_devices + '</td><td>' + time(x.first_access_at) + '</td><td>' + time(x.last_access_at) + '</td><td><button class="btn" data-user="' + x.user_id + '">风险档案</button></td></tr>';
+        }).join("") + '</tbody></table>';
+    }
+    function clientProfileTable(rows) {
+        if (!rows.length) return '<div class="empty">暂无客户端分类数据，请先执行历史 UA 回填</div>';
+        return '<table><thead><tr><th>客户端</th><th>版本</th><th>平台</th><th>用户数</th><th>访问次数</th><th>首次访问</th><th>最近访问</th></tr></thead><tbody>' + rows.map(function (x) {
+            return '<tr><td>' + esc(x.client_family || "未分类") + '</td><td>' + esc(x.client_version || "-") + '</td><td>' + esc(x.client_platform || "未知") + '</td><td>' + x.user_count + '</td><td>' + x.access_count + '</td><td>' + time(x.first_access_at) + '</td><td>' + time(x.last_access_at) + '</td></tr>';
+        }).join("") + '</tbody></table>';
     }
     function logTable(rows, options) {
         options = options || {};
@@ -472,7 +482,7 @@
                         esc(x.user_agent || "客户端未提供 UA") +
                         '">' +
                         esc(x.user_agent || "客户端未提供 UA") +
-                        "</span></td>" +
+                        "</span><br>" + (x.user_agent ? '<button class="btn compact" data-same-ua="' + esc(x.user_agent) + '">查找相同 UA 用户</button>' : '') + '<br><span class="muted">' + esc((x.client_family || "未分类") + (x.client_version ? " " + x.client_version : "") + " · " + (x.client_platform || "未知")) + "</span></td>" +
                         (showUaTrust
                             ? "<td>" +
                               badge(
@@ -787,12 +797,6 @@
                 "封锁前多长时间内的访问参与风险计算",
             ],
             [
-                "early_window_seconds",
-                "早期获取窗口（秒）",
-                "number",
-                "距离封锁越近的访问将获得更高权重",
-            ],
-            [
                 "probe_interval_seconds",
                 "私有探测间隔（秒）",
                 "number",
@@ -913,7 +917,6 @@
                 keys: [
                     "retention_days",
                     "risk_window_seconds",
-                    "early_window_seconds",
                     "multi_account_ip_threshold",
                 ],
             },
@@ -1569,9 +1572,15 @@
                 var from = root.querySelector("#log-from").value;
                 var to = root.querySelector("#log-to").value;
                 state.filters.logs = {
+                    view: root.querySelector("#log-view").value,
                     user_id: root.querySelector("#log-user").value,
                     search: root.querySelector("#log-search").value,
                     ip: root.querySelector("#log-ip").value,
+                    ua: root.querySelector("#log-ua").value,
+                    ua_match: root.querySelector("#log-ua-match").value,
+                    client_family: root.querySelector("#log-family").value,
+                    client_version: root.querySelector("#log-version").value,
+                    client_platform: root.querySelector("#log-platform").value,
                     endpoint: root.querySelector("#log-endpoint").value,
                     response_status: root.querySelector("#log-status").value,
                     date_from: from
@@ -1595,6 +1604,17 @@
                 state.pageNo = 1;
                 load();
             };
+        root.querySelectorAll("[data-same-ua]").forEach(function (x) {
+            x.onclick = function () {
+                state.filters.logs = {
+                    view: "users",
+                    ua: x.dataset.sameUa,
+                    ua_match: "exact",
+                };
+                state.pageNo = 1;
+                load();
+            };
+        });
         var ne = root.querySelector("[data-new-experiment]");
         if (ne)
             ne.onclick = function () {

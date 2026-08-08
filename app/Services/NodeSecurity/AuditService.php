@@ -38,6 +38,7 @@ class AuditService
         try {
             $now = time();
             $ua = mb_substr((string)$request->userAgent(), 0, 512);
+            $uaClassification = (new UaClassifierService())->classify($ua);
             $ip = (string)$request->ip();
             $started = (float)$request->attributes->get('node_security_started_at', microtime(true));
             [$content, $status, $etag] = $this->responseMetadata($response);
@@ -50,6 +51,10 @@ class AuditService
                 'request_ip' => mb_substr($ip, 0, 64),
                 'ip_hash' => hash('sha256', $ip),
                 'user_agent' => $ua ?: null,
+                'ua_hash' => $uaClassification['ua_hash'],
+                'client_family' => $uaClassification['client_family'],
+                'client_version' => $uaClassification['client_version'],
+                'client_platform' => $uaClassification['client_platform'],
                 'device_hash' => hash('sha256', strtolower($ua) . '|' . $ip),
                 'etag' => $etag,
                 'response_status' => $status,

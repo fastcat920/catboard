@@ -200,6 +200,11 @@ textarea {
 .btn:disabled {
     opacity: 0.55;
 }
+.btn.compact {
+    margin-top: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
 .modal {
     position: fixed;
     inset: 0;

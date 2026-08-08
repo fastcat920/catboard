@@ -105,7 +105,8 @@
             .then(function (groups) {
                 var modal = document.createElement("div");
                 modal.className = "user-batch-group-modal";
-                modal.innerHTML = '<div class="user-batch-group-box"><div class="user-batch-group-head"><div><b>批量加入权限组</b><small>只修改用户权限组，不修改套餐、流量和到期时间</small></div><button type="button" data-batch-close>×</button></div><div class="user-batch-group-body"><div class="user-batch-warning">操作范围：当前全部筛选结果' + (selection.total == null ? '，实际人数将在预览时从服务器核对' : '，页面显示共 <b>' + selection.total + '</b> 名用户') + '。请确认筛选条件无误。</div><label>目标权限组<select data-batch-group><option value="">请选择权限组</option>' + groups.map(function (group) { return '<option value="' + group.id + '">' + escapeHtml(group.name) + '（当前 ' + Number(group.user_count || 0) + ' 人 / ' + Number(group.server_count || 0) + ' 节点）</option>'; }).join("") + '</select></label><div data-batch-preview class="user-batch-preview muted">选择权限组后点击“预览影响”。</div><label data-batch-confirm-wrap hidden>输入权限组名称确认<input data-batch-confirm autocomplete="off" placeholder="请输入完整权限组名称"></label><div data-batch-error class="user-batch-error" hidden></div></div><div class="user-batch-group-actions"><button type="button" data-batch-close>取消</button><button type="button" data-batch-preview-button>预览影响</button><button type="button" data-batch-submit disabled>确认修改</button></div></div>';
+                modal.style.setProperty("--batch-theme-color", themeColor());
+                modal.innerHTML = '<div class="user-batch-group-box"><div class="user-batch-group-head"><div><b>批量修改权限组</b><small>只修改用户权限组，不修改套餐、流量和到期时间</small></div><button type="button" data-batch-close>×</button></div><div class="user-batch-group-body"><div class="user-batch-warning">操作范围：当前全部筛选结果' + (selection.total == null ? '' : '，共 <b>' + selection.total + '</b> 名用户') + '。请确认筛选条件无误。</div><label>目标权限组<select data-batch-group><option value="">请选择权限组</option>' + groups.map(function (group) { return '<option value="' + group.id + '">' + escapeHtml(group.name) + '（当前 ' + Number(group.user_count || 0) + ' 人 / ' + Number(group.server_count || 0) + ' 节点）</option>'; }).join("") + '</select></label><div data-batch-error class="user-batch-error" hidden></div></div><div class="user-batch-group-actions"><button type="button" data-batch-close>取消</button><button type="button" data-batch-submit disabled>确定</button></div></div>';
                 document.body.appendChild(modal);
                 bindBatchGroupModal(modal, selection);
             })
@@ -118,55 +119,36 @@
         return div.innerHTML;
     }
 
+    function themeColor() {
+        var name = ((window.settings || {}).theme || {}).color || "default";
+        return { default: "#0665d0", darkblue: "#3b5998", black: "#343a40", green: "#319795" }[name] || "#0665d0";
+    }
+
     function bindBatchGroupModal(modal, selection) {
         var groupSelect = modal.querySelector("[data-batch-group]");
-        var preview = modal.querySelector("[data-batch-preview]");
-        var confirmWrap = modal.querySelector("[data-batch-confirm-wrap]");
-        var confirmInput = modal.querySelector("[data-batch-confirm]");
         var submit = modal.querySelector("[data-batch-submit]");
         var errorBox = modal.querySelector("[data-batch-error]");
-        var previewData = null;
         modal.querySelectorAll("[data-batch-close]").forEach(function (button) { button.onclick = closeBatchGroupModal; });
         modal.onclick = function (event) { if (event.target === modal) closeBatchGroupModal(); };
         groupSelect.onchange = function () {
-            previewData = null;
-            preview.textContent = "选择权限组后点击“预览影响”。";
-            confirmWrap.hidden = true;
-            confirmInput.value = "";
-            submit.disabled = true;
-        };
-        modal.querySelector("[data-batch-preview-button]").onclick = function () {
-            if (!groupSelect.value) { showBatchError(errorBox, "请先选择目标权限组"); return; }
             showBatchError(errorBox, "");
-            preview.textContent = "正在核对服务器上的最新筛选结果……";
-            api("/user/batchGroupPreview", {
-                method: "POST",
-                body: JSON.stringify({ group_id: Number(groupSelect.value), source_query: selection.sourceQuery }),
-            }).then(function (data) {
-                previewData = data;
-                var sample = data.samples.map(function (user) { return "ID " + user.id + " · " + escapeHtml(user.email); }).join("<br>");
-                preview.innerHTML = '<div class="user-batch-preview-summary">服务器实际匹配 <b>' + data.total + '</b> 人，将统一修改为 <b>' + escapeHtml(data.group.name) + '</b>。</div><details><summary>查看前 ' + data.samples.length + ' 名匹配用户</summary><div>' + sample + '</div></details>';
-                confirmWrap.hidden = false;
-                confirmWrap.firstChild.textContent = "输入权限组名称 “" + data.group.name + "” 确认";
-                confirmInput.oninput = function () { submit.disabled = confirmInput.value !== data.group.name; };
-                submit.disabled = true;
-            }).catch(function (error) { preview.textContent = "预览失败"; showBatchError(errorBox, error.message); });
+            submit.disabled = !groupSelect.value;
         };
         submit.onclick = function () {
-            if (!previewData || confirmInput.value !== previewData.group.name) return;
+            if (!groupSelect.value) return;
             submit.disabled = true;
             submit.textContent = "正在修改……";
             showBatchError(errorBox, "");
             api("/user/batchGroup", {
                 method: "POST",
-                body: JSON.stringify({ group_id: previewData.group.id, source_query: selection.sourceQuery, confirm_name: confirmInput.value }),
+                body: JSON.stringify({ group_id: Number(groupSelect.value), source_query: selection.sourceQuery }),
             }).then(function (data) {
                 alert("修改完成：匹配 " + data.matched + " 人，实际更新 " + data.affected + " 人。");
                 closeBatchGroupModal();
                 location.reload();
             }).catch(function (error) {
                 submit.disabled = false;
-                submit.textContent = "确认修改";
+                submit.textContent = "确定";
                 showBatchError(errorBox, error.message);
             });
         };

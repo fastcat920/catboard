@@ -67,13 +67,10 @@
 .user-batch-group-body label { display: grid; gap: 7px; font-weight: 600; }
 .user-batch-group-body select, .user-batch-group-body input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #111827; }
 .user-batch-warning { padding: 12px; border-radius: 6px; background: #fff7e6; color: #8a4b08; }
-.user-batch-preview { padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; }
-.user-batch-preview details { margin-top: 10px; }
-.user-batch-preview details div { max-height: 180px; margin-top: 8px; overflow: auto; line-height: 1.8; }
 .user-batch-error { padding: 10px; border-radius: 6px; background: #fee2e2; color: #b91c1c; }
 .user-batch-group-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid #e5e7eb; background: #fff; }
 .user-batch-group-actions button { padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
-.user-batch-group-actions [data-batch-submit] { border-color: #1677ff; background: #1677ff; color: #fff; }
+.user-batch-group-actions [data-batch-submit] { border-color: var(--batch-theme-color, #1677ff); background: var(--batch-theme-color, #1677ff); color: #fff; }
 .user-batch-group-actions button:disabled { opacity: .5; cursor: not-allowed; }
 body.dark .user-batch-group-box, body.dark .user-batch-group-head, body.dark .user-batch-group-actions { background: #1f2937; color: #f3f4f6; }
 @media (max-width: 640px) { .user-batch-group-entry { right: 12px; bottom: 12px; } .user-batch-group-modal { padding: 10px; } }

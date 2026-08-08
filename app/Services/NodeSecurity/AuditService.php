@@ -40,7 +40,7 @@ class AuditService
             $ua = mb_substr((string)$request->userAgent(), 0, 512);
             $ip = (string)$request->ip();
             $started = (float)$request->attributes->get('node_security_started_at', microtime(true));
-            $content = method_exists($response, 'getContent') ? (string)$response->getContent() : '';
+            [$content, $status, $etag] = $this->responseMetadata($response);
             DB::table('v2_node_access_log')->insert([
                 'user_id' => (int)$request->user['id'],
                 'session_id' => mb_substr((string)($request->user['auth_session'] ?? ''), 0, 64) ?: null,
@@ -51,8 +51,8 @@ class AuditService
                 'ip_hash' => hash('sha256', $ip),
                 'user_agent' => $ua ?: null,
                 'device_hash' => hash('sha256', strtolower($ua) . '|' . $ip),
-                'etag' => mb_substr((string)$response->headers->get('ETag'), 0, 64) ?: null,
-                'response_status' => (int)$response->getStatusCode(),
+                'etag' => $etag,
+                'response_status' => $status,
                 'response_bytes' => strlen($content),
                 'duration_ms' => max(0, (int)round((microtime(true) - $started) * 1000)),
                 'requested_at' => $now,
@@ -61,5 +61,28 @@ class AuditService
         } catch (\Throwable $e) {
             Log::warning('Node security record failed: ' . $e->getMessage());
         }
+    }
+
+    private function responseMetadata($response): array
+    {
+        if (is_object($response) && method_exists($response, 'getContent')) {
+            $content = (string)$response->getContent();
+        } elseif (is_string($response)) {
+            $content = $response;
+        } elseif (is_scalar($response)) {
+            $content = (string)$response;
+        } else {
+            $content = json_encode($response) ?: '';
+        }
+
+        $status = is_object($response) && method_exists($response, 'getStatusCode')
+            ? (int)$response->getStatusCode()
+            : 200;
+        $etag = null;
+        if (is_object($response) && isset($response->headers) && method_exists($response->headers, 'get')) {
+            $etag = mb_substr((string)$response->headers->get('ETag'), 0, 64) ?: null;
+        }
+
+        return [$content, $status, $etag];
     }
 }

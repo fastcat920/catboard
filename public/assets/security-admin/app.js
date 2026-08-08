@@ -19,6 +19,7 @@
         users: "风险用户",
         logs: "访问记录",
         watermarks: "水印实验",
+        entries: "节点入口池",
         probes: "探测点",
         alerts: "安全告警",
         settings: "风控设置",
@@ -198,6 +199,7 @@
         if (state.page === "users") return users(d);
         if (state.page === "logs") return logs(d);
         if (state.page === "watermarks") return watermarks(d);
+        if (state.page === "entries") return entryPools(d);
         if (state.page === "probes") return probes(d);
         if (state.page === "alerts") return alerts(d);
         return settings(d);
@@ -255,6 +257,27 @@
             alertTable(d.alerts || []) +
             "</section></div>"
         );
+    }
+    function entryHealthLabel(status) {
+        return ({ healthy: "双向正常", domestic_blocked: "国内方向异常", overseas_blocked: "海外方向异常", unreachable: "全部不可达", insufficient_probes: "探测点不足", waiting: "等待探测" })[status] || status || "等待探测";
+    }
+    function entryPools(rows) {
+        rows = rows || [];
+        if (!rows.length) return '<div class="panel empty">暂无可配置节点；执行入口池迁移后刷新。</div>';
+        return '<section class="panel table-wrap"><table><thead><tr><th>节点</th><th>原始地址</th><th>下发模式</th><th>入口数量</th><th>健康入口</th><th>操作</th></tr></thead><tbody>' + rows.map(function (x, index) {
+            var mode = { primary_only: "仅主入口", manual_backup: "主入口＋备用入口", auto_fallback: "自动故障转移" }[x.delivery_mode] || x.delivery_mode;
+            var healthy = (x.entries || []).filter(function (e) { return e.health_status === "healthy"; }).length;
+            return '<tr><td><b>' + esc(x.server_name) + '</b><br><span class="muted">' + esc(x.server_type) + ' / ' + x.server_id + '</span></td><td>' + esc(x.original_address) + '</td><td>' + badge(mode, x.delivery_mode === "auto_fallback" ? "ok" : "") + '</td><td>' + (x.entries || []).length + '</td><td>' + healthy + '</td><td><button class="btn" data-manage-entry="' + index + '">管理入口</button></td></tr>';
+        }).join("") + '</tbody></table></section>';
+    }
+    function entryPoolModal(node) {
+        var list = node.entries || [];
+        modal("管理节点入口 · " + node.server_name,
+            '<form id="entry-setting-form" class="form-grid" data-type="' + esc(node.server_type) + '" data-id="' + node.server_id + '"><label>下发模式<select name="delivery_mode"><option value="primary_only"' + selected(node.delivery_mode, "primary_only") + '>仅主入口</option><option value="manual_backup"' + selected(node.delivery_mode, "manual_backup") + '>主入口＋备用入口</option><option value="auto_fallback"' + selected(node.delivery_mode, "auto_fallback") + '>自动故障转移</option></select></label><label>客户端检测间隔（秒）<input name="check_interval" type="number" min="30" value="' + esc(node.check_interval || 60) + '"></label><label class="span2">客户端检测 URL<input name="check_url" type="url" required value="' + esc(node.check_url) + '"></label><div class="span2"><button class="btn primary" type="submit">保存下发设置</button></div></form><h3>入口列表</h3><div class="table-wrap"><table><thead><tr><th>名称</th><th>地址</th><th>优先级</th><th>角色</th><th>探测状态</th><th>操作</th></tr></thead><tbody>' + (list.length ? list.map(function (e) { return '<tr><td>' + esc(e.name) + '</td><td>' + esc(e.host) + ':' + e.port + '</td><td>' + e.priority + '</td><td>' + (e.is_primary ? '主入口' : '备用') + (e.enabled ? '' : ' · 已停用') + '</td><td>' + entryHealthLabel(e.health_status) + '<br><span class="muted">' + time(e.last_checked_at) + '</span></td><td><button class="btn" data-edit-entry="' + e.id + '">编辑</button> <button class="btn danger" data-delete-entry="' + e.id + '">删除</button></td></tr>'; }).join("") : '<tr><td colspan="6" class="empty">尚未添加入口，旧节点地址仍会正常下发</td></tr>') + '</tbody></table></div><h3>添加入口</h3>' + entryFormHtml(node, null), { boxClass: "modal-profile-wide" });
+    }
+    function entryFormHtml(node, entry) {
+        entry = entry || {};
+        return '<form class="form-grid entry-form" data-entry-id="' + (entry.id || '') + '" data-type="' + esc(node.server_type) + '" data-server-id="' + node.server_id + '"><label>入口名称<input name="name" required value="' + esc(entry.name || '') + '" placeholder="例如：备用入口1"></label><label>优先级<input name="priority" type="number" min="1" value="' + esc(entry.priority || 100) + '"></label><label>地址 / 域名<input name="host" required value="' + esc(entry.host || '') + '"></label><label>端口<input name="port" type="number" min="1" max="65535" required value="' + esc(entry.port || '') + '"></label><label class="check"><input name="is_primary" type="checkbox" ' + (entry.is_primary ? 'checked' : '') + '> 设为主入口</label><label class="check"><input name="enabled" type="checkbox" ' + (entry.id && !entry.enabled ? '' : 'checked') + '> 启用并参与下发/探测</label><div class="span2"><button class="btn primary" type="submit">' + (entry.id ? '保存入口' : '添加入口') + '</button></div></form>';
     }
     function events(d) {
         var p = d || {};
@@ -1338,6 +1361,7 @@
                 users: "users?page=" + state.pageNo,
                 logs: "access-logs?page=" + state.pageNo,
                 watermarks: "experiments",
+                entries: "entry-pools",
                 alerts: "alerts?page=" + state.pageNo,
                 settings: "settings",
             }[state.page] +
@@ -1557,6 +1581,43 @@
                         );
                     }, 0);
                 });
+            };
+        });
+        root.querySelectorAll("[data-manage-entry]").forEach(function (x) {
+            x.onclick = function () { entryPoolModal((state.data || [])[Number(x.dataset.manageEntry)]); };
+        });
+        var entrySettingForm = root.querySelector("#entry-setting-form");
+        if (entrySettingForm) entrySettingForm.onsubmit = function (event) {
+            event.preventDefault();
+            var data = formData(entrySettingForm);
+            data.server_type = entrySettingForm.dataset.type;
+            data.server_id = Number(entrySettingForm.dataset.id);
+            data.check_interval = Number(data.check_interval);
+            post("entry-setting/save", data, load);
+        };
+        root.querySelectorAll(".entry-form").forEach(function (form) {
+            form.onsubmit = function (event) {
+                event.preventDefault();
+                var data = formData(form);
+                data.id = form.dataset.entryId ? Number(form.dataset.entryId) : null;
+                data.server_type = form.dataset.type;
+                data.server_id = Number(form.dataset.serverId);
+                data.port = Number(data.port);
+                data.priority = Number(data.priority);
+                post("entry/save", data, load);
+            };
+        });
+        root.querySelectorAll("[data-edit-entry]").forEach(function (button) {
+            button.onclick = function () {
+                var node = (state.data || []).find(function (item) { return (item.entries || []).some(function (entry) { return Number(entry.id) === Number(button.dataset.editEntry); }); });
+                var entry = node && node.entries.find(function (item) { return Number(item.id) === Number(button.dataset.editEntry); });
+                if (node && entry) modal("编辑入口 · " + node.server_name, entryFormHtml(node, entry));
+            };
+        });
+        root.querySelectorAll("[data-delete-entry]").forEach(function (button) {
+            button.onclick = function () {
+                if (!confirm("确认删除这个入口？已下载到客户端的旧配置不会被远程删除。")) return;
+                post("entry/delete", { id: Number(button.dataset.deleteEntry) }, load);
             };
         });
         var fl = root.querySelector("[data-filter-logs]");

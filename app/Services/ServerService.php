@@ -236,7 +236,7 @@ class ServerService
         );
         $tmp = array_column($servers, 'sort');
         array_multisort($tmp, SORT_ASC, $servers);
-        return array_map(function ($server) {
+        $servers = array_map(function ($server) {
             if (strpos($server['port'], '-')) {
                 $server['mport'] = (string)$server['port'];
             } else {
@@ -246,6 +246,7 @@ class ServerService
             $server['cache_key'] = "{$server['type']}-{$server['id']}-{$server['updated_at']}-{$server['is_online']}";
             return $server;
         }, $servers);
+        return (new NodeEntryPoolService())->expand($servers);
     }
 
     public function getAvailableUsers($groupId)

@@ -59,6 +59,7 @@ class AppController extends Controller
         foreach ($config['proxy-groups'] as $k => $v) {
             $config['proxy-groups'][$k]['proxies'] = array_merge($config['proxy-groups'][$k]['proxies'], $proxies);
         }
+        \App\Services\NodeEntryPoolService::applyClashFallbackGroups($config, $servers);
         $yamlContent = Yaml::dump($config);
         $response = response($yamlContent, 200)
             ->header('Content-Type', 'text/yaml');

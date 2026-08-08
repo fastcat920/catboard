@@ -6,6 +6,7 @@ use App\Services\NodeSecurity\ExperimentService;
 use App\Services\NodeSecurity\EventWindowService;
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\UaClassifierService;
+use App\Services\NodeEntryPoolService;
 use PHPUnit\Framework\TestCase;
 
 class NodeSecurityTest extends TestCase
@@ -37,6 +38,19 @@ class NodeSecurityTest extends TestCase
         $this->assertSame('Windows', $fastcat['client_platform']);
         $this->assertSame('FlClash', $flclash['client_family']);
         $this->assertSame('Android', $flclash['client_platform']);
+    }
+
+    public function testEntryPoolBuildsPerNodeFallbackGroup()
+    {
+        $config = ['proxy-groups' => [['name' => '选择', 'type' => 'select', 'proxies' => ['香港｜主入口', '香港｜备用1']]]];
+        $servers = [
+            ['name' => '香港｜主入口', '_entry_mode' => 'auto_fallback', '_entry_logical_key' => 'vmess:1', '_entry_logical_name' => '香港', '_entry_check_url' => 'https://example.com/204', '_entry_check_interval' => 60],
+            ['name' => '香港｜备用1', '_entry_mode' => 'auto_fallback', '_entry_logical_key' => 'vmess:1', '_entry_logical_name' => '香港', '_entry_check_url' => 'https://example.com/204', '_entry_check_interval' => 60],
+        ];
+        NodeEntryPoolService::applyClashFallbackGroups($config, $servers);
+        $this->assertSame(['香港'], $config['proxy-groups'][0]['proxies']);
+        $this->assertSame('fallback', $config['proxy-groups'][1]['type']);
+        $this->assertSame(['香港｜主入口', '香港｜备用1'], $config['proxy-groups'][1]['proxies']);
     }
 
     public function testEventWindowUsesMonitoringBaselineWhenItIsMoreRecent()

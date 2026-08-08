@@ -201,6 +201,10 @@ class AdminRoute
             $router->get ('/security/probe-targets/candidates', 'V1\\Admin\\NodeSecurityController@probeTargetCandidates');
             $router->post('/security/probe-targets/batch', 'V1\\Admin\\NodeSecurityController@batchProbeTargets');
             $router->get ('/security/probe-results', 'V1\\Admin\\NodeSecurityController@probeResults');
+            $router->get ('/security/entry-pools', 'V1\\Admin\\NodeSecurityController@entryPools');
+            $router->post('/security/entry-setting/save', 'V1\\Admin\\NodeSecurityController@saveEntrySetting');
+            $router->post('/security/entry/save', 'V1\\Admin\\NodeSecurityController@saveEntry');
+            $router->post('/security/entry/delete', 'V1\\Admin\\NodeSecurityController@deleteEntry');
         });
     }
 }

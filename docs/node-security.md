@@ -41,6 +41,14 @@
    php artisan migrate --path=database/migrations/2026_08_08_000006_add_access_log_ua_classification.php --force
    php artisan security:backfill-ua
    ```
+
+   若需要使用节点多入口、备用入口和客户端自动故障转移，再执行：
+
+   ```bash
+   php artisan migrate --path=database/migrations/2026_08_08_000007_create_node_entry_pool_tables.php --force
+   ```
+
+   迁移后在“节点安全 → 节点入口池”配置。未配置入口池的节点继续使用原始地址，不受影响。`auto_fallback` 会在 Clash、Mihomo、Clash Verge、FlClash、Stash 等 YAML 配置中建立节点级 fallback 组；其他订阅格式安全降级为主入口和备用入口多个节点。
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认 Horizon 队列、Redis 和 `APP_KEY` 正常；`node_security` 队列用于探测结果上报后的快速分析，变更 `APP_KEY` 会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右上角主题按钮旁的“节点安全”，或访问 `/{secure_path}/security/dashboard`。

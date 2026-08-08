@@ -564,6 +564,10 @@ class NodeSecurityController extends Controller
                 'server_name' => $server['name'] ?? '未命名节点',
                 'original_address' => $this->formatServerAddress((string)($server['host'] ?? ''), (string)($server['port'] ?? '')),
             ];
+        })->filter(function ($server) use ($request) {
+            if ($request->filled('server_type') && $server['server_type'] !== $request->input('server_type')) return false;
+            if ($request->filled('server_id') && $server['server_id'] !== (int)$request->input('server_id')) return false;
+            return true;
         })->keyBy(function ($server) { return $server['server_type'] . ':' . $server['server_id']; });
         $settings = DB::table('v2_node_entry_setting')->get()->keyBy(function ($row) {
             return $row->server_type . ':' . $row->server_id;

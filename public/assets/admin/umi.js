@@ -106835,6 +106835,10 @@
                     }, y.a.createElement(m["a"], {
                         type: "copy"
                     }), " \u590d\u5236"), y.a.createElement(p["a"].Item, {
+                        onClick: ()=>window.FastCatEntryPool && window.FastCatEntryPool.open(e.type, e.id, e.name)
+                    }, y.a.createElement(m["a"], {
+                        type: "cluster"
+                    }), " \u5165\u53e3\u6c60"), y.a.createElement(p["a"].Item, {
                         style: {
                             color: "#ff4d4f"
                         },

@@ -19,7 +19,6 @@
         users: "风险用户",
         logs: "访问记录",
         watermarks: "水印实验",
-        entries: "节点入口池",
         probes: "探测点",
         alerts: "安全告警",
         settings: "风控设置",
@@ -199,7 +198,6 @@
         if (state.page === "users") return users(d);
         if (state.page === "logs") return logs(d);
         if (state.page === "watermarks") return watermarks(d);
-        if (state.page === "entries") return entryPools(d);
         if (state.page === "probes") return probes(d);
         if (state.page === "alerts") return alerts(d);
         return settings(d);
@@ -1370,7 +1368,6 @@
                 users: "users?page=" + state.pageNo,
                 logs: "access-logs?page=" + state.pageNo,
                 watermarks: "experiments",
-                entries: "entry-pools?page=" + state.pageNo,
                 alerts: "alerts?page=" + state.pageNo,
                 settings: "settings",
             }[state.page] +

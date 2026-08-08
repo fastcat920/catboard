@@ -190,6 +190,124 @@
         },
     };
 
+    var entryPoolState = null;
+
+    function closeEntryPoolModal() {
+        var modal = document.querySelector(".node-entry-pool-modal");
+        if (modal) modal.remove();
+        entryPoolState = null;
+    }
+
+    function entryHealthText(status) {
+        return {
+            healthy: "双向正常",
+            domestic_blocked: "国内方向异常",
+            overseas_blocked: "海外方向异常",
+            unreachable: "全部不可达",
+            insufficient_probes: "探测点不足",
+            waiting: "等待探测",
+        }[status] || status || "等待探测";
+    }
+
+    function loadEntryPool(type, id) {
+        return api("/security/entry-pools?server_type=" + encodeURIComponent(type) + "&server_id=" + encodeURIComponent(id), {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+        }).then(function (page) {
+            if (!page || !page.data || !page.data[0]) throw new Error("节点不存在或已停用");
+            return page.data[0];
+        });
+    }
+
+    function entryForm(node, entry) {
+        entry = entry || {};
+        return '<form class="node-entry-form" data-entry-id="' + (entry.id || "") + '">' +
+            '<div class="node-entry-grid"><label>入口名称<input name="name" required value="' + escapeHtml(entry.name || "") + '" placeholder="例如：备用入口 1"></label>' +
+            '<label>优先级<input name="priority" type="number" min="1" max="10000" required value="' + escapeHtml(entry.priority || 100) + '"></label>' +
+            '<label>地址 / 域名<input name="host" required value="' + escapeHtml(entry.host || "") + '"></label>' +
+            '<label>端口<input name="port" type="number" min="1" max="65535" required value="' + escapeHtml(entry.port || node.original_address.split(":").pop() || "") + '"></label></div>' +
+            '<div class="node-entry-checks"><label><input name="is_primary" type="checkbox"' + (entry.is_primary ? " checked" : "") + '> 设为主入口</label>' +
+            '<label><input name="enabled" type="checkbox"' + (entry.id && !entry.enabled ? "" : " checked") + '> 启用并参与下发和探测</label></div>' +
+            '<div class="node-entry-form-actions">' + (entry.id ? '<button type="button" data-entry-cancel>取消编辑</button>' : "") + '<button type="submit" class="primary">' + (entry.id ? "保存入口" : "添加入口") + '</button></div></form>';
+    }
+
+    function renderEntryPoolModal(node, editingId) {
+        var old = document.querySelector(".node-entry-pool-modal");
+        if (old) old.remove();
+        var entries = node.entries || [];
+        var editing = entries.find(function (item) { return Number(item.id) === Number(editingId); });
+        var modal = document.createElement("div");
+        modal.className = "node-entry-pool-modal";
+        modal.style.setProperty("--entry-theme-color", themeColor());
+        modal.innerHTML = '<div class="node-entry-pool-box"><div class="node-entry-pool-head"><div><b>管理节点入口 · ' + escapeHtml(node.server_name) + '</b><small>节点 ID ' + node.server_id + ' · ' + escapeHtml(node.server_type) + ' · 原地址 ' + escapeHtml(node.original_address) + '</small></div><button type="button" data-entry-close>×</button></div>' +
+            '<div class="node-entry-pool-body"><section><h3>下发设置</h3><form class="node-entry-setting"><div class="node-entry-grid"><label>下发模式<select name="delivery_mode"><option value="primary_only"' + (node.delivery_mode === "primary_only" ? " selected" : "") + '>仅主入口</option><option value="manual_backup"' + (node.delivery_mode === "manual_backup" ? " selected" : "") + '>主入口＋备用入口</option><option value="auto_fallback"' + (node.delivery_mode === "auto_fallback" ? " selected" : "") + '>自动故障转移</option></select></label><label>客户端检测间隔（秒）<input name="check_interval" type="number" min="30" max="86400" required value="' + Number(node.check_interval || 60) + '"></label><label class="wide">客户端检测 URL<input name="check_url" type="url" required value="' + escapeHtml(node.check_url || "") + '"></label></div><div class="node-entry-form-actions"><button type="submit" class="primary">保存下发设置</button></div></form></section>' +
+            '<section><h3>入口列表</h3><div class="node-entry-table-wrap"><table><thead><tr><th>名称</th><th>地址</th><th>优先级</th><th>角色</th><th>探测状态</th><th>操作</th></tr></thead><tbody>' + (entries.length ? entries.map(function (entry) { return '<tr><td>' + escapeHtml(entry.name) + '</td><td>' + escapeHtml(entry.host) + ':' + entry.port + '</td><td>' + entry.priority + '</td><td>' + (entry.is_primary ? "主入口" : "备用") + (entry.enabled ? "" : " · 已停用") + '</td><td>' + escapeHtml(entryHealthText(entry.health_status)) + '</td><td><button type="button" data-entry-edit="' + entry.id + '">编辑</button> <button type="button" class="danger" data-entry-delete="' + entry.id + '">删除</button></td></tr>'; }).join("") : '<tr><td colspan="6" class="empty">尚未启用入口池；首次保存设置时会自动导入节点原地址作为主入口</td></tr>') + '</tbody></table></div></section>' +
+            '<section><h3>' + (editing ? "编辑入口" : "添加入口") + '</h3>' + entryForm(node, editing) + '</section><div class="node-entry-message" hidden></div></div></div>';
+        document.body.appendChild(modal);
+        entryPoolState = { type: node.server_type, id: node.server_id };
+        bindEntryPoolModal(modal, node);
+    }
+
+    function entryPayload(form, node) {
+        return {
+            id: form.dataset.entryId ? Number(form.dataset.entryId) : null,
+            server_type: node.server_type,
+            server_id: Number(node.server_id),
+            name: form.elements.name.value.trim(),
+            host: form.elements.host.value.trim(),
+            port: Number(form.elements.port.value),
+            priority: Number(form.elements.priority.value),
+            is_primary: form.elements.is_primary.checked,
+            enabled: form.elements.enabled.checked,
+        };
+    }
+
+    function reloadEntryPool(editingId) {
+        return loadEntryPool(entryPoolState.type, entryPoolState.id).then(function (node) {
+            renderEntryPoolModal(node, editingId);
+        });
+    }
+
+    function entryError(modal, error) {
+        var box = modal.querySelector(".node-entry-message");
+        box.hidden = false;
+        box.textContent = error.message || "请求失败";
+    }
+
+    function bindEntryPoolModal(modal, node) {
+        modal.querySelector("[data-entry-close]").onclick = closeEntryPoolModal;
+        modal.onclick = function (event) { if (event.target === modal) closeEntryPoolModal(); };
+        modal.querySelector(".node-entry-setting").onsubmit = function (event) {
+            event.preventDefault();
+            var form = event.currentTarget, submit = form.querySelector('[type="submit"]');
+            submit.disabled = true; submit.textContent = "正在保存……";
+            api("/security/entry-setting/save", { method: "POST", body: JSON.stringify({ server_type: node.server_type, server_id: Number(node.server_id), delivery_mode: form.elements.delivery_mode.value, check_interval: Number(form.elements.check_interval.value), check_url: form.elements.check_url.value.trim() }) })
+                .then(function () { return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = "保存下发设置"; entryError(modal, error); });
+        };
+        modal.querySelector(".node-entry-form").onsubmit = function (event) {
+            event.preventDefault();
+            var form = event.currentTarget, submit = form.querySelector('[type="submit"]');
+            submit.disabled = true; submit.textContent = "正在保存……";
+            api("/security/entry/save", { method: "POST", body: JSON.stringify(entryPayload(form, node)) })
+                .then(function () { return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = form.dataset.entryId ? "保存入口" : "添加入口"; entryError(modal, error); });
+        };
+        var cancel = modal.querySelector("[data-entry-cancel]");
+        if (cancel) cancel.onclick = function () { renderEntryPoolModal(node); };
+        modal.querySelectorAll("[data-entry-edit]").forEach(function (button) { button.onclick = function () { renderEntryPoolModal(node, button.dataset.entryEdit); }; });
+        modal.querySelectorAll("[data-entry-delete]").forEach(function (button) { button.onclick = function () {
+            if (!confirm("确认删除这个入口？已下载到客户端的旧配置不会被远程删除。")) return;
+            button.disabled = true;
+            api("/security/entry/delete", { method: "POST", body: JSON.stringify({ id: Number(button.dataset.entryDelete) }) })
+                .then(function () { return reloadEntryPool(); }).catch(function (error) { button.disabled = false; entryError(modal, error); });
+        }; });
+    }
+
+    window.FastCatEntryPool = {
+        open: function (type, id) {
+            loadEntryPool(type, id).then(function (node) { renderEntryPoolModal(node); }).catch(function (error) { alert(error.message); });
+        },
+    };
+
     function headerActions() {
         var header = document.querySelector("#page-header .content-header");
         if (!header) return null;

@@ -177,6 +177,37 @@
         box.textContent = message || "";
     }
 
+    function serializeFilter(filters) {
+        var parts = [];
+        function append(prefix, value) {
+            if (value == null) {
+                parts.push(prefix + "=");
+            } else if (typeof value === "object") {
+                Object.keys(value).forEach(function (key) {
+                    append(prefix + "[" + key + "]", value[key]);
+                });
+            } else {
+                parts.push(prefix + "=" + encodeURIComponent(value));
+            }
+        }
+        append("filter", filters || []);
+        return parts.join("&");
+    }
+
+    window.FastCatBatchGroup = {
+        open: function (filters, total) {
+            if (!Array.isArray(filters) || !filters.length) {
+                alert("请先使用过滤器筛选用户");
+                return;
+            }
+            lastUserFetch = {
+                sourceQuery: serializeFilter(filters),
+                total: Number(total || 0),
+            };
+            openBatchGroupModal();
+        },
+    };
+
     function headerActions() {
         var header = document.querySelector("#page-header .content-header");
         if (!header) return null;
@@ -206,13 +237,9 @@
             host.appendChild(link);
             mounting = false;
         }
-        recoverUserFetch();
-        mountBatchGroup();
     }
 
     function start() {
-        captureUserFetch();
-        recoverUserFetch();
         mount();
         new MutationObserver(function () {
             window.requestAnimationFrame(mount);

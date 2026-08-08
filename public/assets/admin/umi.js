@@ -71164,6 +71164,13 @@
                         disabled: !E.length
                     }, g.a.createElement("a", {
                         disabled: !E.length,
+                        onClick: ()=>window.FastCatBatchGroup && window.FastCatBatchGroup.open(E, x.total)
+                    }, g.a.createElement(u["a"], {
+                        type: "team"
+                    }), " \u6279\u91cf\u4fee\u6539\u6743\u9650\u7ec4")), g.a.createElement(c["a"].Item, {
+                        disabled: !E.length
+                    }, g.a.createElement("a", {
+                        disabled: !E.length,
                         onClick: ()=>this.ban()
                     }, g.a.createElement(u["a"], {
                         type: "stop"

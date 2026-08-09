@@ -211,6 +211,8 @@ class AdminRoute
             $router->post('/security/entry-setting/save', 'V1\\Admin\\NodeSecurityController@saveEntrySetting');
             $router->post('/security/entry/save', 'V1\\Admin\\NodeSecurityController@saveEntry');
             $router->post('/security/entry/delete', 'V1\\Admin\\NodeSecurityController@deleteEntry');
+            $router->post('/security/entry-client-policy/save', 'V1\\Admin\\NodeSecurityController@saveEntryClientPolicy');
+            $router->post('/security/entry-client-policy/delete', 'V1\\Admin\\NodeSecurityController@deleteEntryClientPolicy');
         });
     }
 }

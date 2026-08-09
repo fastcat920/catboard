@@ -222,7 +222,7 @@ class ServerService
         return $servers;
     }
 
-    public function getAvailableServers(User $user)
+    public function getAvailableServers(User $user, ?array $client = null)
     {
         $servers = array_merge(
             $this->getAvailableShadowsocks($user),
@@ -246,7 +246,7 @@ class ServerService
             $server['cache_key'] = "{$server['type']}-{$server['id']}-{$server['updated_at']}-{$server['is_online']}";
             return $server;
         }, $servers);
-        return (new NodeEntryPoolService())->expand($servers);
+        return (new NodeEntryPoolService())->expand($servers, $client);
     }
 
     public function getAvailableUsers($groupId)

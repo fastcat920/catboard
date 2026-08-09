@@ -750,7 +750,14 @@ class NodeSecurityController extends Controller
         $entries = DB::table('v2_node_entry_pool')->orderBy('priority')->orderBy('id')->get()->groupBy(function ($row) {
             return $row->server_type . ':' . $row->server_id;
         });
-        $data = $servers->map(function ($server, $key) use ($settings, $entries) {
+        try {
+            $clientPolicies = DB::table('v2_node_entry_client_policy')->orderBy('priority')->orderBy('id')->get()->groupBy(function ($row) {
+                return $row->server_type . ':' . $row->server_id;
+            });
+        } catch (\Throwable $e) {
+            $clientPolicies = collect();
+        }
+        $data = $servers->map(function ($server, $key) use ($settings, $entries, $clientPolicies) {
             $setting = $settings->get($key);
             $server['delivery_mode'] = $setting->delivery_mode ?? 'primary_only';
             $server['check_url'] = $setting->check_url ?? 'http://www.gstatic.com/generate_204';
@@ -762,6 +769,15 @@ class NodeSecurityController extends Controller
                     'priority' => $entry->priority, 'is_primary' => (bool)$entry->is_primary,
                     'enabled' => (bool)$entry->enabled, 'health_status' => $entry->health_status,
                     'last_checked_at' => $entry->last_checked_at, 'last_healthy_at' => $entry->last_healthy_at,
+                ];
+            })->values();
+            $server['client_policies'] = $clientPolicies->get($key, collect())->map(function ($policy) {
+                return [
+                    'id' => (int)$policy->id, 'client_family' => $policy->client_family,
+                    'client_platform' => $policy->client_platform, 'min_version' => $policy->min_version,
+                    'max_version' => $policy->max_version, 'delivery_mode' => $policy->delivery_mode,
+                    'check_url' => $policy->check_url, 'check_interval' => (int)$policy->check_interval,
+                    'priority' => (int)$policy->priority, 'enabled' => (bool)$policy->enabled,
                 ];
             })->values();
             return $server;
@@ -857,6 +873,56 @@ class NodeSecurityController extends Controller
         if (!$entry) abort(404, '入口不存在');
         DB::table('v2_node_entry_pool')->where('id', $entry->id)->delete();
         $this->adminLog($request, 'entry.delete', 'node_entry', $entry->id, ['server_type' => $entry->server_type, 'server_id' => $entry->server_id, 'host_hash' => $entry->host_hash]);
+        return response(['data' => true]);
+    }
+
+    public function saveEntryClientPolicy(Request $request)
+    {
+        $request->validate([
+            'id' => 'nullable|integer', 'server_type' => 'required|string|max:32',
+            'server_id' => 'required|integer|min:1', 'client_family' => 'required|string|max:64',
+            'client_platform' => 'nullable|string|max:24', 'min_version' => 'nullable|string|max:32',
+            'max_version' => 'nullable|string|max:32',
+            'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
+            'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
+            'priority' => 'required|integer|min:1|max:10000', 'enabled' => 'required|boolean',
+        ]);
+        $minVersion = trim((string)$request->input('min_version'));
+        $maxVersion = trim((string)$request->input('max_version'));
+        if ($minVersion !== '' && $maxVersion !== '' && version_compare($minVersion, $maxVersion, '>')) {
+            abort(422, '最低版本不能高于最高版本');
+        }
+        $this->ensureServerExists($request->input('server_type'), (int)$request->input('server_id'));
+        $where = ['id' => (int)$request->input('id')];
+        if ($request->filled('id') && !DB::table('v2_node_entry_client_policy')->where($where)->exists()) abort(404, '客户端规则不存在');
+        $now = time();
+        $payload = [
+            'server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id'),
+            'client_family' => trim($request->input('client_family')),
+            'client_platform' => trim((string)$request->input('client_platform')) ?: null,
+            'min_version' => $minVersion ?: null, 'max_version' => $maxVersion ?: null,
+            'delivery_mode' => $request->input('delivery_mode'), 'check_url' => $request->input('check_url'),
+            'check_interval' => (int)$request->input('check_interval'), 'priority' => (int)$request->input('priority'),
+            'enabled' => $request->boolean('enabled'), 'updated_at' => $now,
+        ];
+        if ($request->filled('id')) DB::table('v2_node_entry_client_policy')->where($where)->update($payload);
+        else DB::table('v2_node_entry_client_policy')->insert($payload + ['created_at' => $now]);
+        $this->adminLog($request, 'entry_client_policy.save', 'node', $request->input('server_id'), [
+            'server_type' => $payload['server_type'], 'client_family' => $payload['client_family'],
+            'client_platform' => $payload['client_platform'], 'delivery_mode' => $payload['delivery_mode'],
+        ]);
+        return response(['data' => true]);
+    }
+
+    public function deleteEntryClientPolicy(Request $request)
+    {
+        $request->validate(['id' => 'required|integer']);
+        $policy = DB::table('v2_node_entry_client_policy')->where('id', $request->input('id'))->first();
+        if (!$policy) abort(404, '客户端规则不存在');
+        DB::table('v2_node_entry_client_policy')->where('id', $policy->id)->delete();
+        $this->adminLog($request, 'entry_client_policy.delete', 'node', $policy->server_id, [
+            'server_type' => $policy->server_type, 'client_family' => $policy->client_family,
+        ]);
         return response(['data' => true]);
     }
 

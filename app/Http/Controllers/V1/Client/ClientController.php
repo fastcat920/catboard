@@ -10,6 +10,7 @@ use App\Protocols\ClashMeta;
 use App\Services\ServerService;
 use App\Services\UserService;
 use App\Services\NodeSecurity\AuditService;
+use App\Services\NodeSecurity\UaClassifierService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,8 @@ class ClientController extends Controller
         $userService = new UserService();
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
-            $servers = $serverService->getAvailableServers($user);
+            $client = (new UaClassifierService())->classify($request->userAgent());
+            $servers = $serverService->getAvailableServers($user, $client);
             $audit = new AuditService();
             $servers = $audit->prepare($request, $servers, 'client.subscribe');
             if($flag) {

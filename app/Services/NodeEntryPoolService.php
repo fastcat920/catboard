@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class NodeEntryPoolService
 {
-    public function expand(array $servers): array
+    public function expand(array $servers, ?array $client = null): array
     {
         try {
             $settings = DB::table('v2_node_entry_setting')->get()->keyBy(function ($row) {
@@ -20,6 +20,17 @@ class NodeEntryPoolService
         } catch (\Throwable $e) {
             return $servers;
         }
+        $policies = collect();
+        if ($client) {
+            try {
+                $policies = DB::table('v2_node_entry_client_policy')->where('enabled', 1)
+                    ->orderBy('priority')->orderBy('id')->get()->groupBy(function ($row) {
+                        return $row->server_type . ':' . $row->server_id;
+                    });
+            } catch (\Throwable $e) {
+                // Client policies are optional during rolling upgrades.
+            }
+        }
 
         $expanded = [];
         foreach ($servers as $server) {
@@ -30,8 +41,12 @@ class NodeEntryPoolService
                 $expanded[] = $server;
                 continue;
             }
-            $mode = in_array($setting->delivery_mode, ['primary_only', 'manual_backup', 'auto_fallback'], true)
-                ? $setting->delivery_mode : 'primary_only';
+            $policy = $client ? $this->matchingPolicy($policies->get($key, collect()), $client) : null;
+            $deliveryMode = $policy->delivery_mode ?? $setting->delivery_mode;
+            $mode = in_array($deliveryMode, ['primary_only', 'manual_backup', 'auto_fallback'], true)
+                ? $deliveryMode : 'primary_only';
+            $checkUrl = $policy->check_url ?? $setting->check_url;
+            $checkInterval = (int)($policy->check_interval ?? $setting->check_interval);
             $selected = $mode === 'primary_only'
                 ? $pool->sortByDesc('is_primary')->take(1)
                 : $pool;
@@ -44,16 +59,34 @@ class NodeEntryPoolService
                 $copy['_entry_mode'] = $mode;
                 $copy['_entry_logical_name'] = $server['name'];
                 $copy['_entry_logical_key'] = $key;
-                $copy['_entry_check_url'] = $setting->check_url;
-                $copy['_entry_check_interval'] = (int)$setting->check_interval;
+                $copy['_entry_check_url'] = $checkUrl;
+                $copy['_entry_check_interval'] = $checkInterval;
+                if ($policy) $copy['_entry_client_policy_id'] = (int)$policy->id;
                 if ($mode !== 'primary_only') {
                     $copy['name'] = $server['name'] . '｜' . ($entry->is_primary ? '主入口' : $entry->name);
                 }
-                $copy['cache_key'] = ($copy['cache_key'] ?? $key) . '-entry-' . $entry->id . '-' . $entry->updated_at;
+                $copy['cache_key'] = ($copy['cache_key'] ?? $key)
+                    . '-entry-' . $entry->id . '-' . $entry->updated_at
+                    . '-setting-' . $setting->updated_at
+                    . ($policy ? '-policy-' . $policy->id . '-' . $policy->updated_at : '');
                 $expanded[] = $copy;
             }
         }
         return $expanded;
+    }
+
+    private function matchingPolicy($policies, array $client)
+    {
+        $family = (string)($client['client_family'] ?? '');
+        $platform = (string)($client['client_platform'] ?? '');
+        $version = trim((string)($client['client_version'] ?? ''));
+        return $policies->first(function ($policy) use ($family, $platform, $version) {
+            if ($policy->client_family !== '*' && $policy->client_family !== $family) return false;
+            if ($policy->client_platform && $policy->client_platform !== '*' && $policy->client_platform !== $platform) return false;
+            if ($policy->min_version && ($version === '' || version_compare($version, $policy->min_version, '<'))) return false;
+            if ($policy->max_version && ($version === '' || version_compare($version, $policy->max_version, '>'))) return false;
+            return true;
+        });
     }
 
     public static function applyClashFallbackGroups(array &$config, array $servers): void

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\ServerService;
 use App\Services\UserService;
 use App\Services\NodeSecurity\AuditService;
+use App\Services\NodeSecurity\UaClassifierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Yaml\Yaml;
@@ -19,7 +20,8 @@ class AppController extends Controller
         $userService = new UserService();
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
-            $servers = $serverService->getAvailableServers($user);
+            $client = (new UaClassifierService())->classify($request->userAgent());
+            $servers = $serverService->getAvailableServers($user, $client);
         }
         $audit = new AuditService();
         $servers = $audit->prepare($request, $servers, 'client.app.config');

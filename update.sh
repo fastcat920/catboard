@@ -36,6 +36,11 @@ echo "Running registered database upgrades..."
 php artisan v2board:upgrade-database
 echo "Database migrations and one-time data upgrades completed."
 
+echo "Refreshing application routes and compiled views..."
+php artisan route:clear
+php artisan view:clear
+echo "Application routes and views refreshed."
+
 if [ -f "/etc/init.d/bt" ]; then
   chown -R www "$(pwd)";
 fi

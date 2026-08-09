@@ -13,6 +13,7 @@ use App\Services\NodeSecurity\SettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Schema;
 use App\Utils\Helper;
 
 class NodeSecurityController extends Controller
@@ -353,6 +354,7 @@ class NodeSecurityController extends Controller
 
     public function snapshotAnalysisCatalog(Request $request)
     {
+        $this->ensureSnapshotAccessIndex();
         $query = DB::table('v2_node_snapshot as s')->leftJoin('v2_node_access_snapshot as x', 'x.snapshot_id', '=', 's.id')
             ->select('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
                 DB::raw('COUNT(DISTINCT x.user_id) as user_count'), DB::raw('COUNT(x.access_log_id) as access_count'));
@@ -368,6 +370,7 @@ class NodeSecurityController extends Controller
 
     public function snapshotComparison(Request $request)
     {
+        $this->ensureSnapshotAccessIndex();
         $snapshotIds = collect(explode(',', (string)$request->input('snapshot_ids')))->map(function ($id) {
             return (int)$id;
         })->filter()->unique()->values();
@@ -416,6 +419,7 @@ class NodeSecurityController extends Controller
 
     public function userSnapshotTrajectory(Request $request)
     {
+        $this->ensureSnapshotAccessIndex();
         $identity = trim((string)$request->input('user'));
         if ($identity === '') abort(422, '请输入用户 ID 或完整邮箱');
         $user = ctype_digit($identity) ? User::find((int)$identity) : User::where('email', $identity)->first();
@@ -887,6 +891,13 @@ class NodeSecurityController extends Controller
 
     private function from(Request $request): int { return time() - max(1, min(90, (int)$request->input('days', 7))) * 86400; }
     private function perPage(Request $request): int { return max(10, min(100, (int)$request->input('per_page', 25))); }
+
+    private function ensureSnapshotAccessIndex(): void
+    {
+        if (!Schema::hasTable('v2_node_access_snapshot')) {
+            abort(503, '快照访问索引尚未安装，请重新执行 ./update.sh 完成数据库升级');
+        }
+    }
 
     private function adminLog(Request $request, string $action, ?string $targetType, $targetId, array $payload): void
     {

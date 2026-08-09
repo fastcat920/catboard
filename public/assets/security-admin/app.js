@@ -476,6 +476,10 @@
         if (!page || !page.last_page || page.last_page < 2) return "";
         return '<div class="pagination"><button class="btn" data-snapshot-page="' + kind + '" data-page-no="' + (page.current_page - 1) + '"' + (page.current_page <= 1 ? ' disabled' : '') + '>上一页</button><span>第 ' + page.current_page + ' / ' + page.last_page + ' 页，共 ' + page.total + ' 条</span><button class="btn" data-snapshot-page="' + kind + '" data-page-no="' + (page.current_page + 1) + '"' + (page.current_page >= page.last_page ? ' disabled' : '') + '>下一页</button></div>';
     }
+    function snapshotSortHeader(label, key, current, direction) {
+        var active = current === key;
+        return '<button type="button" class="table-sort' + (active ? ' active ' + direction : '') + '" data-trajectory-sort="' + key + '"><span>' + label + '</span><i><b>▲</b><b>▼</b></i></button>';
+    }
     function snapshotAnalysis(d) {
         var catalog = (d || {}).catalog || { data: [] };
         var filters = state.filters.snapshot_analysis || {};
@@ -501,7 +505,8 @@
             var trajectoryRows = (trajectoryPage.data || []).map(function (row) {
                 return '<tr><td><b>#' + row.snapshot_id + '</b><br><span class="muted">' + esc(String(row.version || "").slice(0, 12)) + '</span></td><td>' + esc(row.server_name || "未命名") + '<br><span class="muted">' + esc(row.server_type) + ' #' + row.server_id + '</span></td><td><b>' + row.access_count + '</b> 次</td><td>' + row.unique_ips + ' / ' + row.unique_devices + '</td><td>' + esc(row.endpoints || "-") + '</td><td>' + time(row.first_access_at) + '<br><span class="muted">最近 ' + time(row.last_access_at) + '</span></td></tr>';
             }).join("");
-            trajectoryResult = '<section class="panel snapshot-result"><div class="settings-section-head"><div><h2>' + esc(user.email) + ' · 快照轨迹</h2><p>ID ' + user.id + ' · ' + esc(user.group_name || "未分组") + ' · ' + (user.banned ? "已封禁" : "正常") + ' · 按最近访问时间从新到旧排序</p></div></div><div class="cards snapshot-cards"><div class="card"><div class="muted">访问次数</div><div class="value">' + Number(summaryUser.access_count || 0) + '</div></div><div class="card"><div class="muted">不同快照</div><div class="value">' + Number(summaryUser.snapshot_count || 0) + '</div></div><div class="card"><div class="muted">最近访问</div><div class="snapshot-time">' + time(summaryUser.last_access_at) + '</div></div></div><div class="table-wrap"><table><thead><tr><th>快照</th><th>节点</th><th>访问</th><th>IP / 设备</th><th>接口</th><th>时间</th></tr></thead><tbody>' + (trajectoryRows || '<tr><td colspan="6" class="empty">该时间范围内没有快照访问记录</td></tr>') + '</tbody></table></div>' + snapshotPager(trajectoryPage, "user") + '</section>';
+            var trajectorySort = filters.trajectory_sort || "last_access_at", trajectoryOrder = filters.trajectory_order || "desc";
+            trajectoryResult = '<section class="panel snapshot-result"><div class="settings-section-head"><div><h2>' + esc(user.email) + ' · 快照轨迹</h2><p>ID ' + user.id + ' · ' + esc(user.group_name || "未分组") + ' · ' + (user.banned ? "已封禁" : "正常") + ' · 点击表头可以切换排序</p></div></div><div class="cards snapshot-cards"><div class="card"><div class="muted">访问次数</div><div class="value">' + Number(summaryUser.access_count || 0) + '</div></div><div class="card"><div class="muted">不同快照</div><div class="value">' + Number(summaryUser.snapshot_count || 0) + '</div></div><div class="card"><div class="muted">最近访问</div><div class="snapshot-time">' + time(summaryUser.last_access_at) + '</div></div></div><div class="table-wrap"><table><thead><tr><th>' + snapshotSortHeader("快照", "snapshot_id", trajectorySort, trajectoryOrder) + '</th><th>' + snapshotSortHeader("节点", "server_name", trajectorySort, trajectoryOrder) + '</th><th>' + snapshotSortHeader("访问", "access_count", trajectorySort, trajectoryOrder) + '</th><th>' + snapshotSortHeader("IP / 设备", "unique_ips", trajectorySort, trajectoryOrder) + '</th><th>接口</th><th>' + snapshotSortHeader("时间", "last_access_at", trajectorySort, trajectoryOrder) + '</th></tr></thead><tbody>' + (trajectoryRows || '<tr><td colspan="6" class="empty">该时间范围内没有快照访问记录</td></tr>') + '</tbody></table></div>' + snapshotPager(trajectoryPage, "user") + '</section>';
         }
         return '<div class="snapshot-tabs"><button class="btn' + (mode === "compare" ? ' primary' : '') + '" data-snapshot-mode="compare">快照对比</button><button class="btn' + (mode === "user" ? ' primary' : '') + '" data-snapshot-mode="user">用户快照轨迹</button></div>' +
             (mode === "compare" ? '<section class="filter-panel"><div class="settings-section-head"><div><h2>选择 2～10 个快照</h2><p>已选择 ' + selectedIds.length + ' 个；跨页搜索时选择会保留。</p></div></div><div class="filter-grid"><label>快照 / 节点名称<input id="snapshot-search" value="' + esc(filters.search || "") + '" placeholder="快照 ID 或节点名称"></label><label>节点类型<input id="snapshot-type" value="' + esc(filters.server_type || "") + '" placeholder="例如 vmess"></label><label>节点 ID<input id="snapshot-server-id" type="number" value="' + esc(filters.server_id || "") + '"></label></div><div class="filter-actions"><button class="btn" data-filter-snapshots>搜索快照</button><button class="btn" data-clear-snapshot-selection>清空选择</button></div><div class="table-wrap snapshot-picker"><table><thead><tr><th></th><th>快照</th><th>节点</th><th>发布时间</th><th>用户 / 访问</th></tr></thead><tbody>' + (catalogRows || '<tr><td colspan="5" class="empty">没有找到快照</td></tr>') + '</tbody></table></div>' + snapshotPager(catalog, "catalog") + '<div class="filter-grid snapshot-run"><label>开始时间<input id="snapshot-from" type="datetime-local" value="' + esc(filters.date_from_text || "") + '"></label><label>结束时间<input id="snapshot-to" type="datetime-local" value="' + esc(filters.date_to_text || "") + '"></label><label>用户范围<select id="snapshot-scope"><option value="all"' + selected(filters.scope || "all", "all") + '>全部命中用户</option><option value="common"' + selected(filters.scope, "common") + '>所有快照共同用户</option><option value="differences"' + selected(filters.scope, "differences") + '>存在快照差异的用户</option>' + selectedIds.map(function (id, index) { var label = selectedIds.length === 2 ? (index === 0 ? "旧快照独有" : "新快照新增") : "仅此快照"; return '<option value="only:' + id + '"' + selected(filters.scope, "only:" + id) + '>' + label + ' #' + id + '</option>'; }).join("") + '</select></label></div><div class="filter-actions"><button class="btn primary" data-run-snapshot-compare' + (selectedIds.length < 2 ? ' disabled' : '') + '>开始对比（' + selectedIds.length + '）</button><span class="muted">默认分析最近 30 天；可留空使用默认范围。</span></div></section>' + compareResult : '<section class="filter-panel"><div class="settings-section-head"><div><h2>查询用户访问过的快照</h2><p>使用用户 ID 或完整邮箱精确查找。</p></div></div><div class="filter-grid"><label>用户 ID / 邮箱<input id="trajectory-user" value="' + esc(filters.trajectory_user || "") + '" placeholder="44567 或 user@example.com"></label><label>快照 ID（可选）<input id="trajectory-snapshot" type="number" value="' + esc(filters.trajectory_snapshot || "") + '"></label><label>开始时间<input id="trajectory-from" type="datetime-local" value="' + esc(filters.trajectory_from_text || "") + '"></label><label>结束时间<input id="trajectory-to" type="datetime-local" value="' + esc(filters.trajectory_to_text || "") + '"></label></div><div class="filter-actions"><button class="btn primary" data-run-user-trajectory>查询轨迹</button><span class="muted">默认查询最近 30 天。</span></div></section>' + trajectoryResult);
@@ -1584,7 +1589,7 @@
         };
         function trajectoryPath(page) {
             var filters = state.filters.snapshot_analysis;
-            return "snapshot-analysis/user?page=" + (page || 1) + queryString({ identity: filters.trajectory_user || "", snapshot_id: filters.trajectory_snapshot || "", date_from: filters.trajectory_from || "", date_to: filters.trajectory_to || "" });
+            return "snapshot-analysis/user?page=" + (page || 1) + queryString({ identity: filters.trajectory_user || "", snapshot_id: filters.trajectory_snapshot || "", date_from: filters.trajectory_from || "", date_to: filters.trajectory_to || "", sort_by: filters.trajectory_sort || "last_access_at", sort_order: filters.trajectory_order || "desc" });
         }
         function runUserTrajectory(page) {
             state.loading = true; state.error = ""; render();
@@ -1613,6 +1618,15 @@
                 if (button.dataset.snapshotPage === "catalog") { state.pageNo = page; load(); }
                 else if (button.dataset.snapshotPage === "compare") runSnapshotComparison(page);
                 else runUserTrajectory(page);
+            };
+        });
+        root.querySelectorAll("[data-trajectory-sort]").forEach(function (button) {
+            button.onclick = function () {
+                var filters = state.filters.snapshot_analysis;
+                var key = button.dataset.trajectorySort;
+                filters.trajectory_order = filters.trajectory_sort === key && filters.trajectory_order === "desc" ? "asc" : "desc";
+                filters.trajectory_sort = key;
+                runUserTrajectory(1);
             };
         });
         root.querySelectorAll("[data-user-snapshots]").forEach(function (button) {

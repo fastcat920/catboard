@@ -797,6 +797,11 @@ textarea {
 .snapshot-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0 18px; }
 .snapshot-time { margin-top: 8px; font-weight: 700; }
 .snapshot-mini { margin-top: 6px; padding: 4px 8px; font-size: 12px; }
+.table-sort { display: inline-flex; align-items: center; gap: 7px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; cursor: pointer; white-space: nowrap; }
+.table-sort i { display: grid; gap: 0; color: #c4c9d2; font-style: normal; font-size: 8px; line-height: 8px; }
+.table-sort i b { height: 8px; font-weight: 400; }
+.table-sort.active.asc i b:first-child, .table-sort.active.desc i b:last-child { color: var(--primary); }
+.table-sort:hover span { color: var(--primary); }
 @media (max-width: 760px) { .snapshot-tabs { flex-wrap: wrap; } .snapshot-cards { grid-template-columns: 1fr; } }
 .check {
     display: flex;

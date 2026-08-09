@@ -440,13 +440,19 @@ class NodeSecurityController extends Controller
         $base = DB::table('v2_node_access_snapshot as x')->where('x.user_id', $user->id)->whereBetween('x.requested_at', [$from, $to]);
         if ($request->filled('snapshot_id')) $base->where('x.snapshot_id', (int)$request->input('snapshot_id'));
         $summary = (clone $base)->selectRaw('COUNT(DISTINCT x.access_log_id) as access_count, COUNT(DISTINCT x.snapshot_id) as snapshot_count, MIN(x.requested_at) as first_access_at, MAX(x.requested_at) as last_access_at')->first();
+        $sorts = ['snapshot_id' => 'snapshot_id', 'server_name' => 's.server_name', 'access_count' => 'access_count',
+            'unique_ips' => 'unique_ips', 'last_access_at' => 'last_access_at'];
+        $sort = $sorts[$request->input('sort_by')] ?? 'last_access_at';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
         $rows = $base->join('v2_node_snapshot as s', 's.id', '=', 'x.snapshot_id')->join('v2_node_access_log as l', 'l.id', '=', 'x.access_log_id')
             ->select('s.id as snapshot_id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
                 DB::raw('COUNT(DISTINCT x.access_log_id) as access_count'), DB::raw('MIN(x.requested_at) as first_access_at'), DB::raw('MAX(x.requested_at) as last_access_at'),
                 DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'), DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
                 DB::raw("GROUP_CONCAT(DISTINCT l.endpoint ORDER BY l.endpoint SEPARATOR '、') as endpoints"))
             ->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
-            ->orderByDesc('last_access_at')->orderByDesc('access_count')->orderByDesc('snapshot_id')->paginate($this->perPage($request));
+            ->orderBy($sort, $direction)->when($sort === 'unique_ips', function ($query) use ($direction) {
+                $query->orderBy('unique_devices', $direction);
+            })->orderByDesc('last_access_at')->orderByDesc('access_count')->orderByDesc('snapshot_id')->paginate($this->perPage($request));
         $groupName = $user->group_id ? ServerGroup::where('id', $user->group_id)->value('name') : null;
         return response(['data' => ['user' => ['id' => $user->id, 'email' => $user->email, 'group_id' => $user->group_id, 'group_name' => $groupName, 'banned' => (bool)$user->banned],
             'summary' => ['access_count' => (int)($summary->access_count ?? 0), 'snapshot_count' => (int)($summary->snapshot_count ?? 0), 'first_access_at' => $summary->first_access_at ?? null, 'last_access_at' => $summary->last_access_at ?? null, 'from' => $from, 'to' => $to], 'snapshots' => $rows]]);

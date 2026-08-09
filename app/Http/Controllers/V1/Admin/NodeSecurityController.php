@@ -421,9 +421,18 @@ class NodeSecurityController extends Controller
     {
         $this->ensureSnapshotAccessIndex();
         $identity = trim((string)$request->input('user'));
-        if ($identity === '') abort(422, '请输入用户 ID 或完整邮箱');
-        $user = ctype_digit($identity) ? User::find((int)$identity) : User::where('email', $identity)->first();
-        if (!$user) abort(404, '用户不存在');
+        if ($identity === '') return response(['message' => '请输入用户 ID 或邮箱'], 422);
+        if (ctype_digit($identity)) {
+            $user = User::find((int)$identity);
+        } else {
+            $user = User::where('email', $identity)->first();
+            if (!$user) {
+                $matches = User::where('email', 'like', '%' . $identity . '%')->orderBy('id')->limit(2)->get();
+                if ($matches->count() > 1) return response(['message' => '匹配到多个用户，请输入完整邮箱或用户 ID'], 422);
+                $user = $matches->first();
+            }
+        }
+        if (!$user) return response(['message' => '没有找到该用户，请检查邮箱或改用用户 ID'], 404);
         $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
         $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
         if ($from > $to) abort(422, '开始时间不能晚于结束时间');

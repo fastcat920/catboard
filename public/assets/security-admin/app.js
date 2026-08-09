@@ -1056,11 +1056,15 @@
             ? candidates
                   .map(function (x) {
                       return (
-                          "<tr><td><b>" +
+                          '<tr><td><input type="checkbox" data-candidate-user value="' +
+                          x.user_id +
+                          '"></td><td><b>' +
                           esc(x.email) +
                           '</b><br><span class="muted">ID ' +
                           x.user_id +
-                          "</span></td><td><b>" +
+                          "</span><br>" +
+                          badge(x.banned ? "已封禁" : "正常", x.banned ? "critical" : "ok") +
+                          "</td><td><b>" +
                           x.access_count +
                           "</b> 次</td><td>" +
                           x.unique_ips +
@@ -1074,7 +1078,7 @@
                       );
                   })
                   .join("")
-            : '<tr><td colspan="5" class="empty">' +
+            : '<tr><td colspan="6" class="empty">' +
               (evidence.snapshot_linked
                   ? "关联窗口内没有用户命中该节点快照"
                   : "事件未关联节点快照，不展示候选用户") +
@@ -1179,7 +1183,11 @@
                 e.id +
                 '">排除误报</button><button class="btn" data-event-action="resolved" data-id="' +
                 e.id +
-                '">标记已恢复</button></div><section class="timeline-section"><h3>候选用户（按接近失败时间排序）</h3><div class="table-wrap"><table><thead><tr><th>用户</th><th>访问</th><th>IP / 设备</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' +
+                '">标记已恢复</button></div><section class="timeline-section"><div class="timeline-heading"><h3>候选用户（按接近失败时间排序）</h3><div class="timeline-tools"><label class="check"><input type="checkbox" data-candidate-user-all> 全选</label><button class="btn danger" data-candidate-batch="ban" data-event-id="' +
+                e.id +
+                '" disabled>批量封禁</button><button class="btn" data-candidate-batch="unban" data-event-id="' +
+                e.id +
+                '" disabled>批量解封</button></div></div><div class="table-wrap"><table><thead><tr><th></th><th>用户</th><th>访问</th><th>IP / 设备</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' +
                 candidateRows +
                 '</tbody></table></div></section><section class="timeline-section"><div class="timeline-heading"><h3>完整访问时间线</h3><div class="timeline-tools"><input id="timeline-search" placeholder="搜索邮箱、ID、IP、接口"><label class="check"><input id="timeline-near" type="checkbox"> 仅看封锁前 60 秒</label></div></div><div class="table-wrap timeline-table"><table><thead><tr><th>访问时间</th><th>用户</th><th>接口</th><th>IP</th><th>客户端 / 设备</th><th>响应</th></tr></thead><tbody>' +
                 logRows +
@@ -1509,6 +1517,53 @@
         var timelineNear = root.querySelector("#timeline-near");
         if (timelineSearch) timelineSearch.oninput = filterTimeline;
         if (timelineNear) timelineNear.onchange = filterTimeline;
+        function selectedCandidateUsers() {
+            return Array.from(root.querySelectorAll("[data-candidate-user]:checked")).map(function (input) {
+                return Number(input.value);
+            });
+        }
+        function updateCandidateBatchButtons() {
+            var count = selectedCandidateUsers().length;
+            root.querySelectorAll("[data-candidate-batch]").forEach(function (button) {
+                button.disabled = count === 0;
+                button.textContent = (button.dataset.candidateBatch === "ban" ? "批量封禁" : "批量解封") + (count ? "（" + count + "）" : "");
+            });
+            var all = root.querySelector("[data-candidate-user-all]");
+            var boxes = Array.from(root.querySelectorAll("[data-candidate-user]"));
+            if (all) {
+                all.checked = boxes.length > 0 && boxes.every(function (input) { return input.checked; });
+                all.indeterminate = boxes.some(function (input) { return input.checked; }) && !all.checked;
+            }
+        }
+        root.querySelectorAll("[data-candidate-user]").forEach(function (input) {
+            input.onchange = updateCandidateBatchButtons;
+        });
+        var candidateAll = root.querySelector("[data-candidate-user-all]");
+        if (candidateAll) candidateAll.onchange = function () {
+            root.querySelectorAll("[data-candidate-user]").forEach(function (input) { input.checked = candidateAll.checked; });
+            updateCandidateBatchButtons();
+        };
+        root.querySelectorAll("[data-candidate-batch]").forEach(function (button) {
+            button.onclick = function () {
+                var ids = selectedCandidateUsers();
+                if (!ids.length) return;
+                var action = button.dataset.candidateBatch;
+                var label = action === "ban" ? "封禁" : "解封";
+                if (!confirm("确认批量" + label + "选中的 " + ids.length + " 名候选用户？")) return;
+                button.disabled = true;
+                button.textContent = "正在" + label + "……";
+                api("users/batch-ban", { method: "POST", body: { user_ids: ids, action: action } })
+                    .then(function (result) {
+                        alert(label + "完成：匹配 " + result.matched + " 人，实际修改 " + result.affected + " 人。");
+                        return api("event/detail?id=" + button.dataset.eventId);
+                    })
+                    .then(eventDetailModal)
+                    .catch(function (error) {
+                        state.error = error.message;
+                        render();
+                    });
+            };
+        });
         root.querySelectorAll("[data-event]").forEach(function (x) {
             x.onclick = function () {
                 api("event/detail?id=" + x.dataset.event).then(function (d) {

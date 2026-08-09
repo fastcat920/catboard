@@ -780,8 +780,13 @@ textarea {
 .timeline-tools {
     margin-bottom: 12px;
 }
-.timeline-tools input {
+.timeline-tools input:not([type="checkbox"]) {
     min-width: 280px;
+}
+.timeline-section input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    vertical-align: -3px;
 }
 .check {
     display: flex;

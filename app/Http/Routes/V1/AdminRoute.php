@@ -181,6 +181,7 @@ class AdminRoute
             $router->get ('/security/users', 'V1\\Admin\\NodeSecurityController@users');
             $router->get ('/security/user/detail', 'V1\\Admin\\NodeSecurityController@userDetail');
             $router->post('/security/user/action', 'V1\\Admin\\NodeSecurityController@userAction');
+            $router->post('/security/users/batch-ban', 'V1\\Admin\\NodeSecurityController@batchBanUsers');
             $router->get ('/security/access-logs', 'V1\\Admin\\NodeSecurityController@accessLogs');
             $router->get ('/security/snapshots', 'V1\\Admin\\NodeSecurityController@snapshots');
             $router->get ('/security/experiments', 'V1\\Admin\\NodeSecurityController@experiments');

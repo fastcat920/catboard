@@ -63,7 +63,7 @@ class NodeSecurityController extends Controller
         if ($event->snapshot_id) {
             $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
                 ->whereBetween('l.requested_at', [$eventWindow['start_at'], $eventWindow['end_at']])
-                ->select('l.*', 'u.email')->orderBy('l.requested_at')->get()
+                ->select('l.*', 'u.email', 'u.banned')->orderBy('l.requested_at')->get()
                 ->filter(function ($log) use ($event) {
                     return in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
                 })->values()->map(function ($log) use ($event) {
@@ -76,6 +76,7 @@ class NodeSecurityController extends Controller
             return [
                 'user_id' => (int)$closest->user_id,
                 'email' => $closest->email,
+                'banned' => (bool)$closest->banned,
                 'access_count' => $items->count(),
                 'first_access_at' => (int)$items->min('requested_at'),
                 'last_access_at' => (int)$items->max('requested_at'),
@@ -211,6 +212,27 @@ class NodeSecurityController extends Controller
         }
         $this->adminLog($request, 'user.' . $action, 'user', $user->id, []);
         return response(['data' => true]);
+    }
+
+    public function batchBanUsers(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array|min:1|max:500',
+            'user_ids.*' => 'required|integer|min:1|distinct',
+            'action' => 'required|in:ban,unban',
+        ]);
+        $userIds = collect($request->input('user_ids'))->map(function ($id) {
+            return (int)$id;
+        })->unique()->values();
+        $existingIds = User::whereIn('id', $userIds)->pluck('id');
+        $banned = $request->input('action') === 'ban' ? 1 : 0;
+        $affected = User::whereIn('id', $existingIds)->where('banned', '!=', $banned)->update(['banned' => $banned]);
+        $this->adminLog($request, 'user.batch_' . $request->input('action'), 'user', null, [
+            'user_ids' => $existingIds->values()->all(), 'requested' => $userIds->count(), 'affected' => $affected,
+        ]);
+        return response(['data' => [
+            'requested' => $userIds->count(), 'matched' => $existingIds->count(), 'affected' => $affected,
+        ]]);
     }
 
     public function accessLogs(Request $request)

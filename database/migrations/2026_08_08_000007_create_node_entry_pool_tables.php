@@ -8,7 +8,7 @@ class CreateNodeEntryPoolTables extends Migration
 {
     public function up()
     {
-        Schema::create('v2_node_entry_pool', function (Blueprint $table) {
+        if (!Schema::hasTable('v2_node_entry_pool')) Schema::create('v2_node_entry_pool', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->string('server_type', 32);
             $table->unsignedInteger('server_id');
@@ -27,7 +27,7 @@ class CreateNodeEntryPoolTables extends Migration
             $table->index(['server_type', 'server_id', 'enabled'], 'node_entry_server_enabled');
             $table->index(['health_status', 'last_checked_at'], 'node_entry_health_time');
         });
-        Schema::create('v2_node_entry_setting', function (Blueprint $table) {
+        if (!Schema::hasTable('v2_node_entry_setting')) Schema::create('v2_node_entry_setting', function (Blueprint $table) {
             $table->string('server_type', 32);
             $table->unsignedInteger('server_id');
             $table->string('delivery_mode', 24)->default('primary_only');

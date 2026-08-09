@@ -8,7 +8,7 @@ class CreateNodeAccessSnapshotTable extends Migration
 {
     public function up()
     {
-        Schema::create('v2_node_access_snapshot', function (Blueprint $table) {
+        if (!Schema::hasTable('v2_node_access_snapshot')) Schema::create('v2_node_access_snapshot', function (Blueprint $table) {
             $table->unsignedBigInteger('access_log_id');
             $table->unsignedInteger('user_id');
             $table->unsignedBigInteger('snapshot_id');

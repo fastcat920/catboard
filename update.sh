@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [ ! -d ".git" ]; then
   echo "Please deploy using Git."
   exit 1
@@ -10,7 +12,7 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-git config --global --add safe.directory $(pwd)
+git config --global --add safe.directory "$(pwd)"
 git fetch origin custom
 git reset --hard origin/custom
 rm -rf composer.lock composer.phar
@@ -18,7 +20,7 @@ wget https://github.com/composer/composer/releases/latest/download/composer.phar
 php composer.phar update -vvv
 
 php_main_version=$(php -v | head -n 1 | cut -d ' ' -f 2 | cut -d '.' -f 1)
-if [ $php_main_version -ge 8 ]; then
+if [ "$php_main_version" -ge 8 ]; then
     php composer.phar require joanhey/adapterman
     if ! php -m | grep -q "pcntl"; then
         echo "Adding pcntl extension to cli-php.ini"
@@ -30,6 +32,10 @@ fi
 
 php artisan v2board:update
 
+echo "Running registered database upgrades..."
+php artisan v2board:upgrade-database
+echo "Database migrations and one-time data upgrades completed."
+
 if [ -f "/etc/init.d/bt" ]; then
-  chown -R www $(pwd);
+  chown -R www "$(pwd)";
 fi

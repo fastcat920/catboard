@@ -3,52 +3,15 @@
 ## 部署
 
 1. 备份数据库和当前代码。
-2. 发布代码后只执行节点安全迁移：
+2. 发布和更新统一执行：
 
    ```bash
-   php artisan migrate --path=database/migrations/2026_08_07_000001_create_node_security_tables.php --force
+   ./update.sh
    ```
 
-   不要直接执行无 `--path` 的全量迁移。该面板安装器会从 `database/install.sql` 创建部分 Laravel 标准表，但未登记对应迁移，全量迁移可能与已有表冲突。
+   更新脚本会调用 `php artisan v2board:upgrade-database`，按登记顺序执行本分支全部未完成的业务迁移，并自动运行尚未完成的一次性历史数据回填。已完成的迁移和数据升级会跳过，因此跨多个版本更新也不需要手工补迁移命令。
 
-   若需要使用私有多地区探测点，再执行第二个迁移：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_07_000002_create_node_security_probe_tables.php --force
-   ```
-
-   私有探测点使用手动监控目标池，还需要执行第三个迁移：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_07_000003_create_security_probe_targets.php --force
-   ```
-
-   若需要区分首次探测失败时间和达到连续失败阈值的时间，再执行：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_08_000004_add_probe_failure_started_at.php --force
-   ```
-
-   若需要启用“首次监控正常”基线及动态事件关联窗口，再执行：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_08_000005_add_probe_first_healthy_at.php --force
-   ```
-
-   若需要按 UA 查找关联用户和客户端分类，再执行：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_08_000006_add_access_log_ua_classification.php --force
-   php artisan security:backfill-ua
-   ```
-
-   若需要使用节点多入口、备用入口和客户端自动故障转移，再执行：
-
-   ```bash
-   php artisan migrate --path=database/migrations/2026_08_08_000007_create_node_entry_pool_tables.php --force
-   ```
-
-   迁移后在“节点安全 → 节点入口池”配置。未配置入口池的节点继续使用原始地址，不受影响。`auto_fallback` 会在 Clash、Mihomo、Clash Verge、FlClash、Stash 等 YAML 配置中建立节点级 fallback 组；其他订阅格式安全降级为主入口和备用入口多个节点。
+   不要自行执行无 `--path` 的全量 `php artisan migrate --force`。该面板安装器会从 `database/install.sql` 创建部分 Laravel 标准表，但未登记对应的标准迁移，全量迁移可能与已有表冲突。以后新增数据库迁移统一放入 `database/migrations/custom`，一次性数据修复任务登记到 `V2boardDatabaseUpgrade`，全部由 `./update.sh` 执行。
 3. 确认 Laravel 定时任务每分钟运行：`* * * * * php /path/to/artisan schedule:run`。
 4. 确认 Horizon 队列、Redis 和 `APP_KEY` 正常；`node_security` 队列用于探测结果上报后的快速分析，变更 `APP_KEY` 会导致历史水印地址无法解密。
 5. 打开原管理员后台，点击右上角主题按钮旁的“节点安全”，或访问 `/{secure_path}/security/dashboard`。
@@ -81,12 +44,11 @@
 ```bash
 php artisan security:node-health
 php artisan security:analyze
-php artisan security:backfill-ua
 php artisan route:list | grep security
 php artisan test --filter NodeSecurityTest
 ```
 
-访问记录支持按原始 UA、客户端、版本和平台筛选，并可切换为“关联用户”或“客户端分类”视图。升级并执行 UA 分类迁移后，运行 `php artisan security:backfill-ua` 可为历史访问记录补齐分类；新记录会在写入时自动分类。
+访问记录支持按原始 UA、客户端、版本和平台筛选，并可切换为“关联用户”或“客户端分类”视图。`./update.sh` 会自动执行 UA 分类迁移，并在首次需要时为历史访问记录补齐分类；新记录会在写入时自动分类。
 
 风险分不再根据访问距离封锁时间的远近加权。“早期获取窗口”设置已移除，风险依据保留为封锁事件命中和水印命中；旧数据库中的 `early_access_hits` 字段仅为升级兼容保留，并在重新分析时清零。
 

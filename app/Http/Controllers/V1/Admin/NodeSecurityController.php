@@ -84,7 +84,12 @@ class NodeSecurityController extends Controller
                 'unique_ips' => $items->pluck('request_ip')->filter()->unique()->count(),
                 'unique_devices' => $items->pluck('device_hash')->filter()->unique()->count(),
             ];
-        })->sortBy('closest_seconds')->values();
+        })->sort(function ($left, $right) {
+            $countOrder = $right['access_count'] <=> $left['access_count'];
+            if ($countOrder !== 0) return $countOrder;
+            $distanceOrder = $left['closest_seconds'] <=> $right['closest_seconds'];
+            return $distanceOrder !== 0 ? $distanceOrder : ($left['user_id'] <=> $right['user_id']);
+        })->values();
         return response(['data' => [
             'event' => $event,
             'snapshot' => $snapshot,

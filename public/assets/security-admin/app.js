@@ -1183,7 +1183,7 @@
                 e.id +
                 '">排除误报</button><button class="btn" data-event-action="resolved" data-id="' +
                 e.id +
-                '">标记已恢复</button></div><section class="timeline-section"><div class="timeline-heading"><h3>候选用户（按接近失败时间排序）</h3><div class="timeline-tools"><label class="check"><input type="checkbox" data-candidate-user-all> 全选</label><button class="btn danger" data-candidate-batch="ban" data-event-id="' +
+                '">标记已恢复</button></div><section class="timeline-section"><div class="timeline-heading"><h3>候选用户（按访问次数排序）</h3><div class="timeline-tools"><label class="check"><input type="checkbox" data-candidate-user-all> 全选</label><button class="btn danger" data-candidate-batch="ban" data-event-id="' +
                 e.id +
                 '" disabled>批量封禁</button><button class="btn" data-candidate-batch="unban" data-event-id="' +
                 e.id +

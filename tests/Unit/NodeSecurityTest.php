@@ -53,6 +53,17 @@ class NodeSecurityTest extends TestCase
         $this->assertSame(['香港｜主入口', '香港｜备用1'], $config['proxy-groups'][1]['proxies']);
     }
 
+    public function testEntryClientVisibilitySupportsAllowAndDenyLists()
+    {
+        $this->assertTrue(NodeEntryPoolService::clientVisibilityAllows('all', false, null));
+        $this->assertFalse(NodeEntryPoolService::clientVisibilityAllows('allowlist', false, null));
+        $this->assertTrue(NodeEntryPoolService::clientVisibilityAllows('allowlist', true, 'show'));
+        $this->assertFalse(NodeEntryPoolService::clientVisibilityAllows('allowlist', true, 'hide'));
+        $this->assertTrue(NodeEntryPoolService::clientVisibilityAllows('denylist', false, null));
+        $this->assertFalse(NodeEntryPoolService::clientVisibilityAllows('denylist', true, 'hide'));
+        $this->assertTrue(NodeEntryPoolService::clientVisibilityAllows('denylist', true, 'show'));
+    }
+
     public function testEventWindowUsesMonitoringBaselineWhenItIsMoreRecent()
     {
         $event = (object)[

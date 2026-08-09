@@ -42,6 +42,7 @@ class NodeEntryPoolService
                 continue;
             }
             $policy = $client ? $this->matchingPolicy($policies->get($key, collect()), $client) : null;
+            if (!$this->isVisibleToClient($setting, $policy, $client !== null)) continue;
             $deliveryMode = $policy->delivery_mode ?? $setting->delivery_mode;
             $mode = in_array($deliveryMode, ['primary_only', 'manual_backup', 'auto_fallback'], true)
                 ? $deliveryMode : 'primary_only';
@@ -73,6 +74,20 @@ class NodeEntryPoolService
             }
         }
         return $expanded;
+    }
+
+    private function isVisibleToClient($setting, $policy, bool $hasClient): bool
+    {
+        $mode = $setting->client_visibility_mode ?? 'all';
+        return self::clientVisibilityAllows($mode, $hasClient && (bool)$policy, $policy->visibility ?? null);
+    }
+
+    public static function clientVisibilityAllows(string $mode, bool $matched, ?string $visibility): bool
+    {
+        if ($mode === 'all') return true;
+        if ($mode === 'allowlist') return $matched && ($visibility ?? 'show') === 'show';
+        if ($mode === 'denylist') return !$matched || ($visibility ?? 'show') !== 'hide';
+        return true;
     }
 
     private function matchingPolicy($policies, array $client)

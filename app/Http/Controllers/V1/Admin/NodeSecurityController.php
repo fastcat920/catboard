@@ -762,6 +762,7 @@ class NodeSecurityController extends Controller
             $server['delivery_mode'] = $setting->delivery_mode ?? 'primary_only';
             $server['check_url'] = $setting->check_url ?? 'http://www.gstatic.com/generate_204';
             $server['check_interval'] = $setting->check_interval ?? 60;
+            $server['client_visibility_mode'] = $setting->client_visibility_mode ?? 'all';
             $server['entries'] = $entries->get($key, collect())->map(function ($entry) {
                 try { $host = Crypt::decryptString($entry->host_encrypted); } catch (\Throwable $e) { $host = '解密失败'; }
                 return [
@@ -776,6 +777,7 @@ class NodeSecurityController extends Controller
                     'id' => (int)$policy->id, 'client_family' => $policy->client_family,
                     'client_platform' => $policy->client_platform, 'min_version' => $policy->min_version,
                     'max_version' => $policy->max_version, 'delivery_mode' => $policy->delivery_mode,
+                    'visibility' => $policy->visibility ?? 'show',
                     'check_url' => $policy->check_url, 'check_interval' => (int)$policy->check_interval,
                     'priority' => (int)$policy->priority, 'enabled' => (bool)$policy->enabled,
                 ];
@@ -805,6 +807,7 @@ class NodeSecurityController extends Controller
         $request->validate([
             'server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1',
             'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
+            'client_visibility_mode' => 'required|in:all,allowlist,denylist',
             'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
         ]);
         $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
@@ -813,12 +816,13 @@ class NodeSecurityController extends Controller
         $imported = false;
         DB::transaction(function () use ($request, $server, $settingWhere, $now, &$imported) {
             DB::table('v2_node_entry_setting')->updateOrInsert($settingWhere,
-                ['delivery_mode' => $request->input('delivery_mode'), 'check_url' => $request->input('check_url'),
+                ['delivery_mode' => $request->input('delivery_mode'), 'client_visibility_mode' => $request->input('client_visibility_mode'),
+                    'check_url' => $request->input('check_url'),
                     'check_interval' => (int)$request->input('check_interval'), 'created_at' => $now, 'updated_at' => $now]
             );
             $imported = $this->importOriginalEntryIfEmpty($server, $settingWhere, $now);
         });
-        $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'check_interval'));
+        $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'client_visibility_mode', 'check_interval'));
         return response(['data' => ['saved' => true, 'original_entry_imported' => $imported]]);
     }
 
@@ -884,6 +888,7 @@ class NodeSecurityController extends Controller
             'client_platform' => 'nullable|string|max:24', 'min_version' => 'nullable|string|max:32',
             'max_version' => 'nullable|string|max:32',
             'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
+            'visibility' => 'required|in:show,hide',
             'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
             'priority' => 'required|integer|min:1|max:10000', 'enabled' => 'required|boolean',
         ]);
@@ -901,7 +906,8 @@ class NodeSecurityController extends Controller
             'client_family' => trim($request->input('client_family')),
             'client_platform' => trim((string)$request->input('client_platform')) ?: null,
             'min_version' => $minVersion ?: null, 'max_version' => $maxVersion ?: null,
-            'delivery_mode' => $request->input('delivery_mode'), 'check_url' => $request->input('check_url'),
+            'delivery_mode' => $request->input('delivery_mode'), 'visibility' => $request->input('visibility'),
+            'check_url' => $request->input('check_url'),
             'check_interval' => (int)$request->input('check_interval'), 'priority' => (int)$request->input('priority'),
             'enabled' => $request->boolean('enabled'), 'updated_at' => $now,
         ];
@@ -910,6 +916,7 @@ class NodeSecurityController extends Controller
         $this->adminLog($request, 'entry_client_policy.save', 'node', $request->input('server_id'), [
             'server_type' => $payload['server_type'], 'client_family' => $payload['client_family'],
             'client_platform' => $payload['client_platform'], 'delivery_mode' => $payload['delivery_mode'],
+            'visibility' => $payload['visibility'],
         ]);
         return response(['data' => true]);
     }

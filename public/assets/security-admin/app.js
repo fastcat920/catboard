@@ -1584,7 +1584,7 @@
         };
         function trajectoryPath(page) {
             var filters = state.filters.snapshot_analysis;
-            return "snapshot-analysis/user?page=" + (page || 1) + queryString({ user: filters.trajectory_user || "", snapshot_id: filters.trajectory_snapshot || "", date_from: filters.trajectory_from || "", date_to: filters.trajectory_to || "" });
+            return "snapshot-analysis/user?page=" + (page || 1) + queryString({ identity: filters.trajectory_user || "", snapshot_id: filters.trajectory_snapshot || "", date_from: filters.trajectory_from || "", date_to: filters.trajectory_to || "" });
         }
         function runUserTrajectory(page) {
             state.loading = true; render();

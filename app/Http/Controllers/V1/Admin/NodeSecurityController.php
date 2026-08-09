@@ -420,7 +420,8 @@ class NodeSecurityController extends Controller
     public function userSnapshotTrajectory(Request $request)
     {
         $this->ensureSnapshotAccessIndex();
-        $identity = trim((string)$request->input('user'));
+        $identityInput = $request->query('identity', $request->query('user'));
+        $identity = trim((string)$identityInput);
         if ($identity === '') return response(['message' => '请输入用户 ID 或邮箱'], 422);
         if (ctype_digit($identity)) {
             $user = User::find((int)$identity);

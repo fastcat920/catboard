@@ -1185,7 +1185,9 @@
                 e.id +
                 '">标记已恢复</button></div><section class="timeline-section"><div class="timeline-heading"><h3>候选用户（按访问次数排序）</h3><div class="timeline-tools"><label class="check"><input type="checkbox" data-candidate-user-all> 全选</label><button class="btn danger" data-candidate-batch="ban" data-event-id="' +
                 e.id +
-                '" disabled>批量封禁</button><button class="btn" data-candidate-batch="unban" data-event-id="' +
+                '" disabled>批量封禁</button><button class="btn primary" data-candidate-group data-event-id="' +
+                e.id +
+                '" disabled>分配权限组</button><button class="btn" data-candidate-batch="unban" data-event-id="' +
                 e.id +
                 '" disabled>批量解封</button></div></div><div class="table-wrap"><table><thead><tr><th></th><th>用户</th><th>访问</th><th>IP / 设备</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' +
                 candidateRows +
@@ -1195,6 +1197,23 @@
         );
         var box = root.querySelector(".modal-box");
         if (box) box.classList.add("modal-wide");
+    }
+    function candidateGroupModal(groups, userIds, eventId, parentModal) {
+        modal(
+            "分配候选用户权限组",
+            '<form id="candidate-group-form" data-users="' +
+                esc(userIds.join(",")) +
+                '" data-event-id="' +
+                eventId +
+                '"><div class="form-grid"><div class="span2 edit-note">已选择 <b>' +
+                userIds.length +
+                '</b> 名候选用户。此操作只修改权限组，不修改套餐、流量和到期时间。</div><label class="span2">目标权限组<select name="group_id" required><option value="">请选择权限组</option>' +
+                groups.map(function (group) {
+                    return '<option value="' + group.id + '">' + esc(group.name) + "（ID " + group.id + "）</option>";
+                }).join("") +
+                '</select></label><div class="span2 modal-actions"><button type="button" class="btn" data-close>取消</button><button type="submit" class="btn primary">确认分配</button></div></div></form>',
+            { parent: parentModal },
+        );
     }
     function eventForm() {
         modal(
@@ -1528,6 +1547,11 @@
                 button.disabled = count === 0;
                 button.textContent = (button.dataset.candidateBatch === "ban" ? "批量封禁" : "批量解封") + (count ? "（" + count + "）" : "");
             });
+            var groupButton = root.querySelector("[data-candidate-group]");
+            if (groupButton) {
+                groupButton.disabled = count === 0;
+                groupButton.textContent = "分配权限组" + (count ? "（" + count + "）" : "");
+            }
             var all = root.querySelector("[data-candidate-user-all]");
             var boxes = Array.from(root.querySelectorAll("[data-candidate-user]"));
             if (all) {
@@ -1564,6 +1588,39 @@
                     });
             };
         });
+        var candidateGroup = root.querySelector("[data-candidate-group]");
+        if (candidateGroup) candidateGroup.onclick = function () {
+            var ids = selectedCandidateUsers();
+            if (!ids.length) return;
+            var parentModal = state.modal;
+            candidateGroup.disabled = true;
+            candidateGroup.textContent = "正在加载……";
+            api("groups")
+                .then(function (groups) { candidateGroupModal(groups || [], ids, candidateGroup.dataset.eventId, parentModal); })
+                .catch(function (error) { state.error = error.message; render(); });
+        };
+        var candidateGroupForm = root.querySelector("#candidate-group-form");
+        if (candidateGroupForm) candidateGroupForm.onsubmit = function (event) {
+            event.preventDefault();
+            var groupId = Number(candidateGroupForm.elements.group_id.value);
+            var ids = candidateGroupForm.dataset.users.split(",").filter(Boolean).map(Number);
+            if (!groupId || !ids.length) return;
+            var submit = candidateGroupForm.querySelector('[type="submit"]');
+            submit.disabled = true;
+            submit.textContent = "正在分配……";
+            api("users/batch-group", { method: "POST", body: { user_ids: ids, group_id: groupId } })
+                .then(function (result) {
+                    alert("权限组分配完成：匹配 " + result.matched + " 人，实际修改 " + result.affected + " 人，目标权限组：" + result.group_name + "。");
+                    return api("event/detail?id=" + candidateGroupForm.dataset.eventId);
+                })
+                .then(eventDetailModal)
+                .catch(function (error) {
+                    submit.disabled = false;
+                    submit.textContent = "确认分配";
+                    state.error = error.message;
+                    render();
+                });
+        };
         root.querySelectorAll("[data-event]").forEach(function (x) {
             x.onclick = function () {
                 api("event/detail?id=" + x.dataset.event).then(function (d) {

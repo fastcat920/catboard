@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\ServerGroup;
 use App\Services\AuthService;
 use App\Services\NodeSecurity\ExperimentService;
 use App\Services\NodeSecurity\EventWindowService;
@@ -237,6 +238,38 @@ class NodeSecurityController extends Controller
         ]);
         return response(['data' => [
             'requested' => $userIds->count(), 'matched' => $existingIds->count(), 'affected' => $affected,
+        ]]);
+    }
+
+    public function groups()
+    {
+        return response(['data' => ServerGroup::orderBy('id')->get(['id', 'name'])]);
+    }
+
+    public function batchGroupUsers(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array|min:1|max:500',
+            'user_ids.*' => 'required|integer|min:1|distinct',
+            'group_id' => 'required|integer|min:1',
+        ]);
+        $group = ServerGroup::find($request->input('group_id'));
+        if (!$group) abort(422, '权限组不存在');
+        $userIds = collect($request->input('user_ids'))->map(function ($id) {
+            return (int)$id;
+        })->unique()->values();
+        $existingIds = User::whereIn('id', $userIds)->pluck('id');
+        $affected = User::whereIn('id', $existingIds)->where(function ($query) use ($group) {
+            $query->whereNull('group_id')->orWhere('group_id', '!=', $group->id);
+        })
+            ->update(['group_id' => $group->id, 'updated_at' => time()]);
+        $this->adminLog($request, 'user.batch_group', 'user', null, [
+            'user_ids' => $existingIds->values()->all(), 'group_id' => $group->id,
+            'group_name' => $group->name, 'requested' => $userIds->count(), 'affected' => $affected,
+        ]);
+        return response(['data' => [
+            'requested' => $userIds->count(), 'matched' => $existingIds->count(), 'affected' => $affected,
+            'group_id' => $group->id, 'group_name' => $group->name,
         ]]);
     }
 

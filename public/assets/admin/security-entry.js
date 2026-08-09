@@ -255,6 +255,8 @@
 
     function renderEntryPoolModal(node, editingId, editingPolicyId) {
         var old = document.querySelector(".node-entry-pool-modal");
+        var oldBox = old && old.querySelector(".node-entry-pool-box");
+        var scrollTop = oldBox ? oldBox.scrollTop : 0;
         if (old) old.remove();
         var entries = node.entries || [];
         var policies = node.client_policies || [];
@@ -271,6 +273,11 @@
             '<div class="node-entry-message" hidden></div></div></div>';
         document.body.appendChild(modal);
         entryPoolState = { type: node.server_type, id: node.server_id };
+        var box = modal.querySelector(".node-entry-pool-box");
+        if (box && scrollTop) {
+            box.scrollTop = scrollTop;
+            requestAnimationFrame(function () { box.scrollTop = scrollTop; });
+        }
         bindEntryPoolModal(modal, node);
     }
 

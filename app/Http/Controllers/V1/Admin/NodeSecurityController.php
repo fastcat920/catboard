@@ -422,18 +422,18 @@ class NodeSecurityController extends Controller
         $this->ensureSnapshotAccessIndex();
         $identityInput = $request->query('identity', $request->query('user'));
         $identity = trim((string)$identityInput);
-        if ($identity === '') return response(['message' => '请输入用户 ID 或邮箱'], 422);
+        if ($identity === '') return response(['data' => ['lookup_error' => '请输入用户 ID 或邮箱']]);
         if (ctype_digit($identity)) {
             $user = User::find((int)$identity);
         } else {
             $user = User::where('email', $identity)->first();
             if (!$user) {
                 $matches = User::where('email', 'like', '%' . $identity . '%')->orderBy('id')->limit(2)->get();
-                if ($matches->count() > 1) return response(['message' => '匹配到多个用户，请输入完整邮箱或用户 ID'], 422);
+                if ($matches->count() > 1) return response(['data' => ['lookup_error' => '匹配到多个用户，请输入完整邮箱或用户 ID']]);
                 $user = $matches->first();
             }
         }
-        if (!$user) return response(['message' => '没有找到该用户，请检查邮箱或改用用户 ID'], 404);
+        if (!$user) return response(['data' => ['lookup_error' => '没有找到该用户，请检查邮箱或改用用户 ID']]);
         $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
         $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
         if ($from > $to) abort(422, '开始时间不能晚于结束时间');
@@ -446,7 +446,7 @@ class NodeSecurityController extends Controller
                 DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'), DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
                 DB::raw("GROUP_CONCAT(DISTINCT l.endpoint ORDER BY l.endpoint SEPARATOR '、') as endpoints"))
             ->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
-            ->orderByDesc('last_access_at')->paginate($this->perPage($request));
+            ->orderByDesc('last_access_at')->orderByDesc('access_count')->orderByDesc('snapshot_id')->paginate($this->perPage($request));
         $groupName = $user->group_id ? ServerGroup::where('id', $user->group_id)->value('name') : null;
         return response(['data' => ['user' => ['id' => $user->id, 'email' => $user->email, 'group_id' => $user->group_id, 'group_name' => $groupName, 'banned' => (bool)$user->banned],
             'summary' => ['access_count' => (int)($summary->access_count ?? 0), 'snapshot_count' => (int)($summary->snapshot_count ?? 0), 'first_access_at' => $summary->first_access_at ?? null, 'last_access_at' => $summary->last_access_at ?? null, 'from' => $from, 'to' => $to], 'snapshots' => $rows]]);

@@ -452,7 +452,15 @@ class NodeSecurityController extends Controller
             ->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
             ->orderBy($sort, $direction)->when($sort === 'unique_ips', function ($query) use ($direction) {
                 $query->orderBy('unique_devices', $direction);
-            })->orderByDesc('last_access_at')->orderByDesc('access_count')->orderByDesc('snapshot_id')->paginate($this->perPage($request));
+            });
+        if ($sort === 'last_access_at') {
+            // A single subscription request creates many rows with the same timestamp.
+            // Keep tied rows moving in the selected direction so the sort remains visible.
+            $rows->orderBy('first_access_at', $direction)->orderBy('snapshot_id', $direction);
+        } else {
+            $rows->orderByDesc('last_access_at')->orderByDesc('snapshot_id');
+        }
+        $rows = $rows->paginate($this->perPage($request));
         $groupName = $user->group_id ? ServerGroup::where('id', $user->group_id)->value('name') : null;
         return response(['data' => ['user' => ['id' => $user->id, 'email' => $user->email, 'group_id' => $user->group_id, 'group_name' => $groupName, 'banned' => (bool)$user->banned],
             'summary' => ['access_count' => (int)($summary->access_count ?? 0), 'snapshot_count' => (int)($summary->snapshot_count ?? 0), 'first_access_at' => $summary->first_access_at ?? null, 'last_access_at' => $summary->last_access_at ?? null, 'from' => $from, 'to' => $to], 'snapshots' => $rows]]);

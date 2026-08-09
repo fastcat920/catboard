@@ -8,6 +8,7 @@ use App\Services\NodeSecurity\ProbeAnalysisService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class NodeSecurityAnalyze extends Command
 {
@@ -30,6 +31,9 @@ class NodeSecurityAnalyze extends Command
             (new ProbeAnalysisService())->analyze();
             $this->detectSharedIps((int)$settings['multi_account_ip_threshold']);
             $cutoff = time() - max(1, (int)$settings['retention_days']) * 86400;
+            if (Schema::hasTable('v2_node_access_snapshot')) {
+                DB::table('v2_node_access_snapshot')->where('requested_at', '<', $cutoff)->delete();
+            }
             DB::table('v2_node_access_log')->where('requested_at', '<', $cutoff)->delete();
             Cache::forever($lastRunKey, $currentBucket);
             return 0;

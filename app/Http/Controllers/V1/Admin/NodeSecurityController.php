@@ -351,6 +351,93 @@ class NodeSecurityController extends Controller
         return response(['data' => $query->orderByDesc('published_at')->paginate($this->perPage($request))]);
     }
 
+    public function snapshotAnalysisCatalog(Request $request)
+    {
+        $query = DB::table('v2_node_snapshot as s')->leftJoin('v2_node_access_snapshot as x', 'x.snapshot_id', '=', 's.id')
+            ->select('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
+                DB::raw('COUNT(DISTINCT x.user_id) as user_count'), DB::raw('COUNT(x.access_log_id) as access_count'));
+        if ($request->filled('server_type')) $query->where('s.server_type', $request->input('server_type'));
+        if ($request->filled('server_id')) $query->where('s.server_id', (int)$request->input('server_id'));
+        if ($request->filled('search')) $query->where(function ($nested) use ($request) {
+            $search = '%' . $request->input('search') . '%';
+            $nested->where('s.server_name', 'like', $search)->orWhere('s.id', $request->input('search'));
+        });
+        return response(['data' => $query->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
+            ->orderByDesc('s.published_at')->paginate(min(100, $this->perPage($request)))]);
+    }
+
+    public function snapshotComparison(Request $request)
+    {
+        $snapshotIds = collect(explode(',', (string)$request->input('snapshot_ids')))->map(function ($id) {
+            return (int)$id;
+        })->filter()->unique()->values();
+        if ($snapshotIds->count() < 2 || $snapshotIds->count() > 10) abort(422, '请选择 2～10 个快照');
+        $snapshots = DB::table('v2_node_snapshot')->whereIn('id', $snapshotIds)->get(['id', 'version', 'server_type', 'server_id', 'server_name', 'port', 'published_at'])->keyBy('id');
+        if ($snapshots->count() !== $snapshotIds->count()) abort(422, '包含不存在的快照');
+        $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
+        $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
+        if ($from > $to) abort(422, '开始时间不能晚于结束时间');
+
+        $grouped = DB::table('v2_node_access_snapshot as x')->whereIn('x.snapshot_id', $snapshotIds)
+            ->whereBetween('x.requested_at', [$from, $to])
+            ->select('x.user_id', DB::raw('COUNT(*) as access_count'), DB::raw('COUNT(DISTINCT x.snapshot_id) as snapshot_count'),
+                DB::raw('MIN(x.requested_at) as first_access_at'), DB::raw('MAX(x.requested_at) as last_access_at'))
+            ->groupBy('x.user_id');
+        $scope = (string)$request->input('scope', 'all');
+        if ($scope === 'common') $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) = ?', [$snapshotIds->count()]);
+        if ($scope === 'differences') $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) < ?', [$snapshotIds->count()]);
+        if (strpos($scope, 'only:') === 0) {
+            $onlyId = (int)substr($scope, 5);
+            if (!$snapshotIds->contains($onlyId)) abort(422, '独有快照不在对比范围内');
+            $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) = 1')->havingRaw('SUM(CASE WHEN x.snapshot_id = ? THEN 1 ELSE 0 END) > 0', [$onlyId]);
+        }
+
+        $allGrouped = DB::table('v2_node_access_snapshot as x')->whereIn('x.snapshot_id', $snapshotIds)
+            ->whereBetween('x.requested_at', [$from, $to])->select('x.user_id', DB::raw('COUNT(DISTINCT x.snapshot_id) as snapshot_count'))->groupBy('x.user_id');
+        $summary = DB::query()->fromSub($allGrouped, 'm')->selectRaw('COUNT(*) as any_users, SUM(CASE WHEN snapshot_count = ? THEN 1 ELSE 0 END) as common_users, SUM(CASE WHEN snapshot_count < ? THEN 1 ELSE 0 END) as different_users', [$snapshotIds->count(), $snapshotIds->count()])->first();
+        $users = DB::query()->fromSub($grouped, 'm')->join('v2_user as u', 'u.id', '=', 'm.user_id')
+            ->leftJoin('v2_server_group as g', 'g.id', '=', 'u.group_id')
+            ->select('m.*', 'u.email', 'u.group_id', 'u.banned', 'g.name as group_name')
+            ->orderByDesc('m.access_count')->orderByDesc('m.last_access_at')->paginate($this->perPage($request));
+        $pageUserIds = collect($users->items())->pluck('user_id');
+        $hits = $pageUserIds->isEmpty() ? collect() : DB::table('v2_node_access_snapshot')->whereIn('snapshot_id', $snapshotIds)
+            ->whereIn('user_id', $pageUserIds)->whereBetween('requested_at', [$from, $to])
+            ->select('user_id', 'snapshot_id', DB::raw('COUNT(*) as access_count'), DB::raw('MAX(requested_at) as last_access_at'))
+            ->groupBy('user_id', 'snapshot_id')->get()->groupBy('user_id');
+        foreach ($users->items() as $user) {
+            $user->snapshot_hits = $hits->get($user->user_id, collect())->keyBy('snapshot_id');
+        }
+        return response(['data' => [
+            'snapshots' => $snapshotIds->map(function ($id) use ($snapshots) { return $snapshots->get($id); })->values(),
+            'summary' => ['any_users' => (int)($summary->any_users ?? 0), 'common_users' => (int)($summary->common_users ?? 0), 'different_users' => (int)($summary->different_users ?? 0), 'from' => $from, 'to' => $to],
+            'users' => $users,
+        ]]);
+    }
+
+    public function userSnapshotTrajectory(Request $request)
+    {
+        $identity = trim((string)$request->input('user'));
+        if ($identity === '') abort(422, '请输入用户 ID 或完整邮箱');
+        $user = ctype_digit($identity) ? User::find((int)$identity) : User::where('email', $identity)->first();
+        if (!$user) abort(404, '用户不存在');
+        $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
+        $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
+        if ($from > $to) abort(422, '开始时间不能晚于结束时间');
+        $base = DB::table('v2_node_access_snapshot as x')->where('x.user_id', $user->id)->whereBetween('x.requested_at', [$from, $to]);
+        if ($request->filled('snapshot_id')) $base->where('x.snapshot_id', (int)$request->input('snapshot_id'));
+        $summary = (clone $base)->selectRaw('COUNT(DISTINCT x.access_log_id) as access_count, COUNT(DISTINCT x.snapshot_id) as snapshot_count, MIN(x.requested_at) as first_access_at, MAX(x.requested_at) as last_access_at')->first();
+        $rows = $base->join('v2_node_snapshot as s', 's.id', '=', 'x.snapshot_id')->join('v2_node_access_log as l', 'l.id', '=', 'x.access_log_id')
+            ->select('s.id as snapshot_id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
+                DB::raw('COUNT(DISTINCT x.access_log_id) as access_count'), DB::raw('MIN(x.requested_at) as first_access_at'), DB::raw('MAX(x.requested_at) as last_access_at'),
+                DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'), DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
+                DB::raw("GROUP_CONCAT(DISTINCT l.endpoint ORDER BY l.endpoint SEPARATOR '、') as endpoints"))
+            ->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
+            ->orderByDesc('last_access_at')->paginate($this->perPage($request));
+        $groupName = $user->group_id ? ServerGroup::where('id', $user->group_id)->value('name') : null;
+        return response(['data' => ['user' => ['id' => $user->id, 'email' => $user->email, 'group_id' => $user->group_id, 'group_name' => $groupName, 'banned' => (bool)$user->banned],
+            'summary' => ['access_count' => (int)($summary->access_count ?? 0), 'snapshot_count' => (int)($summary->snapshot_count ?? 0), 'first_access_at' => $summary->first_access_at ?? null, 'last_access_at' => $summary->last_access_at ?? null, 'from' => $from, 'to' => $to], 'snapshots' => $rows]]);
+    }
+
     public function experiments(Request $request)
     {
         $experiments = DB::table('v2_watermark_experiment')->orderByDesc('created_at')->get();

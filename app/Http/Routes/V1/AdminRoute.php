@@ -186,6 +186,9 @@ class AdminRoute
             $router->post('/security/users/batch-group', 'V1\\Admin\\NodeSecurityController@batchGroupUsers');
             $router->get ('/security/access-logs', 'V1\\Admin\\NodeSecurityController@accessLogs');
             $router->get ('/security/snapshots', 'V1\\Admin\\NodeSecurityController@snapshots');
+            $router->get ('/security/snapshot-analysis/catalog', 'V1\\Admin\\NodeSecurityController@snapshotAnalysisCatalog');
+            $router->get ('/security/snapshot-analysis/compare', 'V1\\Admin\\NodeSecurityController@snapshotComparison');
+            $router->get ('/security/snapshot-analysis/user', 'V1\\Admin\\NodeSecurityController@userSnapshotTrajectory');
             $router->get ('/security/experiments', 'V1\\Admin\\NodeSecurityController@experiments');
             $router->post('/security/experiment/create', 'V1\\Admin\\NodeSecurityController@createExperiment');
             $router->post('/security/experiment/split', 'V1\\Admin\\NodeSecurityController@splitExperiment');

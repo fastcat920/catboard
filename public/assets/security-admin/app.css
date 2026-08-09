@@ -788,6 +788,16 @@ textarea {
     height: 17px;
     vertical-align: -3px;
 }
+.snapshot-tabs { display: flex; gap: 10px; margin-bottom: 16px; }
+.snapshot-picker { max-height: 430px; margin-top: 14px; border: 1px solid #eaecf0; border-radius: 8px; }
+.snapshot-picker thead { position: sticky; top: 0; z-index: 1; background: var(--panel, #fff); }
+.snapshot-picker input[type="checkbox"] { width: 17px; height: 17px; }
+.snapshot-run { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eaecf0; }
+.snapshot-result { margin-top: 18px; }
+.snapshot-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0 18px; }
+.snapshot-time { margin-top: 8px; font-weight: 700; }
+.snapshot-mini { margin-top: 6px; padding: 4px 8px; font-size: 12px; }
+@media (max-width: 760px) { .snapshot-tabs { flex-wrap: wrap; } .snapshot-cards { grid-template-columns: 1fr; } }
 .check {
     display: flex;
     align-items: center;

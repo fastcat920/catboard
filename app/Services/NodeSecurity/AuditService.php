@@ -42,7 +42,7 @@ class AuditService
             $ip = (string)$request->ip();
             $started = (float)$request->attributes->get('node_security_started_at', microtime(true));
             [$content, $status, $etag] = $this->responseMetadata($response);
-            DB::table('v2_node_access_log')->insert([
+            $accessLogId = DB::table('v2_node_access_log')->insertGetId([
                 'user_id' => (int)$request->user['id'],
                 'session_id' => mb_substr((string)($request->user['auth_session'] ?? ''), 0, 64) ?: null,
                 'snapshot_ids' => json_encode($snapshotIds),
@@ -63,6 +63,13 @@ class AuditService
                 'requested_at' => $now,
                 'created_at' => $now,
             ]);
+            $links = collect($snapshotIds)->map(function ($snapshotId) use ($accessLogId, $request, $now) {
+                return [
+                    'access_log_id' => $accessLogId, 'user_id' => (int)$request->user['id'],
+                    'snapshot_id' => (int)$snapshotId, 'requested_at' => $now, 'created_at' => $now,
+                ];
+            })->filter(function ($link) { return $link['snapshot_id'] > 0; })->unique('snapshot_id')->values()->all();
+            if ($links) DB::table('v2_node_access_snapshot')->insertOrIgnore($links);
         } catch (\Throwable $e) {
             Log::warning('Node security record failed: ' . $e->getMessage());
         }

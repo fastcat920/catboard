@@ -9,7 +9,9 @@
         loading: false,
         modal: null,
         pageNo: 1,
-        filters: { events: {}, users: {}, logs: {} },
+        filters: { events: {}, users: {}, logs: {}, snapshot_analysis: {} },
+        snapshotSelection: [],
+        snapshotResult: null,
         refreshTimer: null,
         modalParent: null,
     };
@@ -18,6 +20,7 @@
         events: "泄露事件",
         users: "风险用户",
         logs: "访问记录",
+        snapshot_analysis: "快照分析",
         watermarks: "水印实验",
         probes: "探测点",
         alerts: "安全告警",
@@ -197,6 +200,7 @@
         if (state.page === "events") return events(d);
         if (state.page === "users") return users(d);
         if (state.page === "logs") return logs(d);
+        if (state.page === "snapshot_analysis") return snapshotAnalysis(d);
         if (state.page === "watermarks") return watermarks(d);
         if (state.page === "probes") return probes(d);
         if (state.page === "alerts") return alerts(d);
@@ -414,7 +418,7 @@
                         (action
                             ? '<td><button class="btn" data-user="' +
                               x.user_id +
-                              '">详情</button></td>'
+                              '">详情</button> <button class="btn" data-user-snapshots="' + x.user_id + '">快照轨迹</button></td>'
                             : "") +
                         "</tr>"
                     );
@@ -465,8 +469,42 @@
     function logUserTable(rows) {
         if (!rows.length) return '<div class="empty">没有找到使用该 UA 的用户</div>';
         return '<table><thead><tr><th>用户</th><th>访问次数</th><th>客户端 / 平台</th><th>IP / 设备</th><th>首次访问</th><th>最近访问</th><th>操作</th></tr></thead><tbody>' + rows.map(function (x) {
-            return '<tr><td>' + esc(x.email) + '<br><span class="muted">ID ' + x.user_id + '</span></td><td>' + x.access_count + '</td><td>' + esc(x.client_families || "未分类") + '<br><span class="muted">' + esc(x.client_platforms || "未知") + '</span></td><td>' + x.unique_ips + ' / ' + x.unique_devices + '</td><td>' + time(x.first_access_at) + '</td><td>' + time(x.last_access_at) + '</td><td><button class="btn" data-user="' + x.user_id + '">风险档案</button></td></tr>';
+            return '<tr><td>' + esc(x.email) + '<br><span class="muted">ID ' + x.user_id + '</span></td><td>' + x.access_count + '</td><td>' + esc(x.client_families || "未分类") + '<br><span class="muted">' + esc(x.client_platforms || "未知") + '</span></td><td>' + x.unique_ips + ' / ' + x.unique_devices + '</td><td>' + time(x.first_access_at) + '</td><td>' + time(x.last_access_at) + '</td><td><button class="btn" data-user="' + x.user_id + '">风险档案</button> <button class="btn" data-user-snapshots="' + x.user_id + '">快照轨迹</button></td></tr>';
         }).join("") + '</tbody></table>';
+    }
+    function snapshotPager(page, kind) {
+        if (!page || !page.last_page || page.last_page < 2) return "";
+        return '<div class="pagination"><button class="btn" data-snapshot-page="' + kind + '" data-page-no="' + (page.current_page - 1) + '"' + (page.current_page <= 1 ? ' disabled' : '') + '>上一页</button><span>第 ' + page.current_page + ' / ' + page.last_page + ' 页，共 ' + page.total + ' 条</span><button class="btn" data-snapshot-page="' + kind + '" data-page-no="' + (page.current_page + 1) + '"' + (page.current_page >= page.last_page ? ' disabled' : '') + '>下一页</button></div>';
+    }
+    function snapshotAnalysis(d) {
+        var catalog = (d || {}).catalog || { data: [] };
+        var filters = state.filters.snapshot_analysis || {};
+        var mode = filters.mode || "compare";
+        var selectedIds = state.snapshotSelection || [];
+        var result = state.snapshotResult;
+        var catalogRows = (catalog.data || []).map(function (snapshot) {
+            var checked = selectedIds.indexOf(Number(snapshot.id)) !== -1;
+            return '<tr><td><input type="checkbox" data-snapshot-select value="' + snapshot.id + '"' + (checked ? ' checked' : '') + '></td><td><b>#' + snapshot.id + '</b><br><span class="muted">' + esc(String(snapshot.version || "").slice(0, 12)) + '</span></td><td>' + esc(snapshot.server_name || "未命名") + '<br><span class="muted">' + esc(snapshot.server_type) + ' #' + snapshot.server_id + '</span></td><td>' + time(snapshot.published_at) + '</td><td>' + Number(snapshot.user_count || 0) + ' / ' + Number(snapshot.access_count || 0) + '</td></tr>';
+        }).join("");
+        var compareResult = "";
+        if (result && result.type === "compare") {
+            var comparison = result.data || {}, snapshots = comparison.snapshots || [], usersPage = comparison.users || {}, summary = comparison.summary || {};
+            var userRows = (usersPage.data || []).map(function (user) {
+                var hits = user.snapshot_hits || {};
+                return '<tr><td>' + esc(user.email) + '<br><span class="muted">ID ' + user.user_id + ' · ' + esc(user.group_name || "未分组") + '</span></td><td><b>' + user.access_count + '</b> 次<br><span class="muted">命中 ' + user.snapshot_count + ' / ' + snapshots.length + ' 个快照</span></td>' + snapshots.map(function (snapshot) { var hit = hits[snapshot.id] || hits[String(snapshot.id)]; return '<td>' + (hit ? '<b>' + hit.access_count + '</b> 次<br><span class="muted">' + time(hit.last_access_at) + '</span>' : '<span class="muted">未访问</span>') + '</td>'; }).join("") + '<td>' + badge(user.banned ? "已封禁" : "正常", user.banned ? "critical" : "ok") + '<br><button class="btn snapshot-mini" data-user-snapshots="' + user.user_id + '">查看轨迹</button></td></tr>';
+            }).join("");
+            compareResult = '<section class="panel snapshot-result"><div class="settings-section-head"><div><h2>对比结果</h2><p>' + time(summary.from) + ' ～ ' + time(summary.to) + '</p></div></div><div class="cards snapshot-cards"><div class="card"><div class="muted">任意访问</div><div class="value">' + Number(summary.any_users || 0) + '</div></div><div class="card"><div class="muted">共同用户</div><div class="value">' + Number(summary.common_users || 0) + '</div></div><div class="card"><div class="muted">存在差异</div><div class="value">' + Number(summary.different_users || 0) + '</div></div></div><div class="table-wrap"><table><thead><tr><th>用户</th><th>总访问</th>' + snapshots.map(function (snapshot) { return '<th>#' + snapshot.id + '<br><span class="muted">' + esc(snapshot.server_name || snapshot.server_type) + '</span></th>'; }).join("") + '<th>状态</th></tr></thead><tbody>' + (userRows || '<tr><td colspan="' + (snapshots.length + 3) + '" class="empty">当前条件没有用户</td></tr>') + '</tbody></table></div>' + snapshotPager(usersPage, "compare") + '</section>';
+        }
+        var trajectoryResult = "";
+        if (result && result.type === "user") {
+            var trajectory = result.data || {}, trajectoryPage = trajectory.snapshots || {}, user = trajectory.user || {}, summaryUser = trajectory.summary || {};
+            var trajectoryRows = (trajectoryPage.data || []).map(function (row) {
+                return '<tr><td><b>#' + row.snapshot_id + '</b><br><span class="muted">' + esc(String(row.version || "").slice(0, 12)) + '</span></td><td>' + esc(row.server_name || "未命名") + '<br><span class="muted">' + esc(row.server_type) + ' #' + row.server_id + '</span></td><td><b>' + row.access_count + '</b> 次</td><td>' + row.unique_ips + ' / ' + row.unique_devices + '</td><td>' + esc(row.endpoints || "-") + '</td><td>' + time(row.first_access_at) + '<br><span class="muted">最近 ' + time(row.last_access_at) + '</span></td></tr>';
+            }).join("");
+            trajectoryResult = '<section class="panel snapshot-result"><div class="settings-section-head"><div><h2>' + esc(user.email) + ' · 快照轨迹</h2><p>ID ' + user.id + ' · ' + esc(user.group_name || "未分组") + ' · ' + (user.banned ? "已封禁" : "正常") + '</p></div></div><div class="cards snapshot-cards"><div class="card"><div class="muted">访问次数</div><div class="value">' + Number(summaryUser.access_count || 0) + '</div></div><div class="card"><div class="muted">不同快照</div><div class="value">' + Number(summaryUser.snapshot_count || 0) + '</div></div><div class="card"><div class="muted">最近访问</div><div class="snapshot-time">' + time(summaryUser.last_access_at) + '</div></div></div><div class="table-wrap"><table><thead><tr><th>快照</th><th>节点</th><th>访问</th><th>IP / 设备</th><th>接口</th><th>时间</th></tr></thead><tbody>' + (trajectoryRows || '<tr><td colspan="6" class="empty">该时间范围内没有快照访问记录</td></tr>') + '</tbody></table></div>' + snapshotPager(trajectoryPage, "user") + '</section>';
+        }
+        return '<div class="snapshot-tabs"><button class="btn' + (mode === "compare" ? ' primary' : '') + '" data-snapshot-mode="compare">快照对比</button><button class="btn' + (mode === "user" ? ' primary' : '') + '" data-snapshot-mode="user">用户快照轨迹</button></div>' +
+            (mode === "compare" ? '<section class="filter-panel"><div class="settings-section-head"><div><h2>选择 2～10 个快照</h2><p>已选择 ' + selectedIds.length + ' 个；跨页搜索时选择会保留。</p></div></div><div class="filter-grid"><label>快照 / 节点名称<input id="snapshot-search" value="' + esc(filters.search || "") + '" placeholder="快照 ID 或节点名称"></label><label>节点类型<input id="snapshot-type" value="' + esc(filters.server_type || "") + '" placeholder="例如 vmess"></label><label>节点 ID<input id="snapshot-server-id" type="number" value="' + esc(filters.server_id || "") + '"></label></div><div class="filter-actions"><button class="btn" data-filter-snapshots>搜索快照</button><button class="btn" data-clear-snapshot-selection>清空选择</button></div><div class="table-wrap snapshot-picker"><table><thead><tr><th></th><th>快照</th><th>节点</th><th>发布时间</th><th>用户 / 访问</th></tr></thead><tbody>' + (catalogRows || '<tr><td colspan="5" class="empty">没有找到快照</td></tr>') + '</tbody></table></div>' + snapshotPager(catalog, "catalog") + '<div class="filter-grid snapshot-run"><label>开始时间<input id="snapshot-from" type="datetime-local" value="' + esc(filters.date_from_text || "") + '"></label><label>结束时间<input id="snapshot-to" type="datetime-local" value="' + esc(filters.date_to_text || "") + '"></label><label>用户范围<select id="snapshot-scope"><option value="all"' + selected(filters.scope || "all", "all") + '>全部命中用户</option><option value="common"' + selected(filters.scope, "common") + '>所有快照共同用户</option><option value="differences"' + selected(filters.scope, "differences") + '>存在快照差异的用户</option>' + selectedIds.map(function (id, index) { var label = selectedIds.length === 2 ? (index === 0 ? "旧快照独有" : "新快照新增") : "仅此快照"; return '<option value="only:' + id + '"' + selected(filters.scope, "only:" + id) + '>' + label + ' #' + id + '</option>'; }).join("") + '</select></label></div><div class="filter-actions"><button class="btn primary" data-run-snapshot-compare' + (selectedIds.length < 2 ? ' disabled' : '') + '>开始对比（' + selectedIds.length + '）</button><span class="muted">默认分析最近 30 天；可留空使用默认范围。</span></div></section>' + compareResult : '<section class="filter-panel"><div class="settings-section-head"><div><h2>查询用户访问过的快照</h2><p>使用用户 ID 或完整邮箱精确查找。</p></div></div><div class="filter-grid"><label>用户 ID / 邮箱<input id="trajectory-user" value="' + esc(filters.trajectory_user || "") + '" placeholder="44567 或 user@example.com"></label><label>快照 ID（可选）<input id="trajectory-snapshot" type="number" value="' + esc(filters.trajectory_snapshot || "") + '"></label><label>开始时间<input id="trajectory-from" type="datetime-local" value="' + esc(filters.trajectory_from_text || "") + '"></label><label>结束时间<input id="trajectory-to" type="datetime-local" value="' + esc(filters.trajectory_to_text || "") + '"></label></div><div class="filter-actions"><button class="btn primary" data-run-user-trajectory>查询轨迹</button><span class="muted">默认查询最近 30 天。</span></div></section>' + trajectoryResult);
     }
     function clientProfileTable(rows) {
         if (!rows.length) return '<div class="empty">暂无客户端分类数据，请先执行历史 UA 回填</div>';
@@ -1074,7 +1112,7 @@
                           x.closest_seconds +
                           ' 秒</span></td><td><button class="btn" data-user="' +
                           x.user_id +
-                          '">查看用户</button></td></tr>'
+                          '">查看用户</button> <button class="btn" data-user-snapshots="' + x.user_id + '">快照轨迹</button></td></tr>'
                       );
                   })
                   .join("")
@@ -1388,6 +1426,21 @@
                 });
             return;
         }
+        if (state.page === "snapshot_analysis") {
+            var snapshotFilters = state.filters.snapshot_analysis || {};
+            api("snapshot-analysis/catalog?page=" + state.pageNo + queryString({
+                search: snapshotFilters.search || "",
+                server_type: snapshotFilters.server_type || "",
+                server_id: snapshotFilters.server_id || "",
+            }))
+                .then(function (catalog) {
+                    state.data = { catalog: catalog };
+                    state.loading = false;
+                    render();
+                })
+                .catch(function (e) { state.error = e.message; state.loading = false; render(); });
+            return;
+        }
         var path =
             {
                 dashboard: "dashboard?days=7",
@@ -1475,6 +1528,99 @@
         root.querySelectorAll("[data-goto]").forEach(function (x) {
             x.onclick = function () {
                 state.pageNo = Number(x.dataset.goto);
+                load();
+            };
+        });
+        root.querySelectorAll("[data-snapshot-mode]").forEach(function (button) {
+            button.onclick = function () {
+                state.filters.snapshot_analysis.mode = button.dataset.snapshotMode;
+                state.snapshotResult = null;
+                render();
+            };
+        });
+        root.querySelectorAll("[data-snapshot-select]").forEach(function (input) {
+            input.onchange = function () {
+                var id = Number(input.value);
+                if (input.checked && state.snapshotSelection.length >= 10 && state.snapshotSelection.indexOf(id) === -1) {
+                    input.checked = false;
+                    alert("最多同时选择 10 个快照");
+                    return;
+                }
+                if (input.checked && state.snapshotSelection.indexOf(id) === -1) state.snapshotSelection.push(id);
+                if (!input.checked) state.snapshotSelection = state.snapshotSelection.filter(function (selectedId) { return selectedId !== id; });
+                render();
+            };
+        });
+        var filterSnapshots = root.querySelector("[data-filter-snapshots]");
+        if (filterSnapshots) filterSnapshots.onclick = function () {
+            state.filters.snapshot_analysis.search = root.querySelector("#snapshot-search").value.trim();
+            state.filters.snapshot_analysis.server_type = root.querySelector("#snapshot-type").value.trim();
+            state.filters.snapshot_analysis.server_id = root.querySelector("#snapshot-server-id").value;
+            state.pageNo = 1;
+            load();
+        };
+        var clearSnapshotSelection = root.querySelector("[data-clear-snapshot-selection]");
+        if (clearSnapshotSelection) clearSnapshotSelection.onclick = function () { state.snapshotSelection = []; state.snapshotResult = null; render(); };
+        function comparisonPath(page) {
+            var filters = state.filters.snapshot_analysis;
+            return "snapshot-analysis/compare?page=" + (page || 1) + "&snapshot_ids=" + encodeURIComponent(state.snapshotSelection.join(",")) + queryString({
+                scope: filters.scope || "all", date_from: filters.date_from || "", date_to: filters.date_to || "",
+            });
+        }
+        function runSnapshotComparison(page) {
+            state.loading = true; render();
+            api(comparisonPath(page)).then(function (data) { state.snapshotResult = { type: "compare", data: data }; state.loading = false; render(); })
+                .catch(function (error) { state.error = error.message; state.loading = false; render(); });
+        }
+        var runComparison = root.querySelector("[data-run-snapshot-compare]");
+        if (runComparison) runComparison.onclick = function () {
+            var filters = state.filters.snapshot_analysis;
+            filters.date_from_text = root.querySelector("#snapshot-from").value;
+            filters.date_to_text = root.querySelector("#snapshot-to").value;
+            filters.date_from = filters.date_from_text ? Math.floor(new Date(filters.date_from_text).getTime() / 1000) : "";
+            filters.date_to = filters.date_to_text ? Math.floor(new Date(filters.date_to_text).getTime() / 1000) : "";
+            filters.scope = root.querySelector("#snapshot-scope").value;
+            runSnapshotComparison(1);
+        };
+        function trajectoryPath(page) {
+            var filters = state.filters.snapshot_analysis;
+            return "snapshot-analysis/user?page=" + (page || 1) + queryString({ user: filters.trajectory_user || "", snapshot_id: filters.trajectory_snapshot || "", date_from: filters.trajectory_from || "", date_to: filters.trajectory_to || "" });
+        }
+        function runUserTrajectory(page) {
+            state.loading = true; render();
+            api(trajectoryPath(page)).then(function (data) { state.snapshotResult = { type: "user", data: data }; state.loading = false; render(); })
+                .catch(function (error) { state.error = error.message; state.loading = false; render(); });
+        }
+        var runTrajectory = root.querySelector("[data-run-user-trajectory]");
+        if (runTrajectory) runTrajectory.onclick = function () {
+            var filters = state.filters.snapshot_analysis;
+            filters.trajectory_user = root.querySelector("#trajectory-user").value.trim();
+            filters.trajectory_snapshot = root.querySelector("#trajectory-snapshot").value;
+            filters.trajectory_from_text = root.querySelector("#trajectory-from").value;
+            filters.trajectory_to_text = root.querySelector("#trajectory-to").value;
+            filters.trajectory_from = filters.trajectory_from_text ? Math.floor(new Date(filters.trajectory_from_text).getTime() / 1000) : "";
+            filters.trajectory_to = filters.trajectory_to_text ? Math.floor(new Date(filters.trajectory_to_text).getTime() / 1000) : "";
+            if (!filters.trajectory_user) { state.error = "请输入用户 ID 或完整邮箱"; render(); return; }
+            runUserTrajectory(1);
+        };
+        root.querySelectorAll("[data-snapshot-page]").forEach(function (button) {
+            button.onclick = function () {
+                var page = Number(button.dataset.pageNo);
+                if (button.dataset.snapshotPage === "catalog") { state.pageNo = page; load(); }
+                else if (button.dataset.snapshotPage === "compare") runSnapshotComparison(page);
+                else runUserTrajectory(page);
+            };
+        });
+        root.querySelectorAll("[data-user-snapshots]").forEach(function (button) {
+            button.onclick = function () {
+                state.page = "snapshot_analysis";
+                state.pageNo = 1;
+                state.filters.snapshot_analysis.mode = "user";
+                state.filters.snapshot_analysis.trajectory_user = button.dataset.userSnapshots;
+                state.snapshotResult = null;
+                state.modal = null;
+                state.modalParent = null;
+                history.replaceState(null, "", cfg.adminUrl + "/security/snapshot_analysis");
                 load();
             };
         });

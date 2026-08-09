@@ -43,7 +43,7 @@
               <tbody>
                 <tr>
                   <td style="padding: 16px 24px; background-color: #f8f9fc; border-radius: 12px;">
-                    <a href="https://fastcat2.com" style="font-size: 14px; font-weight: 500; color: #4566ae; text-decoration: none; transition: color 0.2s;">打开{{$name}}官网</a>
+                    <a href="https://fastcat3.com" style="font-size: 14px; font-weight: 500; color: #4566ae; text-decoration: none; transition: color 0.2s;">打开{{$name}}官网</a>
                   </td>
                 </tr>
               </tbody>

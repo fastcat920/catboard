@@ -334,8 +334,10 @@ class UserController extends Controller
         $sort = $request->input('sort') ? $request->input('sort') : 'created_at';
         $builder = User::orderBy($sort, $sortType);
         $this->filter($request, $builder);
+        $sendAt = $request->filled('send_at') ? (int)$request->input('send_at') : null;
+        $recipientCount = 0;
         foreach ($builder->cursor() as $user) {
-            SendEmailJob::dispatch([
+            $job = SendEmailJob::dispatch([
                 'email' => $user->email,
                 'subject' => $request->input('subject'),
                 'template_name' => 'notify',
@@ -345,10 +347,12 @@ class UserController extends Controller
                     'content' => $request->input('content')
                 ]
             ], 'send_email_mass');
+            if ($sendAt) $job->delay(max(0, $sendAt - time()));
+            $recipientCount++;
         }
 
         return response([
-            'data' => true
+            'data' => ['scheduled_at' => $sendAt, 'recipient_count' => $recipientCount]
         ]);
     }
 

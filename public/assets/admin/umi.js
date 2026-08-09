@@ -81980,7 +81980,7 @@
                                     }
                                     return e.abrupt("return");
                                 case 13:
-                                    r["a"].success("\u5df2\u52a0\u5165\u961f\u5217\u6267\u884c"),
+                                    r["a"].success(n.send_at ? "\u5df2\u5b89\u6392\u5b9a\u65f6\u53d1\u9001" : "\u5df2\u52a0\u5165\u961f\u5217\u6267\u884c"),
                                     "function" === typeof i && i();
                                 case 15:
                                 case "end":
@@ -87654,7 +87654,9 @@
                 super(e),
                 this.state = {
                     visible: !1,
-                    submit: {}
+                    submit: {},
+                    sendMode: "now",
+                    sendAt: ""
                 }
             }
             show() {
@@ -87668,9 +87670,15 @@
                 })
             }
             send() {
+                var e = this.state.sendMode === "scheduled"
+                  , t = e ? Math.floor(new Date(this.state.sendAt).getTime() / 1e3) : null;
+                if (e && (!t || t <= Math.floor(Date.now() / 1e3) + 59))
+                    return void window.alert("\u8bf7\u9009\u62e9\u81f3\u5c11\u4e00\u5206\u949f\u540e\u7684\u53d1\u9001\u65f6\u95f4");
                 this.props.dispatch({
                     type: "user/sendMail",
-                    params: this.state.submit,
+                    params: o()({}, this.state.submit, e ? {
+                        send_at: t
+                    } : {}),
                     callback: ()=>{
                         this.hide()
                     }
@@ -87727,6 +87735,28 @@
                             })
                         })
                     }
+                })), l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, "\u53d1\u9001\u65b9\u5f0f"), l.a.createElement("select", {
+                    className: "form-control",
+                    value: this.state.sendMode,
+                    onChange: e=>this.setState({
+                        sendMode: e.target.value
+                    })
+                }, l.a.createElement("option", {
+                    value: "now"
+                }, "\u7acb\u5373\u53d1\u9001"), l.a.createElement("option", {
+                    value: "scheduled"
+                }, "\u5b9a\u65f6\u53d1\u9001"))), "scheduled" === this.state.sendMode && l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, "\u8ba1\u5212\u53d1\u9001\u65f6\u95f4\uff08\u672c\u5730\u65f6\u95f4\uff09"), l.a.createElement("input", {
+                    type: "datetime-local",
+                    className: "form-control",
+                    min: new Date(Date.now() + 12e4 - 6e4 * (new Date).getTimezoneOffset()).toISOString().slice(0, 16),
+                    value: this.state.sendAt,
+                    onChange: e=>this.setState({
+                        sendAt: e.target.value
+                    })
                 }))))
             }
         }

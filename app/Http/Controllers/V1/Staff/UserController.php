@@ -68,8 +68,9 @@ class UserController extends Controller
         $builder = User::orderBy($sort, $sortType);
         $this->filter($request, $builder);
         $users = $builder->get();
+        $sendAt = $request->filled('send_at') ? (int)$request->input('send_at') : null;
         foreach ($users as $user) {
-            SendEmailJob::dispatch([
+            $job = SendEmailJob::dispatch([
                 'email' => $user->email,
                 'subject' => $request->input('subject'),
                 'template_name' => 'notify',
@@ -79,10 +80,11 @@ class UserController extends Controller
                     'content' => $request->input('content')
                 ]
             ]);
+            if ($sendAt) $job->delay(max(0, $sendAt - time()));
         }
 
         return response([
-            'data' => true
+            'data' => ['scheduled_at' => $sendAt, 'recipient_count' => $users->count()]
         ]);
     }
 

@@ -15897,6 +15897,41 @@
                     newPassword: this.refs.new_password.value
                 })
             }
+            sendChangeEmailVerify() {
+                var e = this.refs.change_email.value
+                  , t = this.refs.change_email_password.value;
+                if (!e || !t)
+                    return c["a"].error(Object(m["formatMessage"])({
+                        id: "请填写新邮箱和当前密码"
+                    }));
+                Object(d["b"])("/user/sendChangeEmailVerify", {
+                    new_email: e,
+                    password: t
+                }).then(e=>{
+                    200 === e.code && c["a"].success(Object(m["formatMessage"])({
+                        id: "验证码已发送"
+                    }))
+                })
+            }
+            changeEmail() {
+                var e = this.refs.change_email.value
+                  , t = this.refs.change_email_code.value
+                  , n = this.refs.change_email_password.value;
+                if (!e || !t || !n)
+                    return c["a"].error(Object(m["formatMessage"])({
+                        id: "请填写完整信息"
+                    }));
+                Object(d["b"])("/user/changeEmail", {
+                    new_email: e,
+                    email_code: t,
+                    password: n
+                }).then(e=>{
+                    200 === e.code && (c["a"].success(Object(m["formatMessage"])({
+                        id: "邮箱修改成功，请使用新邮箱重新登录"
+                    })),
+                    h.a.push("/login"))
+                })
+            }
             redeemgiftcard() {
                 if (this.refs.giftcard.value.length == 0)
                     return c["a"].error(Object(m["formatMessage"])({
@@ -16150,6 +16185,70 @@
                     loading: n
                 }, Object(m["formatMessage"])({
                     id: "\u4fdd\u5b58"
+                })))))))), l.a.createElement("div", {
+                    className: "row mb-3 mb-md-0"
+                }, l.a.createElement("div", {
+                    className: "col-md-12"
+                }, l.a.createElement("div", {
+                    className: "block block-rounded "
+                }, l.a.createElement("div", {
+                    className: "block-header block-header-default"
+                }, l.a.createElement("h3", {
+                    className: "block-title"
+                }, Object(m["formatMessage"])({
+                    id: "修改邮箱"
+                }))), l.a.createElement("div", {
+                    className: "block-content"
+                }, l.a.createElement("div", {
+                    className: "row push"
+                }, l.a.createElement("div", {
+                    className: "col-lg-8 col-xl-5"
+                }, l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, Object(m["formatMessage"])({
+                    id: "当前邮箱"
+                })), l.a.createElement("input", {
+                    className: "form-control",
+                    value: t.email || "",
+                    disabled: !0
+                })), l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, Object(m["formatMessage"])({
+                    id: "新邮箱"
+                })), l.a.createElement("input", {
+                    type: "email",
+                    className: "form-control",
+                    placeholder: Object(m["formatMessage"])({id: "请输入新邮箱"}),
+                    ref: "change_email"
+                })), l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, Object(m["formatMessage"])({
+                    id: "当前密码"
+                })), l.a.createElement("input", {
+                    type: "password",
+                    className: "form-control",
+                    placeholder: Object(m["formatMessage"])({id: "请输入当前密码"}),
+                    ref: "change_email_password"
+                })), l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, Object(m["formatMessage"])({
+                    id: "邮箱验证码"
+                })), l.a.createElement("div", {
+                    className: "input-group"
+                }, l.a.createElement("input", {
+                    className: "form-control",
+                    maxLength: 6,
+                    placeholder: Object(m["formatMessage"])({id: "请输入邮箱验证码"}),
+                    ref: "change_email_code"
+                }), l.a.createElement("div", {
+                    className: "input-group-append"
+                }, l.a.createElement(a["a"], {
+                    onClick: ()=>this.sendChangeEmailVerify()
+                }, Object(m["formatMessage"])({id: "发送验证码"}))))), l.a.createElement(a["a"], {
+                    type: "primary",
+                    onClick: ()=>this.changeEmail()
+                }, Object(m["formatMessage"])({
+                    id: "修改邮箱"
                 })))))))), l.a.createElement("div", {
                     className: "row mb-3 mb-md-0"
                 }, l.a.createElement("div", {

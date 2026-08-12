@@ -7,6 +7,8 @@ class CacheKey
     CONST KEYS = [
         'EMAIL_VERIFY_CODE' => '邮箱验证码',
         'LAST_SEND_EMAIL_VERIFY_TIMESTAMP' => '最后一次发送邮箱验证码时间',
+        'CHANGE_EMAIL_VERIFY_CODE' => '修改邮箱验证码',
+        'LAST_SEND_CHANGE_EMAIL_VERIFY_TIMESTAMP' => '最后一次发送修改邮箱验证码时间',
         'SERVER_VMESS_ONLINE_USER' => '节点在线用户',
         'SERVER_VMESS_LAST_CHECK_AT' => '节点最后检查时间',
         'SERVER_VMESS_LAST_PUSH_AT' => '节点最后推送时间',

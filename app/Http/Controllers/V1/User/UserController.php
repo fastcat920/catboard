@@ -4,6 +4,8 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\UserChangePassword;
+use App\Http\Requests\User\UserChangeEmail;
+use App\Http\Requests\User\UserSendChangeEmailVerify;
 use App\Http\Requests\User\UserRedeemGiftCard;
 use App\Http\Requests\User\UserTransfer;
 use App\Http\Requests\User\UserUpdate;
@@ -12,14 +14,17 @@ use App\Models\Order;
 use App\Models\Plan;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Jobs\SendEmailJob;
 use App\Services\AuthService;
 use App\Services\OrderService;
 use App\Services\UserService;
 use App\Utils\CacheKey;
+use App\Utils\Dict;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 class UserController extends Controller
 {
@@ -85,6 +90,118 @@ class UserController extends Controller
         return response([
             'data' => true
         ]);
+    }
+
+    public function sendChangeEmailVerify(UserSendChangeEmailVerify $request)
+    {
+        $user = User::find($request->user['id']);
+        if (!$user) {
+            abort(500, __('The user does not exist'));
+        }
+        if (!Helper::multiPasswordVerify(
+            $user->password_algo,
+            $user->password_salt,
+            $request->input('password'),
+            $user->password
+        )) {
+            abort(500, __('The password is wrong'));
+        }
+
+        $newEmail = strtolower(trim((string)$request->input('new_email')));
+        if ((int)config('v2board.email_whitelist_enable', 0) && !Helper::emailSuffixVerify(
+            $newEmail,
+            config('v2board.email_whitelist_suffix', Dict::EMAIL_WHITELIST_SUFFIX_DEFAULT)
+        )) {
+            abort(500, __('Email suffix is not in the Whitelist'));
+        }
+        if ((int)config('v2board.email_gmail_limit_enable', 0)) {
+            $prefix = explode('@', $newEmail)[0];
+            if (strpos($prefix, '.') !== false || strpos($prefix, '+') !== false) {
+                abort(500, __('Gmail alias is not supported'));
+            }
+        }
+        if (strcasecmp($user->email, $newEmail) === 0) {
+            abort(500, __('The new email must be different from the current email'));
+        }
+        if (User::whereRaw('LOWER(email) = ?', [$newEmail])->exists()) {
+            abort(500, __('Email already exists'));
+        }
+
+        $rateLimitKey = 'change-email:' . $user->id . ':' . $request->ip();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            abort(429, __('Too many requests, please try again later.'));
+        }
+        RateLimiter::hit($rateLimitKey, 3600);
+
+        $lastSendKey = CacheKey::get('LAST_SEND_CHANGE_EMAIL_VERIFY_TIMESTAMP', $user->id . ':' . $newEmail);
+        if (Cache::has($lastSendKey)) {
+            abort(500, __('Email verification code has been sent, please request again later'));
+        }
+
+        $code = (string)random_int(100000, 999999);
+        SendEmailJob::dispatch([
+            'email' => $newEmail,
+            'subject' => config('v2board.app_name', 'V2Board') . __('Email verification code'),
+            'template_name' => 'verify',
+            'template_value' => [
+                'name' => config('v2board.app_name', 'V2Board'),
+                'code' => $code,
+                'url' => config('v2board.app_url')
+            ]
+        ]);
+
+        Cache::put(CacheKey::get('CHANGE_EMAIL_VERIFY_CODE', $user->id . ':' . $newEmail), $code, 300);
+        Cache::put($lastSendKey, time(), 60);
+        return response(['data' => true]);
+    }
+
+    public function changeEmail(UserChangeEmail $request)
+    {
+        $user = User::find($request->user['id']);
+        if (!$user) {
+            abort(500, __('The user does not exist'));
+        }
+        if (!Helper::multiPasswordVerify(
+            $user->password_algo,
+            $user->password_salt,
+            $request->input('password'),
+            $user->password
+        )) {
+            abort(500, __('The password is wrong'));
+        }
+
+        $newEmail = strtolower(trim((string)$request->input('new_email')));
+        if (strcasecmp($user->email, $newEmail) === 0) {
+            abort(500, __('The new email must be different from the current email'));
+        }
+        if (User::whereRaw('LOWER(email) = ?', [$newEmail])->where('id', '!=', $user->id)->exists()) {
+            abort(500, __('Email already exists'));
+        }
+
+        $codeKey = CacheKey::get('CHANGE_EMAIL_VERIFY_CODE', $user->id . ':' . $newEmail);
+        $cachedCode = Cache::get($codeKey);
+        $inputCode = (string)$request->input('email_code');
+        if ($cachedCode === null || !hash_equals((string)$cachedCode, $inputCode)) {
+            abort(500, __('Incorrect email verification code'));
+        }
+
+        $user->email = $newEmail;
+        try {
+            if (!$user->save()) {
+                abort(500, __('Save failed'));
+            }
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ((string)$e->getCode() === '23000') {
+                abort(500, __('Email already exists'));
+            }
+            throw $e;
+        }
+
+        Cache::forget($codeKey);
+        Cache::forget(CacheKey::get('LAST_SEND_CHANGE_EMAIL_VERIFY_TIMESTAMP', $user->id . ':' . $newEmail));
+        $authService = new AuthService($user);
+        $authService->removeAllSession();
+        return response(['data' => true]);
     }
 
     public function newPeriod(Request $request) 

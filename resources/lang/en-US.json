@@ -83,6 +83,8 @@
     "Incorrect traffic alert format": "Incorrect traffic alert format",
     "Email can not be empty": "Email can not be empty",
     "Email format is incorrect": "Email format is incorrect",
+    "The password is wrong": "The current password is incorrect",
+    "The new email must be different from the current email": "The new email must be different from the current email",
     "Password can not be empty": "Password can not be empty",
     "The traffic usage in :app_name has reached 95%": "The traffic usage in :app_name has reached 95%",
     "The service in :app_name is about to expire": "The service in :app_name is about to expire",

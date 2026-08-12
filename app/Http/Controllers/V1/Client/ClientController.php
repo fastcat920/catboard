@@ -7,6 +7,7 @@ use App\Protocols\General;
 use App\Protocols\Singbox\Singbox;
 use App\Protocols\Singbox\SingboxOld;
 use App\Protocols\ClashMeta;
+use App\Protocols\FastCatV1;
 use App\Services\ServerService;
 use App\Services\UserService;
 use App\Services\NodeSecurity\AuditService;
@@ -30,11 +31,23 @@ class ClientController extends Controller
             $servers = $serverService->getAvailableServers($user, $client);
             $audit = new AuditService();
             $servers = $audit->prepare($request, $servers, 'client.subscribe');
+            $queryFlag = strtolower((string) $request->query('flag', ''));
+            $fastCatFlag = strtolower((string) config('fastcat.subscription.flag', 'fastcat-v1'));
+            if ($queryFlag !== '' && hash_equals($fastCatFlag, $queryFlag)) {
+                $this->setSubscribeInfoToServers($servers, $user);
+                $class = new FastCatV1($user, $servers);
+                return $this->auditedResponse($audit, $request, $class->handle());
+            }
             if($flag) {
                 if (!strpos($flag, 'sing')) {
                     $this->setSubscribeInfoToServers($servers, $user);
                     foreach (array_reverse(glob(app_path('Protocols') . '/*.php')) as $file) {
                         $file = 'App\\Protocols\\' . basename($file, '.php');
+                        // FastCatV1 is intentionally query-flag only. Never let an
+                        // existing FastCat User-Agent opt into encrypted output.
+                        if ($file === FastCatV1::class) {
+                            continue;
+                        }
                         $class = new $file($user, $servers);
                         if (strpos($flag, $class->flag) !== false) {
                             return $this->auditedResponse($audit, $request, $class->handle());

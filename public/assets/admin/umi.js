@@ -106865,7 +106865,9 @@
                     }, y.a.createElement(m["a"], {
                         type: "copy"
                     }), " \u590d\u5236"), y.a.createElement(p["a"].Item, {
-                        onClick: ()=>window.FastCatEntryPool && window.FastCatEntryPool.open(e.type, e.id, e.name)
+                        onClick: ()=>window.FastCatEntryPool && window.FastCatEntryPool.open(e.type, e.id, e.name, ()=>this.props.dispatch({
+                            type: "serverManage/getNodes"
+                        }))
                     }, y.a.createElement(m["a"], {
                         type: "cluster"
                     }), " \u5165\u53e3\u6c60"), y.a.createElement(p["a"].Item, {

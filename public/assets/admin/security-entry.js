@@ -191,11 +191,17 @@
     };
 
     var entryPoolState = null;
+    var entryPoolRefresh = null;
+
+    function refreshNodeManagement() {
+        if (typeof entryPoolRefresh === "function") entryPoolRefresh();
+    }
 
     function closeEntryPoolModal() {
         var modal = document.querySelector(".node-entry-pool-modal");
         if (modal) modal.remove();
         entryPoolState = null;
+        entryPoolRefresh = null;
     }
 
     function entryHealthText(status) {
@@ -318,7 +324,7 @@
             var form = event.currentTarget, submit = form.querySelector('[type="submit"]');
             submit.disabled = true; submit.textContent = "正在保存……";
             api("/security/entry-setting/save", { method: "POST", body: JSON.stringify({ server_type: node.server_type, server_id: Number(node.server_id), delivery_mode: form.elements.delivery_mode.value, client_visibility_mode: form.elements.client_visibility_mode.value, sync_primary_host: form.elements.sync_primary_host.checked, sync_primary_port: form.elements.sync_primary_port.checked, check_interval: Number(form.elements.check_interval.value), check_url: form.elements.check_url.value.trim() }) })
-                .then(function () { return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = "保存下发设置"; entryError(modal, error); });
+                .then(function () { refreshNodeManagement(); return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = "保存下发设置"; entryError(modal, error); });
         };
         modal.querySelector(".node-entry-client-policy").onsubmit = function (event) {
             event.preventDefault();
@@ -349,7 +355,7 @@
             var form = event.currentTarget, submit = form.querySelector('[type="submit"]');
             submit.disabled = true; submit.textContent = "正在保存……";
             api("/security/entry/save", { method: "POST", body: JSON.stringify(entryPayload(form, node)) })
-                .then(function () { return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = form.dataset.entryId ? "保存入口" : "添加入口"; entryError(modal, error); });
+                .then(function () { refreshNodeManagement(); return reloadEntryPool(); }).catch(function (error) { submit.disabled = false; submit.textContent = form.dataset.entryId ? "保存入口" : "添加入口"; entryError(modal, error); });
         };
         var cancel = modal.querySelector("[data-entry-cancel]");
         if (cancel) cancel.onclick = function () { renderEntryPoolModal(node); };
@@ -363,7 +369,8 @@
     }
 
     window.FastCatEntryPool = {
-        open: function (type, id) {
+        open: function (type, id, name, refresh) {
+            entryPoolRefresh = refresh;
             loadEntryPool(type, id).then(function (node) { renderEntryPoolModal(node); }).catch(function (error) { alert(error.message); });
         },
     };

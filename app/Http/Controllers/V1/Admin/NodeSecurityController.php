@@ -8,6 +8,7 @@ use App\Models\ServerGroup;
 use App\Services\AuthService;
 use App\Services\NodeSecurity\ExperimentService;
 use App\Services\NodeSecurity\EventWindowService;
+use App\Services\NodeSecurity\EntrySyncService;
 use App\Services\NodeSecurity\RiskService;
 use App\Services\NodeSecurity\SettingsService;
 use Illuminate\Http\Request;
@@ -763,6 +764,8 @@ class NodeSecurityController extends Controller
             $server['check_url'] = $setting->check_url ?? 'http://www.gstatic.com/generate_204';
             $server['check_interval'] = $setting->check_interval ?? 60;
             $server['client_visibility_mode'] = $setting->client_visibility_mode ?? 'all';
+            $server['sync_primary_host'] = (bool)($setting->sync_primary_host ?? false);
+            $server['sync_primary_port'] = (bool)($setting->sync_primary_port ?? false);
             $server['entries'] = $entries->get($key, collect())->map(function ($entry) {
                 try { $host = Crypt::decryptString($entry->host_encrypted); } catch (\Throwable $e) { $host = '解密失败'; }
                 return [
@@ -809,20 +812,28 @@ class NodeSecurityController extends Controller
             'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
             'client_visibility_mode' => 'required|in:all,allowlist,denylist',
             'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
+            'sync_primary_host' => 'required|boolean', 'sync_primary_port' => 'required|boolean',
         ]);
         $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
+        $syncService = new EntrySyncService();
+        if ($request->boolean('sync_primary_port') && !$syncService->validPort($server['port'] ?? null)) {
+            abort(422, '节点当前使用端口范围，入口池只支持单端口，无法开启端口同步');
+        }
         $now = time();
         $settingWhere = ['server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id')];
         $imported = false;
-        DB::transaction(function () use ($request, $server, $settingWhere, $now, &$imported) {
+        DB::transaction(function () use ($request, $server, $settingWhere, $now, $syncService, &$imported) {
             DB::table('v2_node_entry_setting')->updateOrInsert($settingWhere,
                 ['delivery_mode' => $request->input('delivery_mode'), 'client_visibility_mode' => $request->input('client_visibility_mode'),
+                    'sync_primary_host' => $request->boolean('sync_primary_host'),
+                    'sync_primary_port' => $request->boolean('sync_primary_port'),
                     'check_url' => $request->input('check_url'),
                     'check_interval' => (int)$request->input('check_interval'), 'created_at' => $now, 'updated_at' => $now]
             );
             $imported = $this->importOriginalEntryIfEmpty($server, $settingWhere, $now);
+            $syncService->syncServerToPrimary($settingWhere['server_type'], $settingWhere['server_id'], $server);
         });
-        $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'client_visibility_mode', 'check_interval'));
+        $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'client_visibility_mode', 'check_interval', 'sync_primary_host', 'sync_primary_port'));
         return response(['data' => ['saved' => true, 'original_entry_imported' => $imported]]);
     }
 
@@ -865,6 +876,7 @@ class NodeSecurityController extends Controller
             if ($payload['is_primary']) DB::table('v2_node_entry_pool')->where('server_type', $payload['server_type'])->where('server_id', $payload['server_id'])->update(['is_primary' => 0, 'updated_at' => $now]);
             if ($request->filled('id')) DB::table('v2_node_entry_pool')->where($where)->update($payload);
             else DB::table('v2_node_entry_pool')->insert($payload + ['health_status' => 'waiting', 'created_at' => $now]);
+            if ($payload['is_primary']) (new EntrySyncService())->syncPrimaryToServer($payload['server_type'], $payload['server_id']);
         });
         $this->adminLog($request, 'entry.save', 'node_entry', $request->input('id'), ['server_type' => $payload['server_type'], 'server_id' => $payload['server_id'], 'host_hash' => $payload['host_hash']]);
         return response(['data' => true]);

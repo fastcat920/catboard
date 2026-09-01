@@ -95,6 +95,7 @@ class ClashMeta
             $config['proxy-groups'][$k]['proxies'] = array_merge($config['proxy-groups'][$k]['proxies'], $proxies);
         }
         \App\Services\NodeEntryPoolService::applyClashFallbackGroups($config, $servers);
+        $config = $this->transformConfig($config);
         $config['proxy-groups'] = array_filter($config['proxy-groups'], function($group) {
             return $group['proxies'];
         });
@@ -108,6 +109,11 @@ class ClashMeta
         $yaml = Yaml::dump($config, 2, 4, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
         $yaml = str_replace('$app_name', config('v2board.app_name', 'V2Board'), $yaml);
         return $yaml;
+    }
+
+    protected function transformConfig(array $config): array
+    {
+        return $config;
     }
 
     public static function buildShadowsocks($password, $server)

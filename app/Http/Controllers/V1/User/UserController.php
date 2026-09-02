@@ -42,12 +42,15 @@ class UserController extends Controller
         $records = $builder->forPage($current, $pageSize)->get();
         $planNames = Plan::whereIn('id', $records->pluck('plan_id')->filter()->unique())
             ->pluck('name', 'id');
+        $giftcardCodes = Giftcard::whereIn('id', $records->pluck('giftcard_id')->unique())
+            ->pluck('code', 'id');
 
-        $data = $records->map(function ($record) use ($planNames) {
+        $data = $records->map(function ($record) use ($planNames, $giftcardCodes) {
+            $code = $giftcardCodes->get($record->giftcard_id, $record->code_snapshot);
             return [
                 'id' => $record->id,
                 'giftcard_name' => $record->name_snapshot,
-                'code_masked' => $record->code_snapshot,
+                'code_masked' => $this->maskGiftcardCode($code),
                 'type' => $record->type,
                 'value' => $record->value,
                 'plan_id' => $record->plan_id,
@@ -464,7 +467,7 @@ class UserController extends Controller
             GiftcardRedemption::create([
                 'giftcard_id' => $giftcard->id,
                 'user_id' => $user->id,
-                'code_snapshot' => $this->maskGiftcardCode($giftcard->code),
+                'code_snapshot' => $giftcard->code,
                 'name_snapshot' => $giftcard->name,
                 'type' => $giftcard->type,
                 'value' => $giftcard->value,
@@ -488,10 +491,13 @@ class UserController extends Controller
     private function maskGiftcardCode($code)
     {
         $length = strlen($code);
-        if ($length <= 4) {
+        if ($length <= 2) {
             return str_repeat('*', $length);
         }
-        return str_repeat('*', $length - 4) . substr($code, -4);
+        if ($length <= 4) {
+            return substr($code, 0, 1) . str_repeat('*', $length - 2) . substr($code, -1);
+        }
+        return substr($code, 0, 2) . str_repeat('*', $length - 4) . substr($code, -2);
     }
 
     public function info(Request $request)

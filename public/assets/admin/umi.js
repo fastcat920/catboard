@@ -114604,13 +114604,13 @@
             redemptionValue(e) {
                 switch (e.type) {
                 case 1:
-                    return (e.value / 100).toFixed(2) + " ¥";
+                    return "账户余额 " + (e.value / 100).toFixed(2) + " ¥";
                 case 2:
-                    return e.value + " 天";
+                    return e.value + " 天订阅时长";
                 case 3:
-                    return e.value + " GB";
+                    return e.value + " GB 套餐流量";
                 case 4:
-                    return "重置流量";
+                    return "重置套餐流量";
                 case 5:
                     return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
                 default:

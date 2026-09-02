@@ -19,10 +19,19 @@ class GiftcardController extends Controller
         $builder = GiftcardRedemption::query()
             ->leftJoin('v2_user as user', 'user.id', '=', 'v2_giftcard_redemption.user_id')
             ->leftJoin('v2_plan as plan', 'plan.id', '=', 'v2_giftcard_redemption.plan_id')
+            ->leftJoin('v2_giftcard as giftcard', 'giftcard.id', '=', 'v2_giftcard_redemption.giftcard_id')
             ->select([
-                'v2_giftcard_redemption.*',
+                'v2_giftcard_redemption.id',
+                'v2_giftcard_redemption.giftcard_id',
+                'v2_giftcard_redemption.user_id',
+                'v2_giftcard_redemption.name_snapshot',
+                'v2_giftcard_redemption.type',
+                'v2_giftcard_redemption.value',
+                'v2_giftcard_redemption.plan_id',
+                'v2_giftcard_redemption.redeemed_at',
                 'user.email as user_email',
                 'plan.name as plan_name',
+                DB::raw('COALESCE(giftcard.code, v2_giftcard_redemption.code_snapshot) as code_snapshot'),
             ]);
 
         if ($request->filled('giftcard_id')) {
@@ -36,7 +45,8 @@ class GiftcardController extends Controller
             $builder->where(function ($query) use ($search) {
                 $query->where('user.email', 'like', "%{$search}%")
                     ->orWhere('v2_giftcard_redemption.name_snapshot', 'like', "%{$search}%")
-                    ->orWhere('v2_giftcard_redemption.code_snapshot', 'like', "%{$search}%");
+                    ->orWhere('v2_giftcard_redemption.code_snapshot', 'like', "%{$search}%")
+                    ->orWhere('giftcard.code', 'like', "%{$search}%");
                 if (ctype_digit($search)) {
                     $query->orWhere('v2_giftcard_redemption.user_id', (int)$search);
                 }

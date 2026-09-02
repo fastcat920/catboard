@@ -39630,6 +39630,7 @@
           , S = n.n(E)
           , k = n("/MKj")
           , C = n("tI4l")
+          , A = n("t3Un")
           , O = n("v32e");
         class T extends b.a.Component {
             constructor(e) {
@@ -39639,6 +39640,13 @@
                 },
                 this.state = {
                     visible: !1,
+                    redemptionVisible: !1,
+                    redemptionLoading: !1,
+                    redemptions: [],
+                    redemptionTotal: 0,
+                    redemptionPage: 1,
+                    redemptionSearch: "",
+                    redemptionGiftcardId: null,
                     submit: v()({}, this.defaultValue)
                 }
             }
@@ -39659,6 +39667,48 @@
                     })
                 }
                 )
+            }
+            openRedemptions(e) {
+                this.setState({
+                    redemptionVisible: !0,
+                    redemptionGiftcardId: e || null,
+                    redemptionPage: 1
+                }, ()=>this.fetchRedemptions(1))
+            }
+            fetchRedemptions(e) {
+                var t = "current=" + e + "&pageSize=10"
+                  , n = this.state.redemptionSearch.trim();
+                n && (t += "&search=" + encodeURIComponent(n)),
+                this.state.redemptionGiftcardId && (t += "&giftcard_id=" + this.state.redemptionGiftcardId),
+                this.setState({
+                    redemptionLoading: !0
+                }),
+                Object(A["a"])("/" + window.settings.secure_path + "/giftcard/redemptions?" + t).then(t=>{
+                    200 === t.code && this.setState({
+                        redemptions: t.data || [],
+                        redemptionTotal: t.total || 0,
+                        redemptionPage: e
+                    }),
+                    this.setState({
+                        redemptionLoading: !1
+                    })
+                })
+            }
+            redemptionValue(e) {
+                switch (e.type) {
+                case 1:
+                    return (e.value / 100).toFixed(2) + " ¥";
+                case 2:
+                    return e.value + " 天";
+                case 3:
+                    return e.value + " GB";
+                case 4:
+                    return "重置流量";
+                case 5:
+                    return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
+                default:
+                    return "-"
+                }
             }
             generate() {
                 var e = v()({}, this.state.submit);
@@ -39771,6 +39821,11 @@
                             ,
                             href: "javascript:void(0);"
                         }, "\u7f16\u8f91"), b.a.createElement(f["a"], {
+                            type: "vertical"
+                        }), b.a.createElement("a", {
+                            onClick: ()=>this.openRedemptions(n.id),
+                            href: "javascript:void(0);"
+                        }, "兑换记录"), b.a.createElement(f["a"], {
                             type: "vertical"
                         }), b.a.createElement("a", {
                             onClick: ()=>{
@@ -114738,7 +114793,12 @@
                     onClick: ()=>this.modalVisible()
                 }, b.a.createElement(u["a"], {
                     type: "plus"
-                }), "\u6dfb\u52a0\u793c\u54c1\u5361")), b.a.createElement(l["a"], {
+                }), "\u6dfb\u52a0\u793c\u54c1\u5361"), b.a.createElement(c["a"], {
+                    style: {
+                        marginLeft: 8
+                    },
+                    onClick: ()=>this.openRedemptions(null)
+                }, "全部兑换记录")), b.a.createElement(l["a"], {
                     tableLayout: "auto",
                     dataSource: t,
                     columns: x,
@@ -114752,6 +114812,71 @@
                     }),
                     onChange: (e,t,n)=>this.tableOnChange(e, n)
                 })))), b.a.createElement(h["a"], {
+                    title: this.state.redemptionGiftcardId ? "礼品卡兑换记录 #" + this.state.redemptionGiftcardId : "全部礼品卡兑换记录",
+                    visible: this.state.redemptionVisible,
+                    footer: null,
+                    width: 980,
+                    onCancel: ()=>this.setState({
+                        redemptionVisible: !1,
+                        redemptionGiftcardId: null,
+                        redemptionSearch: ""
+                    })
+                }, b.a.createElement("div", {
+                    className: "mb-3",
+                    style: {
+                        display: "flex"
+                    }
+                }, b.a.createElement(s["a"], {
+                    placeholder: "搜索用户ID、邮箱、礼品卡名称或卡密尾号",
+                    value: this.state.redemptionSearch,
+                    onPressEnter: ()=>this.fetchRedemptions(1),
+                    onChange: e=>this.setState({
+                        redemptionSearch: e.target.value
+                    })
+                }), b.a.createElement(c["a"], {
+                    type: "primary",
+                    style: {
+                        marginLeft: 8
+                    },
+                    onClick: ()=>this.fetchRedemptions(1)
+                }, "查询")), b.a.createElement(l["a"], {
+                    rowKey: "id",
+                    loading: this.state.redemptionLoading,
+                    dataSource: this.state.redemptions,
+                    columns: [{
+                        title: "用户",
+                        key: "user",
+                        render: e=>b.a.createElement("div", null, b.a.createElement("div", null, e.user_email || "用户已删除"), b.a.createElement("small", {
+                            className: "text-muted"
+                        }, "ID: ", e.user_id))
+                    }, {
+                        title: "礼品卡",
+                        key: "giftcard",
+                        render: e=>b.a.createElement("div", null, b.a.createElement("div", null, e.name_snapshot), b.a.createElement("small", {
+                            className: "text-muted"
+                        }, e.code_snapshot))
+                    }, {
+                        title: "兑换内容",
+                        key: "value",
+                        render: e=>this.redemptionValue(e)
+                    }, {
+                        title: "兑换时间",
+                        dataIndex: "redeemed_at",
+                        key: "redeemed_at",
+                        render: e=>_()(1e3 * e).format("YYYY/MM/DD HH:mm")
+                    }],
+                    pagination: {
+                        size: "small",
+                        current: this.state.redemptionPage,
+                        pageSize: 10,
+                        total: this.state.redemptionTotal,
+                        showSizeChanger: !1
+                    },
+                    onChange: e=>this.fetchRedemptions(e.current),
+                    scroll: {
+                        x: 800
+                    }
+                })), b.a.createElement(h["a"], {
                     title: "".concat(this.state.submit.id ? "\u7f16\u8f91\u793c\u54c1\u5361" : "\u65b0\u5efa\u793c\u54c1\u5361"),
                     visible: this.state.visible,
                     onCancel: ()=>this.modalVisible(),

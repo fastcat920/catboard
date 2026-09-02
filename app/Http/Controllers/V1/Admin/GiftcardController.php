@@ -5,12 +5,58 @@ namespace App\Http\Controllers\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GiftcardGenerate;
 use App\Models\Giftcard;
+use App\Models\GiftcardRedemption;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class GiftcardController extends Controller
 {
+    public function redemptions(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = min(max((int)$request->input('pageSize', 10), 1), 100);
+        $builder = GiftcardRedemption::query()
+            ->leftJoin('v2_user as user', 'user.id', '=', 'v2_giftcard_redemption.user_id')
+            ->leftJoin('v2_plan as plan', 'plan.id', '=', 'v2_giftcard_redemption.plan_id')
+            ->select([
+                'v2_giftcard_redemption.*',
+                'user.email as user_email',
+                'plan.name as plan_name',
+            ]);
+
+        if ($request->filled('giftcard_id')) {
+            $builder->where('v2_giftcard_redemption.giftcard_id', (int)$request->input('giftcard_id'));
+        }
+        if ($request->filled('type')) {
+            $builder->where('v2_giftcard_redemption.type', (int)$request->input('type'));
+        }
+        if ($request->filled('search')) {
+            $search = trim((string)$request->input('search'));
+            $builder->where(function ($query) use ($search) {
+                $query->where('user.email', 'like', "%{$search}%")
+                    ->orWhere('v2_giftcard_redemption.name_snapshot', 'like', "%{$search}%")
+                    ->orWhere('v2_giftcard_redemption.code_snapshot', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $query->orWhere('v2_giftcard_redemption.user_id', (int)$search);
+                }
+            });
+        }
+
+        $total = $builder->count();
+        $records = $builder->orderBy('v2_giftcard_redemption.redeemed_at', 'DESC')
+            ->orderBy('v2_giftcard_redemption.id', 'DESC')
+            ->forPage($current, $pageSize)
+            ->get();
+
+        return response([
+            'data' => $records,
+            'total' => $total,
+            'current' => $current,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
     public function fetch(Request $request)
     {
         $current = $request->input('current', 1);

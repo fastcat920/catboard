@@ -145,6 +145,7 @@ class AdminRoute
             $router->post('/coupon/show', 'V1\\Admin\\CouponController@show');
             // Giftcard
             $router->get ('/giftcard/fetch', 'V1\\Admin\\GiftcardController@fetch');
+            $router->get ('/giftcard/redemptions', 'V1\\Admin\\GiftcardController@redemptions');
             $router->post('/giftcard/generate', 'V1\\Admin\\GiftcardController@generate');
             $router->post('/giftcard/drop', 'V1\\Admin\\GiftcardController@drop');
             // Knowledge

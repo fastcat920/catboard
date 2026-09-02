@@ -578,12 +578,45 @@ CREATE TABLE `v2_user` (
                            `token` char(32) NOT NULL,
                            `expired_at` bigint(20) DEFAULT '0',
                            `remarks` text,
+                           `deleted_at` int(11) DEFAULT NULL,
+                           `deletion_type` varchar(16) DEFAULT NULL,
+                           `deletion_reason` text,
+                           `deleted_by_admin_id` int(11) DEFAULT NULL,
                            `created_at` int(11) NOT NULL,
                            `updated_at` int(11) NOT NULL,
                            PRIMARY KEY (`id`),
                            UNIQUE KEY `email` (`email`),
-                           UNIQUE KEY `token` (`token`)
+                           UNIQUE KEY `token` (`token`),
+                           KEY `deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+DROP TABLE IF EXISTS `v2_trial_claim`;
+CREATE TABLE `v2_trial_claim` (
+                                  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                                  `email_hash` char(64) NOT NULL,
+                                  `user_id` int(10) unsigned DEFAULT NULL,
+                                  `claimed_at` int(10) unsigned NOT NULL,
+                                  `created_at` int(10) unsigned NOT NULL,
+                                  `updated_at` int(10) unsigned NOT NULL,
+                                  PRIMARY KEY (`id`),
+                                  UNIQUE KEY `email_hash` (`email_hash`),
+                                  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `v2_account_deletion_log`;
+CREATE TABLE `v2_account_deletion_log` (
+                                          `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                                          `user_id` int(10) unsigned NOT NULL,
+                                          `email_hash` char(64) NOT NULL,
+                                          `deletion_type` varchar(16) NOT NULL,
+                                          `admin_id` int(10) unsigned DEFAULT NULL,
+                                          `reason` text,
+                                          `created_at` int(10) unsigned NOT NULL,
+                                          PRIMARY KEY (`id`),
+                                          KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- 2025-09-12 10:05:00

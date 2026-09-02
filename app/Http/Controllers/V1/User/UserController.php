@@ -16,6 +16,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Jobs\SendEmailJob;
 use App\Services\AuthService;
+use App\Services\AccountDeletionService;
 use App\Services\OrderService;
 use App\Services\UserService;
 use App\Utils\CacheKey;
@@ -28,6 +29,65 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class UserController extends Controller
 {
+    public function sendDeleteAccountVerify(Request $request)
+    {
+        $user = User::find($request->user['id']);
+        if (!$user || $user->deleted_at) {
+            abort(500, __('The user does not exist'));
+        }
+
+        $rateLimitKey = 'delete-account-email:' . $user->id . ':' . $request->ip();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            abort(429, __('Too many requests, please try again later.'));
+        }
+        RateLimiter::hit($rateLimitKey, 3600);
+
+        $lastSendKey = CacheKey::get('LAST_SEND_DELETE_ACCOUNT_VERIFY_TIMESTAMP', $user->id);
+        if (Cache::has($lastSendKey)) {
+            abort(500, __('Email verification code has been sent, please request again later'));
+        }
+
+        $code = (string)random_int(100000, 999999);
+        SendEmailJob::dispatch([
+            'email' => $user->email,
+            'subject' => config('v2board.app_name', 'V2Board') . __('Account deletion verification code'),
+            'template_name' => 'verify',
+            'template_value' => [
+                'name' => config('v2board.app_name', 'V2Board'),
+                'code' => $code,
+                'url' => config('v2board.app_url')
+            ]
+        ]);
+
+        Cache::put(CacheKey::get('DELETE_ACCOUNT_VERIFY_CODE', $user->id), $code, 300);
+        Cache::put($lastSendKey, time(), 60);
+        return response(['data' => true]);
+    }
+
+    public function deleteAccount(Request $request, AccountDeletionService $deletionService)
+    {
+        $request->validate([
+            'email_code' => 'required|digits:6',
+            'confirm' => 'required|in:DELETE',
+        ]);
+
+        $user = User::find($request->user['id']);
+        if (!$user || $user->deleted_at) {
+            abort(500, __('The user does not exist'));
+        }
+
+        $codeKey = CacheKey::get('DELETE_ACCOUNT_VERIFY_CODE', $user->id);
+        $cachedCode = Cache::get($codeKey);
+        if ($cachedCode === null || !hash_equals((string)$cachedCode, (string)$request->input('email_code'))) {
+            abort(500, __('Incorrect email verification code'));
+        }
+
+        $deletionService->anonymize($user, 'user', null, 'User requested account deletion');
+        Cache::forget($codeKey);
+        Cache::forget(CacheKey::get('LAST_SEND_DELETE_ACCOUNT_VERIFY_TIMESTAMP', $user->id));
+        return response(['data' => true]);
+    }
+
     public function getActiveSession(Request $request)
     {
         $user = User::find($request->user['id']);

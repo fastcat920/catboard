@@ -20,6 +20,8 @@ class UserRoute
             $router->post('/changePassword', 'V1\\User\\UserController@changePassword');
             $router->post('/sendChangeEmailVerify', 'V1\\User\\UserController@sendChangeEmailVerify');
             $router->post('/changeEmail', 'V1\\User\\UserController@changeEmail');
+            $router->post('/account/sendDeleteVerify', 'V1\\User\\UserController@sendDeleteAccountVerify');
+            $router->post('/account/delete', 'V1\\User\\UserController@deleteAccount');
             $router->post('/update', 'V1\\User\\UserController@update');
             $router->get ('/getSubscribe', 'V1\\User\\UserController@getSubscribe');
             $router->get ('/getStat', 'V1\\User\\UserController@getStat');

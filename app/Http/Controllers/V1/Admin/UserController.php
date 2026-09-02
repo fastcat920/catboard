@@ -9,14 +9,11 @@ use App\Http\Requests\Admin\UserSendMail;
 use App\Http\Requests\Admin\UserUpdate;
 use App\Http\Requests\Admin\UserBatchGroup;
 use App\Jobs\SendEmailJob;
-use App\Models\InviteCode;
-use App\Models\Ticket;
-use App\Models\Order;
 use App\Models\Plan;
-use App\Models\TicketMessage;
 use App\Models\User;
 use App\Models\ServerGroup;
 use App\Services\AuthService;
+use App\Services\AccountDeletionService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +74,7 @@ class UserController extends Controller
             DB::raw('*'),
             DB::raw('(u+d) as total_used')
         )
+            ->whereNull('deleted_at')
             ->orderBy($sort, $sortType);
         $this->filter($request, $userModel);
         $total = $userModel->count();
@@ -379,63 +377,50 @@ class UserController extends Controller
         ]);
     }
 
-    public function allDel(Request $request)
+    public function allDel(Request $request, AccountDeletionService $deletionService)
     {
         $sortType = in_array($request->input('sort_type'), ['ASC', 'DESC']) ? $request->input('sort_type') : 'DESC';
         $sort = $request->input('sort') ? $request->input('sort') : 'created_at';
         $builder = User::orderBy($sort, $sortType);
         $this->filter($request, $builder);
 
-        DB::beginTransaction();
         try {
-            $builder->each(function ($user){
-                $authService = new AuthService($user);
-                $authService->removeAllSession();
-                Order::where('user_id', $user->id)->delete();
-                InviteCode::where('user_id', $user->id)->delete();
-                $tickets = Ticket::where('user_id', $user->id)->get();
-                foreach($tickets as $ticket) {
-                    TicketMessage::where('ticket_id', $ticket->id)->delete();
-                }
-                Ticket::where('user_id', $user->id)->delete();
-                User::where('invite_user_id', $user->id)->update(['invite_user_id' => null]);
+            $ids = $builder->where('is_admin', 0)->whereNull('deleted_at')->pluck('id');
+            User::whereIn('id', $ids)->orderBy('id')->each(function ($user) use ($deletionService, $request) {
+                $deletionService->anonymize(
+                    $user,
+                    'admin',
+                    (int)$request->user['id'],
+                    (string)$request->input('reason', '管理员批量注销')
+                );
             });
-            $builder->delete();
-            DB::commit();
         } catch (\Exception $e) {
-            DB::rollBack();
             abort(500, '批量删除用户信息失败');
-        }  
+        }
 
         return response([
-            'data' => true
+            'data' => true,
+            'affected' => isset($ids) ? $ids->count() : 0,
         ]);
     }
 
-    public function delUser(Request $request)
+    public function delUser(Request $request, AccountDeletionService $deletionService)
     {
         $user = User::find($request->input('id'));
         if (!$user) {
             abort(500, '用户不存在');
         }
-        DB::beginTransaction();
+        if ($user->is_admin) {
+            abort(500, '不能删除管理员账号');
+        }
         try {
-            $authService = new AuthService($user);
-            $authService->removeAllSession();
-            Order::where('user_id', $request->input('id'))->delete();
-            User::where('invite_user_id', $request->input('id'))->update(['invite_user_id' => null]);
-            InviteCode::where('user_id', $request->input('id'))->delete();
-            
-            $tickets = Ticket::where('user_id', $request->input('id'))->get();
-            foreach($tickets as $ticket) {
-                TicketMessage::where('ticket_id', $ticket->id)->delete();
-            }
-            Ticket::where('user_id', $request->input('id'))->delete();
-    
-            $user->delete();
-            DB::commit();
+            $deletionService->anonymize(
+                $user,
+                'admin',
+                (int)$request->user['id'],
+                (string)$request->input('reason', '管理员注销')
+            );
         } catch (\Exception $e) {
-            DB::rollBack();
             abort(500, '删除用户失败');
         }
 

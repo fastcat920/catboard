@@ -19,6 +19,16 @@ rm -rf composer.lock composer.phar
 wget https://github.com/composer/composer/releases/latest/download/composer.phar -O composer.phar
 php composer.phar update -vvv
 
+if ! grep -q '^TRIAL_IDENTITY_KEY=..*' .env; then
+    trial_identity_key="$(php -r 'echo bin2hex(random_bytes(32));')"
+    if grep -q '^TRIAL_IDENTITY_KEY=' .env; then
+        sed -i "s/^TRIAL_IDENTITY_KEY=.*/TRIAL_IDENTITY_KEY=${trial_identity_key}/" .env
+    else
+        printf '\nTRIAL_IDENTITY_KEY=%s\n' "$trial_identity_key" >> .env
+    fi
+    echo "Generated TRIAL_IDENTITY_KEY for account trial protection."
+fi
+
 php_main_version=$(php -v | head -n 1 | cut -d ' ' -f 2 | cut -d '.' -f 1)
 if [ "$php_main_version" -ge 8 ]; then
     php composer.phar require joanhey/adapterman

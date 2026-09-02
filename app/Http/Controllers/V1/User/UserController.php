@@ -10,6 +10,7 @@ use App\Http\Requests\User\UserRedeemGiftCard;
 use App\Http\Requests\User\UserTransfer;
 use App\Http\Requests\User\UserUpdate;
 use App\Models\Giftcard;
+use App\Models\GiftcardRedemption;
 use App\Models\Order;
 use App\Models\Plan;
 use App\Models\Ticket;
@@ -29,6 +30,40 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class UserController extends Controller
 {
+    public function giftcardRedemptions(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = min(max((int)$request->input('pageSize', 10), 1), 50);
+        $builder = GiftcardRedemption::where('user_id', $request->user['id'])
+            ->orderBy('redeemed_at', 'DESC')
+            ->orderBy('id', 'DESC');
+
+        $total = $builder->count();
+        $records = $builder->forPage($current, $pageSize)->get();
+        $planNames = Plan::whereIn('id', $records->pluck('plan_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        $data = $records->map(function ($record) use ($planNames) {
+            return [
+                'id' => $record->id,
+                'giftcard_name' => $record->name_snapshot,
+                'code_masked' => $record->code_snapshot,
+                'type' => $record->type,
+                'value' => $record->value,
+                'plan_id' => $record->plan_id,
+                'plan_name' => $record->plan_id ? $planNames->get($record->plan_id) : null,
+                'redeemed_at' => $record->redeemed_at,
+            ];
+        });
+
+        return response([
+            'data' => $data,
+            'total' => $total,
+            'current' => $current,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
     public function sendDeleteAccountVerify(Request $request)
     {
         $user = User::find($request->user['id']);
@@ -341,7 +376,7 @@ class UserController extends Controller
                 abort(500, __('The user does not exist'));
             }
             $giftcard_input = $request->giftcard;
-            $giftcard = Giftcard::where('code', $giftcard_input)->first();
+            $giftcard = Giftcard::where('code', $giftcard_input)->lockForUpdate()->first();
 
             if (!$giftcard) {
                 abort(500, __('The gift card does not exist'));
@@ -426,6 +461,17 @@ class UserController extends Controller
                 throw new \Exception(__('Save failed'));
             }
 
+            GiftcardRedemption::create([
+                'giftcard_id' => $giftcard->id,
+                'user_id' => $user->id,
+                'code_snapshot' => $this->maskGiftcardCode($giftcard->code),
+                'name_snapshot' => $giftcard->name,
+                'type' => $giftcard->type,
+                'value' => $giftcard->value,
+                'plan_id' => $giftcard->plan_id,
+                'redeemed_at' => $currentTime,
+            ]);
+
             DB::commit();
 
             return response([
@@ -437,6 +483,15 @@ class UserController extends Controller
             DB::rollBack();
             abort(500, $e->getMessage());
         }
+    }
+
+    private function maskGiftcardCode($code)
+    {
+        $length = strlen($code);
+        if ($length <= 4) {
+            return str_repeat('*', $length);
+        }
+        return str_repeat('*', $length - 4) . substr($code, -4);
     }
 
     public function info(Request $request)

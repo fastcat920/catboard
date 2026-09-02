@@ -15878,13 +15878,54 @@
           , m = n("Y2fQ");
         n("v32e");
         class v extends l.a.Component {
+            constructor(e) {
+                super(e),
+                this.state = {
+                    giftcardRedemptions: [],
+                    giftcardRedemptionsTotal: 0,
+                    giftcardRedemptionsPage: 1,
+                    giftcardRedemptionsLoading: !1
+                }
+            }
             componentDidMount() {
                 this.props.dispatch({
                     type: "user/getUserInfo"
                 }),
                 this.props.dispatch({
                     type: "comm/config"
+                }),
+                this.fetchGiftcardRedemptions(1)
+            }
+            fetchGiftcardRedemptions(e) {
+                this.setState({
+                    giftcardRedemptionsLoading: !0
+                }),
+                Object(d["a"])("/user/giftcard/redemptions?current=" + e + "&pageSize=10").then(t=>{
+                    200 === t.code && this.setState({
+                        giftcardRedemptions: t.data || [],
+                        giftcardRedemptionsTotal: t.total || 0,
+                        giftcardRedemptionsPage: e
+                    }),
+                    this.setState({
+                        giftcardRedemptionsLoading: !1
+                    })
                 })
+            }
+            giftcardValueLabel(e) {
+                switch (e.type) {
+                case 1:
+                    return (e.value / 100).toFixed(2);
+                case 2:
+                    return e.value + " 天订阅时长";
+                case 3:
+                    return e.value + " GB 套餐流量";
+                case 4:
+                    return "重置流量";
+                case 5:
+                    return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
+                default:
+                    return "--"
+                }
             }
             changePassword() {
                 if (this.refs.re_password.value !== this.refs.new_password.value)
@@ -15940,7 +15981,7 @@
                 this.props.dispatch({
                     type: "user/redeemgiftcard",
                     giftcard: this.refs.giftcard.value,
-                    callback: () => {componentDidMount()}
+                    callback: ()=>this.fetchGiftcardRedemptions(1)
                 })
             }
             update(e, t) {
@@ -16127,6 +16168,36 @@
                 }, Object(m["formatMessage"])({
                     id: "\u5151\u6362"
                 })))))))), l.a.createElement("div", {
+                    className: "row mb-3 mb-md-0"
+                }, l.a.createElement("div", {
+                    className: "col-md-12"
+                }, l.a.createElement("div", {
+                    className: "block block-rounded"
+                }, l.a.createElement("div", {
+                    className: "block-header block-header-default"
+                }, l.a.createElement("h3", {
+                    className: "block-title"
+                }, "礼品卡兑换记录")), l.a.createElement("div", {
+                    className: "block-content"
+                }, 0 === this.state.giftcardRedemptions.length ? l.a.createElement("p", {
+                    className: "text-muted"
+                }, this.state.giftcardRedemptionsLoading ? "加载中..." : "暂无兑换记录（仅展示功能上线后的记录）") : l.a.createElement("div", {
+                    className: "table-responsive"
+                }, l.a.createElement("table", {
+                    className: "table table-striped table-vcenter"
+                }, l.a.createElement("thead", null, l.a.createElement("tr", null, l.a.createElement("th", null, "礼品卡"), l.a.createElement("th", null, "卡密"), l.a.createElement("th", null, "兑换内容"), l.a.createElement("th", null, "兑换时间"))), l.a.createElement("tbody", null, this.state.giftcardRedemptions.map(e=>l.a.createElement("tr", {
+                    key: e.id
+                }, l.a.createElement("td", null, e.giftcard_name), l.a.createElement("td", null, e.code_masked), l.a.createElement("td", null, this.giftcardValueLabel(e)), l.a.createElement("td", null, new Date(1e3 * e.redeemed_at).toLocaleString())))))), this.state.giftcardRedemptionsTotal > 10 && l.a.createElement("div", {
+                    className: "pb-3 text-right"
+                }, l.a.createElement(a["a"], {
+                    disabled: this.state.giftcardRedemptionsPage <= 1,
+                    onClick: ()=>this.fetchGiftcardRedemptions(this.state.giftcardRedemptionsPage - 1)
+                }, "上一页"), l.a.createElement("span", {
+                    className: "mx-3"
+                }, this.state.giftcardRedemptionsPage, " / ", Math.ceil(this.state.giftcardRedemptionsTotal / 10)), l.a.createElement(a["a"], {
+                    disabled: 10 * this.state.giftcardRedemptionsPage >= this.state.giftcardRedemptionsTotal,
+                    onClick: ()=>this.fetchGiftcardRedemptions(this.state.giftcardRedemptionsPage + 1)
+                }, "下一页")))))), l.a.createElement("div", {
                     className: "row mb-3 mb-md-0"
                 }, l.a.createElement("div", {
                     className: "col-md-12"
@@ -45046,9 +45117,10 @@
                                             case 5:
                                                 return "\u8ba2\u9605\u5957\u9910 " + u.value + " \u5929";
                                             default:
-                                                return "\u672a\u77e5\u7c7b\u578b";
+                                            return "\u672a\u77e5\u7c7b\u578b";
                                         }
-                                    })());
+                                    })()),
+                                    "function" === typeof e.callback && e.callback();
                                 case "end":
                                     return n.stop()
                                 }

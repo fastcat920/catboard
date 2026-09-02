@@ -70,6 +70,25 @@ CREATE TABLE `v2_giftcard` (
                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+DROP TABLE IF EXISTS `v2_giftcard_redemption`;
+CREATE TABLE `v2_giftcard_redemption` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    `giftcard_id` int unsigned NOT NULL,
+    `user_id` int unsigned NOT NULL,
+    `code_snapshot` varchar(255) NOT NULL,
+    `name_snapshot` varchar(255) NOT NULL,
+    `type` tinyint unsigned NOT NULL,
+    `value` int DEFAULT NULL,
+    `plan_id` int unsigned DEFAULT NULL,
+    `redeemed_at` int unsigned NOT NULL,
+    `created_at` int unsigned NOT NULL,
+    `updated_at` int unsigned NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `giftcard_user_unique` (`giftcard_id`,`user_id`),
+    KEY `giftcard_redemption_giftcard_id_index` (`giftcard_id`),
+    KEY `giftcard_redemption_user_redeemed_index` (`user_id`,`redeemed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 DROP TABLE IF EXISTS `v2_invite_code`;
 CREATE TABLE `v2_invite_code` (

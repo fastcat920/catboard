@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\CouponService;
+use App\Services\DepositOrderPresenter;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
@@ -40,7 +41,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function detail(Request $request)
+    public function detail(Request $request, DepositOrderPresenter $depositPresenter)
     {
         $order = Order::where('user_id', $request->user['id'])
             ->where('trade_no', $request->input('trade_no'))
@@ -49,15 +50,8 @@ class OrderController extends Controller
             abort(500, __('Order does not exist or has been paid'));
         }
         if ($order->plan_id == 0) {
-            $order['plan'] = [
-                'id' => 0,
-                'name' => 'deposit'
-            ];
-            $order->bounus = $this->getbounus($order->total_amount);
-            $order->get_amount = $order->total_amount + $order->bounus;
-
             return response([
-                'data' => $order
+                'data' => $depositPresenter->decorate($order)
             ]);
         }
         $order['plan'] = Plan::find($order->plan_id);
@@ -342,22 +336,4 @@ class OrderController extends Controller
         ]);
     }
 
-    private function getbounus($total_amount) {
-        $deposit_bounus = config('v2board.deposit_bounus', []);
-        if (empty($deposit_bounus) || $deposit_bounus[0] === null) {
-            return 0;
-        }
-        $add = 0;
-        foreach ($deposit_bounus as $tier) {
-            list($amount, $bounus) = explode(':', $tier);
-            $amount = (float)$amount * 100;
-            $bounus = (float)$bounus * 100;
-            $amount = (int)$amount;
-            $bounus = (int)$bounus;
-            if ($total_amount >= $amount) {
-                $add = max($add, $bounus);
-            }
-        }
-        return $add;
-    }
 }

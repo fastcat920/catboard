@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    public const CALLBACK_COMMISSION_TRANSFER = '佣金划转 Commission transfer';
+
     protected $table = 'v2_order';
     protected $dateFormat = 'U';
     protected $guarded = ['id'];

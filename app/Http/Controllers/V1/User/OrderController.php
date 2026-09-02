@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function fetch(Request $request, DepositOrderPresenter $depositPresenter)
+    public function fetch(Request $request)
     {
         $model = Order::where('user_id', $request->user['id'])
             ->orderBy('created_at', 'DESC');
@@ -30,10 +30,6 @@ class OrderController extends Controller
         $order = $model->get();
         $plan = Plan::get();
         for ($i = 0; $i < count($order); $i++) {
-            if ($order[$i]['plan_id'] == 0) {
-                $depositPresenter->decorate($order[$i]);
-                continue;
-            }
             for ($x = 0; $x < count($plan); $x++) {
                 if ($order[$i]['plan_id'] === $plan[$x]['id']) {
                     $order[$i]['plan'] = $plan[$x];

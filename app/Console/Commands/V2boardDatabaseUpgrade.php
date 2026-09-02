@@ -55,6 +55,7 @@ class V2boardDatabaseUpgrade extends Command
 
     public function handle(): int
     {
+        $this->ensureTrialIdentityKey();
         $this->info('Checking registered database migrations...');
         foreach ($this->registeredMigrations() as $path) {
             if (!is_file(base_path($path))) throw new RuntimeException("Registered migration is missing: {$path}");
@@ -66,6 +67,7 @@ class V2boardDatabaseUpgrade extends Command
             if ($exitCode !== 0) throw new RuntimeException("Migration failed: {$path}");
         }
 
+        $this->validateAccountDeletionSchema();
         if (!Schema::hasTable('v2_security_setting')) {
             throw new RuntimeException('Security settings table is missing after migrations');
         }
@@ -73,6 +75,60 @@ class V2boardDatabaseUpgrade extends Command
         $this->runDataUpgrade('database_upgrade.backfill_access_snapshots.v1', 'security:backfill-access-snapshots');
         $this->info('Database upgrade completed. No manual migration or backfill command is required.');
         return 0;
+    }
+
+    private function ensureTrialIdentityKey(): void
+    {
+        if (strlen((string)config('account.trial_identity_key', '')) >= 32) return;
+        $envPath = base_path('.env');
+        if (!is_file($envPath) || !is_readable($envPath)) {
+            throw new RuntimeException('TRIAL_IDENTITY_KEY is missing and .env is not readable.');
+        }
+
+        $contents = file_get_contents($envPath);
+        if ($contents === false) throw new RuntimeException('Unable to read .env while generating TRIAL_IDENTITY_KEY.');
+        $key = '';
+        if (preg_match('/^TRIAL_IDENTITY_KEY=(.*)$/m', $contents, $matches)) {
+            $key = trim(trim($matches[1]), "\"'");
+        }
+        $generated = strlen($key) < 32;
+        if ($generated) {
+            if (!is_writable($envPath)) {
+                throw new RuntimeException('TRIAL_IDENTITY_KEY is missing and .env is not writable.');
+            }
+            $key = bin2hex(random_bytes(32));
+            if (preg_match('/^TRIAL_IDENTITY_KEY=.*$/m', $contents)) {
+                $contents = preg_replace('/^TRIAL_IDENTITY_KEY=.*$/m', 'TRIAL_IDENTITY_KEY=' . $key, $contents, 1);
+            } else {
+                $contents = rtrim($contents) . PHP_EOL . PHP_EOL . 'TRIAL_IDENTITY_KEY=' . $key . PHP_EOL;
+            }
+            if (file_put_contents($envPath, $contents, LOCK_EX) === false) {
+                throw new RuntimeException('Unable to persist TRIAL_IDENTITY_KEY to .env.');
+            }
+        }
+
+        putenv('TRIAL_IDENTITY_KEY=' . $key);
+        $_ENV['TRIAL_IDENTITY_KEY'] = $key;
+        $_SERVER['TRIAL_IDENTITY_KEY'] = $key;
+        config(['account.trial_identity_key' => $key]);
+        Artisan::call('config:clear');
+        Artisan::call('config:cache');
+        config(['account.trial_identity_key' => $key]);
+        $this->warn(($generated ? 'Generated' : 'Recovered') . ' and cached TRIAL_IDENTITY_KEY for account trial protection.');
+    }
+
+    private function validateAccountDeletionSchema(): void
+    {
+        $missing = [];
+        foreach (['v2_trial_claim', 'v2_account_deletion_log'] as $table) {
+            if (!Schema::hasTable($table)) $missing[] = $table;
+        }
+        foreach (['deleted_at', 'deletion_type', 'deletion_reason', 'deleted_by_admin_id'] as $column) {
+            if (!Schema::hasColumn('v2_user', $column)) $missing[] = 'v2_user.' . $column;
+        }
+        if ($missing) {
+            throw new RuntimeException('Account deletion schema is incomplete: ' . implode(', ', $missing));
+        }
     }
 
     private function registeredMigrations(): array

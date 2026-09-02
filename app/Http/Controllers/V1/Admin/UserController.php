@@ -18,6 +18,7 @@ use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
@@ -73,9 +74,11 @@ class UserController extends Controller
         $userModel = User::select(
             DB::raw('*'),
             DB::raw('(u+d) as total_used')
-        )
-            ->whereNull('deleted_at')
-            ->orderBy($sort, $sortType);
+        );
+        if (Schema::hasColumn('v2_user', 'deleted_at')) {
+            $userModel->whereNull('deleted_at');
+        }
+        $userModel->orderBy($sort, $sortType);
         $this->filter($request, $userModel);
         $total = $userModel->count();
         $res = $userModel->forPage($current, $pageSize)
@@ -395,6 +398,7 @@ class UserController extends Controller
                 );
             });
         } catch (\Exception $e) {
+            report($e);
             abort(500, '批量删除用户信息失败');
         }
 
@@ -421,6 +425,7 @@ class UserController extends Controller
                 (string)$request->input('reason', '管理员注销')
             );
         } catch (\Exception $e) {
+            report($e);
             abort(500, '删除用户失败');
         }
 

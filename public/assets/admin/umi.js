@@ -114604,7 +114604,7 @@
             redemptionValue(e) {
                 switch (e.type) {
                 case 1:
-                    return "账户余额 " + (e.value / 100).toFixed(2) + " ¥";
+                    return "账户余额 ¥" + (e.value / 100).toFixed(2);
                 case 2:
                     return e.value + " 天订阅时长";
                 case 3:

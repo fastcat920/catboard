@@ -70813,7 +70813,7 @@
             allDel() {
                 p["a"].confirm({
                     title: "\u63d0\u9192",
-                    content: "\u786e\u5b9a\u8981\u6279\u91cf\u6ce8\u9500\u5e76\u533f\u540d\u5316\u7528\u6237\u5417\uff1f\u5386\u53f2\u8ba2\u5355\u4f1a\u4fdd\u7559\u3002",
+                    content: "\u786e\u5b9a\u8981\u8fdb\u884c\u5220\u9664\u5417\uff1f",
                     onOk: ()=>{
                         this.props.dispatch({
                             type: "user/allDel"
@@ -70858,8 +70858,8 @@
             delUser(e) {
                 var t = this;
                 p["a"].confirm({
-                    title: "\u6ce8\u9500\u7528\u6237",
-                    content: "\u786e\u5b9a\u8981\u6ce8\u9500\u5e76\u533f\u540d\u5316".concat(e.email, "\u5417\uff1f\u5386\u53f2\u8ba2\u5355\u4f1a\u4fdd\u7559\u3002"),
+                    title: "\u5220\u9664\u7528\u6237",
+                    content: "\u786e\u5b9a\u8981\u5220\u9664".concat(e.email, "\u7684\u7528\u6237\u4fe1\u606f\u5417\uff1f"),
                     onOk() {
                         t.props.dispatch({
                             type: "user/delUser",
@@ -71030,7 +71030,7 @@
                                 onClick: ()=>this.delUser(t)
                             }, g.a.createElement(u["a"], {
                                 type: "delete"
-                            }), " \u6ce8\u9500\u7528\u6237")))
+                            }), " \u5220\u9664\u7528\u6237")))
                         }, g.a.createElement("a", {
                             href: "javascript:void(0);"
                         }, "\u64cd\u4f5c ", g.a.createElement(u["a"], {
@@ -71181,7 +71181,7 @@
                         onClick: ()=>this.allDel()
                     }, g.a.createElement(u["a"], {
                         type: "delete"
-                    }), " \u6279\u91cf\u6ce8\u9500")))
+                    }), " \u6279\u91cf\u5220\u9664")))
                 }, g.a.createElement(s["a"], null, g.a.createElement(u["a"], {
                     type: "select"
                 }), "\u64cd\u4f5c")))), g.a.createElement(T["a"], null, g.a.createElement(s["a"], {
@@ -71270,7 +71270,7 @@
                     onClick: ()=>this.delUser(this.record)
                 }, g.a.createElement(u["a"], {
                     type: "delete"
-                }), " \u6ce8\u9500\u7528\u6237"))))))))
+                }), " \u5220\u9664\u7528\u6237"))))))))
             }
         }
         t["default"] = Object(E["c"])(e=>{
@@ -82080,7 +82080,7 @@
                                     }
                                     return e.abrupt("return");
                                 case 5:
-                                    return r["a"].success("\u6ce8\u9500\u6210\u529f"),
+                                    return r["a"].success("\u5220\u9664\u6210\u529f"),
                                     e.next = 8,
                                     i({
                                         type: "fetch"

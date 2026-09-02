@@ -39630,7 +39630,6 @@
           , S = n.n(E)
           , k = n("/MKj")
           , C = n("tI4l")
-          , A = n("t3Un")
           , O = n("v32e");
         class T extends b.a.Component {
             constructor(e) {
@@ -39640,13 +39639,6 @@
                 },
                 this.state = {
                     visible: !1,
-                    redemptionVisible: !1,
-                    redemptionLoading: !1,
-                    redemptions: [],
-                    redemptionTotal: 0,
-                    redemptionPage: 1,
-                    redemptionSearch: "",
-                    redemptionGiftcardId: null,
                     submit: v()({}, this.defaultValue)
                 }
             }
@@ -39667,48 +39659,6 @@
                     })
                 }
                 )
-            }
-            openRedemptions(e) {
-                this.setState({
-                    redemptionVisible: !0,
-                    redemptionGiftcardId: e || null,
-                    redemptionPage: 1
-                }, ()=>this.fetchRedemptions(1))
-            }
-            fetchRedemptions(e) {
-                var t = "current=" + e + "&pageSize=10"
-                  , n = this.state.redemptionSearch.trim();
-                n && (t += "&search=" + encodeURIComponent(n)),
-                this.state.redemptionGiftcardId && (t += "&giftcard_id=" + this.state.redemptionGiftcardId),
-                this.setState({
-                    redemptionLoading: !0
-                }),
-                Object(A["a"])("/" + window.settings.secure_path + "/giftcard/redemptions?" + t).then(t=>{
-                    200 === t.code && this.setState({
-                        redemptions: t.data || [],
-                        redemptionTotal: t.total || 0,
-                        redemptionPage: e
-                    }),
-                    this.setState({
-                        redemptionLoading: !1
-                    })
-                })
-            }
-            redemptionValue(e) {
-                switch (e.type) {
-                case 1:
-                    return (e.value / 100).toFixed(2) + " ¥";
-                case 2:
-                    return e.value + " 天";
-                case 3:
-                    return e.value + " GB";
-                case 4:
-                    return "重置流量";
-                case 5:
-                    return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
-                default:
-                    return "-"
-                }
             }
             generate() {
                 var e = v()({}, this.state.submit);
@@ -39821,11 +39771,6 @@
                             ,
                             href: "javascript:void(0);"
                         }, "\u7f16\u8f91"), b.a.createElement(f["a"], {
-                            type: "vertical"
-                        }), b.a.createElement("a", {
-                            onClick: ()=>this.openRedemptions(n.id),
-                            href: "javascript:void(0);"
-                        }, "兑换记录"), b.a.createElement(f["a"], {
                             type: "vertical"
                         }), b.a.createElement("a", {
                             onClick: ()=>{
@@ -114591,6 +114536,7 @@
           , S = n.n(E)
           , k = n("/MKj")
           , C = n("tI4l")
+          , A = n("t3Un")
           , O = n("v32e");
         class T extends b.a.Component {
             constructor(e) {
@@ -114600,6 +114546,13 @@
                 },
                 this.state = {
                     visible: !1,
+                    redemptionVisible: !1,
+                    redemptionLoading: !1,
+                    redemptions: [],
+                    redemptionTotal: 0,
+                    redemptionPage: 1,
+                    redemptionSearch: "",
+                    redemptionGiftcardId: null,
                     submit: v()({}, this.defaultValue)
                 }
             }
@@ -114621,6 +114574,48 @@
                     })
                 }
                 )
+            }
+            openRedemptions(e) {
+                this.setState({
+                    redemptionVisible: !0,
+                    redemptionGiftcardId: e || null,
+                    redemptionPage: 1
+                }, ()=>this.fetchRedemptions(1))
+            }
+            fetchRedemptions(e) {
+                var t = "current=" + e + "&pageSize=10"
+                  , n = this.state.redemptionSearch.trim();
+                n && (t += "&search=" + encodeURIComponent(n)),
+                this.state.redemptionGiftcardId && (t += "&giftcard_id=" + this.state.redemptionGiftcardId),
+                this.setState({
+                    redemptionLoading: !0
+                }),
+                Object(A["a"])("/" + window.settings.secure_path + "/giftcard/redemptions?" + t).then(t=>{
+                    200 === t.code && this.setState({
+                        redemptions: t.data || [],
+                        redemptionTotal: t.total || 0,
+                        redemptionPage: e
+                    }),
+                    this.setState({
+                        redemptionLoading: !1
+                    })
+                })
+            }
+            redemptionValue(e) {
+                switch (e.type) {
+                case 1:
+                    return (e.value / 100).toFixed(2) + " ¥";
+                case 2:
+                    return e.value + " 天";
+                case 3:
+                    return e.value + " GB";
+                case 4:
+                    return "重置流量";
+                case 5:
+                    return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
+                default:
+                    return "-"
+                }
             }
             generate() {
                 var e = v()({}, this.state.submit);

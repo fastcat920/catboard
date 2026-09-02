@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -67,7 +68,8 @@ class V2boardDatabaseUpgrade extends Command
             if ($exitCode !== 0) throw new RuntimeException("Migration failed: {$path}");
         }
 
-        $this->validateAccountDeletionSchema();
+        $this->repairRequiredSchema();
+        $this->validateRequiredSchema();
         if (!Schema::hasTable('v2_security_setting')) {
             throw new RuntimeException('Security settings table is missing after migrations');
         }
@@ -117,17 +119,86 @@ class V2boardDatabaseUpgrade extends Command
         $this->warn(($generated ? 'Generated' : 'Recovered') . ' and cached TRIAL_IDENTITY_KEY for account trial protection.');
     }
 
-    private function validateAccountDeletionSchema(): void
+    private function repairRequiredSchema(): void
+    {
+        if (Schema::hasTable('v2_user')) {
+            $columns = [
+                'deleted_at' => function (Blueprint $table) {
+                    $table->unsignedInteger('deleted_at')->nullable()->after('remarks')->index();
+                },
+                'deletion_type' => function (Blueprint $table) {
+                    $table->string('deletion_type', 16)->nullable()->after('deleted_at');
+                },
+                'deletion_reason' => function (Blueprint $table) {
+                    $table->text('deletion_reason')->nullable()->after('deletion_type');
+                },
+                'deleted_by_admin_id' => function (Blueprint $table) {
+                    $table->unsignedInteger('deleted_by_admin_id')->nullable()->after('deletion_reason');
+                },
+            ];
+            foreach ($columns as $column => $definition) {
+                if (Schema::hasColumn('v2_user', $column)) continue;
+                Schema::table('v2_user', $definition);
+                $this->warn("Repaired missing schema column: v2_user.{$column}");
+            }
+        }
+
+        if (!Schema::hasTable('v2_trial_claim')) {
+            Schema::create('v2_trial_claim', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->char('email_hash', 64)->unique();
+                $table->unsignedInteger('user_id')->nullable()->index();
+                $table->unsignedInteger('claimed_at');
+                $table->unsignedInteger('created_at');
+                $table->unsignedInteger('updated_at');
+            });
+            $this->warn('Repaired missing schema table: v2_trial_claim');
+        }
+
+        if (!Schema::hasTable('v2_account_deletion_log')) {
+            Schema::create('v2_account_deletion_log', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('user_id')->index();
+                $table->char('email_hash', 64);
+                $table->string('deletion_type', 16);
+                $table->unsignedInteger('admin_id')->nullable();
+                $table->text('reason')->nullable();
+                $table->unsignedInteger('created_at');
+            });
+            $this->warn('Repaired missing schema table: v2_account_deletion_log');
+        }
+
+        if (!Schema::hasTable('v2_giftcard_redemption')) {
+            Schema::create('v2_giftcard_redemption', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('giftcard_id')->index();
+                $table->unsignedInteger('user_id');
+                $table->string('code_snapshot');
+                $table->string('name_snapshot');
+                $table->unsignedTinyInteger('type');
+                $table->integer('value')->nullable();
+                $table->unsignedInteger('plan_id')->nullable();
+                $table->unsignedInteger('redeemed_at');
+                $table->unsignedInteger('created_at');
+                $table->unsignedInteger('updated_at');
+                $table->unique(['giftcard_id', 'user_id']);
+                $table->index(['user_id', 'redeemed_at']);
+            });
+            $this->warn('Repaired missing schema table: v2_giftcard_redemption');
+        }
+    }
+
+    private function validateRequiredSchema(): void
     {
         $missing = [];
-        foreach (['v2_trial_claim', 'v2_account_deletion_log'] as $table) {
+        foreach (['v2_trial_claim', 'v2_account_deletion_log', 'v2_giftcard_redemption'] as $table) {
             if (!Schema::hasTable($table)) $missing[] = $table;
         }
         foreach (['deleted_at', 'deletion_type', 'deletion_reason', 'deleted_by_admin_id'] as $column) {
             if (!Schema::hasColumn('v2_user', $column)) $missing[] = 'v2_user.' . $column;
         }
         if ($missing) {
-            throw new RuntimeException('Account deletion schema is incomplete: ' . implode(', ', $missing));
+            throw new RuntimeException('Required database schema is incomplete: ' . implode(', ', $missing));
         }
     }
 

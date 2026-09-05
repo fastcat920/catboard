@@ -14,6 +14,7 @@ use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,9 @@ class OrderController extends Controller
         }
         $order = $model->get();
         $plan = Plan::get();
+        $plan->each(function ($item) use ($request) {
+            ContentLocale::localize($item, ['name', 'content'], $request);
+        });
         for ($i = 0; $i < count($order); $i++) {
             for ($x = 0; $x < count($plan); $x++) {
                 if ($order[$i]['plan_id'] === $plan[$x]['id']) {
@@ -59,6 +63,7 @@ class OrderController extends Controller
         if (!$order['plan']) {
             abort(500, __('Subscription plan does not exist'));
         }
+        ContentLocale::localize($order['plan'], ['name', 'content'], $request);
         if ($order->surplus_order_ids) {
             $order['surplus_orders'] = Order::whereIn('id', $order->surplus_order_ids)->get();
         }
@@ -294,11 +299,12 @@ class OrderController extends Controller
         ]);
     }
 
-    public function getPaymentMethod()
+    public function getPaymentMethod(Request $request)
     {
         $methods = Payment::select([
             'id',
             'name',
+            'name_en',
             'payment',
             'icon',
             'handling_fee_fixed',
@@ -307,6 +313,10 @@ class OrderController extends Controller
             ->where('enable', 1)
             ->orderBy('sort', 'ASC')
             ->get();
+
+        $methods->each(function ($method) use ($request) {
+            ContentLocale::localize($method, ['name'], $request);
+        });
 
         return response([
             'data' => $methods

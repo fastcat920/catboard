@@ -31414,6 +31414,21 @@
                 })), g.a.createElement("div", {
                     className: "form-group"
                 }, g.a.createElement("label", {
+                    for: "notice-title-en"
+                }, "标题（英文）"), g.a.createElement(s["a"], {
+                    id: "notice-title-en",
+                    placeholder: "Notice title in English",
+                    value: this.state.submit.title_en,
+                    onChange: e=>{
+                        this.setState({
+                            submit: p()({}, this.state.submit, {
+                                title_en: e.target.value
+                            })
+                        })
+                    }
+                })), g.a.createElement("div", {
+                    className: "form-group"
+                }, g.a.createElement("label", {
                     for: "example-text-input-alt"
                 }, "\u516c\u544a\u5185\u5bb9"), g.a.createElement(s["a"].TextArea, {
                     rows: 12,
@@ -31423,6 +31438,22 @@
                         this.setState({
                             submit: p()({}, this.state.submit, {
                                 content: e.target.value
+                            })
+                        })
+                    }
+                })), g.a.createElement("div", {
+                    className: "form-group"
+                }, g.a.createElement("label", {
+                    for: "notice-content-en"
+                }, "公告内容（英文）"), g.a.createElement(s["a"].TextArea, {
+                    id: "notice-content-en",
+                    rows: 12,
+                    value: this.state.submit.content_en,
+                    placeholder: "Notice content in English",
+                    onChange: e=>{
+                        this.setState({
+                            submit: p()({}, this.state.submit, {
+                                content_en: e.target.value
                             })
                         })
                     }
@@ -73790,6 +73821,15 @@
                 })), d.a.createElement("div", {
                     className: "form-group"
                 }, d.a.createElement("label", {
+                    for: "payment-name-en"
+                }, "显示名称（英文）"), d.a.createElement(v["a"], {
+                    id: "payment-name-en",
+                    placeholder: "Payment method name in English",
+                    defaultValue: a.name_en,
+                    onChange: e=>this.submitOnChange("name_en", e.target.value)
+                })), d.a.createElement("div", {
+                    className: "form-group"
+                }, d.a.createElement("label", {
                     htmlFor: "example-text-input-alt"
                 }, "\u56fe\u6807URL(\u9009\u586b)"), d.a.createElement(v["a"], {
                     placeholder: "\u7528\u4e8e\u524d\u7aef\u663e\u793a\u4f7f\u7528(https://x.com/icon.svg)",
@@ -82549,6 +82589,21 @@
                 })), m.a.createElement("div", {
                     className: "form-group"
                 }, m.a.createElement("label", {
+                    for: "plan-name-en"
+                }, "套餐名称（英文）"), m.a.createElement(C["a"], {
+                    id: "plan-name-en",
+                    placeholder: "Plan name in English",
+                    value: this.state.record.name_en,
+                    onChange: e=>{
+                        this.setState({
+                            record: d()({}, this.state.record, {
+                                name_en: e.target.value
+                            })
+                        })
+                    }
+                })), m.a.createElement("div", {
+                    className: "form-group"
+                }, m.a.createElement("label", {
                     for: "example-text-input-alt"
                 }, "\u5957\u9910\u63cf\u8ff0"), m.a.createElement(C["a"].TextArea, {
                     rows: 4,
@@ -82558,6 +82613,22 @@
                         this.setState({
                             record: d()({}, this.state.record, {
                                 content: e.target.value
+                            })
+                        })
+                    }
+                })), m.a.createElement("div", {
+                    className: "form-group"
+                }, m.a.createElement("label", {
+                    for: "plan-content-en"
+                }, "套餐描述（英文）"), m.a.createElement(C["a"].TextArea, {
+                    id: "plan-content-en",
+                    rows: 4,
+                    value: this.state.record.content_en,
+                    placeholder: "Plan description in English; HTML is supported",
+                    onChange: e=>{
+                        this.setState({
+                            record: d()({}, this.state.record, {
+                                content_en: e.target.value
                             })
                         })
                     }

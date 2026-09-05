@@ -20,6 +20,7 @@ use App\Services\AuthService;
 use App\Services\AccountDeletionService;
 use App\Services\OrderService;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\CacheKey;
 use App\Utils\Dict;
 use App\Utils\Helper;
@@ -41,6 +42,10 @@ class UserController extends Controller
         $total = $builder->count();
         $records = $builder->forPage($current, $pageSize)->get();
         $planNames = Plan::whereIn('id', $records->pluck('plan_id')->filter()->unique())
+            ->get()
+            ->each(function ($plan) use ($request) {
+                ContentLocale::localize($plan, ['name'], $request);
+            })
             ->pluck('name', 'id');
         $giftcardCodes = Giftcard::whereIn('id', $records->pluck('giftcard_id')->unique())
             ->pluck('code', 'id');
@@ -572,6 +577,7 @@ class UserController extends Controller
             if (!$user['plan']) {
                 abort(500, __('Subscription plan does not exist'));
             }
+            ContentLocale::localize($user['plan'], ['name', 'content'], $request);
         }
 
         //统计在线设备

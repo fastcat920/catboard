@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\PlanService;
+use App\Support\ContentLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,7 @@ class PlanController extends Controller
             if ((!$plan->show && !$plan->renew) || (!$plan->show && $user->plan_id !== $plan->id)) {
                 abort(500, __('Subscription plan does not exist'));
             }
+            ContentLocale::localize($plan, ['name', 'content'], $request);
             return response([
                 'data' => $plan
             ]);
@@ -32,6 +34,7 @@ class PlanController extends Controller
             ->orderBy('sort', 'ASC')
             ->get();
         foreach ($plans as $k => $v) {
+            ContentLocale::localize($plans[$k], ['name', 'content'], $request);
             if ($plans[$k]->capacity_limit === NULL) continue;
             if (!isset($counts[$plans[$k]->id])) continue;
             $plans[$k]->capacity_limit = $plans[$k]->capacity_limit - $counts[$plans[$k]->id]->count;

@@ -32,4 +32,13 @@ class ContentLocale
 
         return $model;
     }
+
+    public static function value($default, $english, Request $request)
+    {
+        if (self::isEnglish($request) && $english !== null && $english !== '') {
+            return $english;
+        }
+
+        return $default;
+    }
 }

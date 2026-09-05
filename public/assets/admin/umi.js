@@ -5681,6 +5681,15 @@
                     defaultValue: t.app_name,
                     onChange: e=>this.set("site", "app_name", e.target.value)
                 })), f.a.createElement(m, {
+                    title: "站点名称（英文）",
+                    description: "用于英文界面显示站点名称，留空时使用中文站点名称。"
+                }, f.a.createElement("input", {
+                    type: "text",
+                    className: "form-control",
+                    placeholder: "Please enter the site name in English",
+                    defaultValue: t.app_name_en,
+                    onChange: e=>this.set("site", "app_name_en", e.target.value)
+                })), f.a.createElement(m, {
                     title: "\u7ad9\u70b9\u63cf\u8ff0",
                     description: "\u7528\u4e8e\u663e\u793a\u9700\u8981\u7ad9\u70b9\u63cf\u8ff0\u7684\u5730\u65b9\u3002"
                 }, f.a.createElement("input", {
@@ -5689,6 +5698,15 @@
                     placeholder: "\u8bf7\u8f93\u5165\u7ad9\u70b9\u63cf\u8ff0",
                     defaultValue: t.app_description,
                     onChange: e=>this.set("site", "app_description", e.target.value)
+                })), f.a.createElement(m, {
+                    title: "站点描述（英文）",
+                    description: "用于英文界面显示站点描述，留空时使用中文站点描述。"
+                }, f.a.createElement("input", {
+                    type: "text",
+                    className: "form-control",
+                    placeholder: "Please enter the site description in English",
+                    defaultValue: t.app_description_en,
+                    onChange: e=>this.set("site", "app_description_en", e.target.value)
                 })), f.a.createElement(m, {
                     title: "\u7ad9\u70b9\u7f51\u5740",
                     description: "\u5f53\u524d\u7f51\u7ad9\u6700\u65b0\u7f51\u5740\uff0c\u5c06\u4f1a\u5728\u90ae\u4ef6\u7b49\u9700\u8981\u7528\u4e8e\u7f51\u5740\u5904\u4f53\u73b0\u3002"

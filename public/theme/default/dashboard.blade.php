@@ -22,7 +22,9 @@
     <script>window.routerBase = "/";</script>
     <script>
         window.settings = {
-            title: '{{$title}}',
+            title: @json($title),
+            title_zh: @json($title_zh),
+            title_en: @json($title_en),
             assets_path: '/theme/{{$theme}}/assets',
             theme: {
                 sidebar: '{{$theme_config['theme_sidebar']}}',
@@ -31,7 +33,9 @@
             },
             version: '{{$version}}',
             background_url: '{{$theme_config['background_url']}}',
-            description: '{{$description}}',
+            description: @json($description),
+            description_zh: @json($description_zh),
+            description_en: @json($description_en),
             i18n: [
                 'zh-CN',
                 'en-US'

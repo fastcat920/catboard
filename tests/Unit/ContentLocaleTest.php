@@ -55,4 +55,12 @@ class ContentLocaleTest extends TestCase
 
         $this->assertSame('中文套餐', $plan->name);
     }
+
+    public function test_localized_config_value_uses_english_with_chinese_fallback(): void
+    {
+        $request = Request::create('/', 'GET', [], [], [], ['HTTP_X_LOCALE' => 'en-US']);
+
+        $this->assertSame('English site', ContentLocale::value('中文站点', 'English site', $request));
+        $this->assertSame('中文站点', ContentLocale::value('中文站点', '', $request));
+    }
 }

@@ -8,7 +8,15 @@
         return supported;
     }
 
-    locale();
+    var activeLocale = locale();
+    if (window.settings) {
+        var useEnglish = activeLocale === 'en-US';
+        window.settings.title = useEnglish && window.settings.title_en ? window.settings.title_en : window.settings.title_zh;
+        window.settings.description = useEnglish && window.settings.description_en ? window.settings.description_en : window.settings.description_zh;
+        if (window.settings.title) {
+            document.title = window.settings.title;
+        }
+    }
 
     var originalOpen = XMLHttpRequest.prototype.open;
     var originalSend = XMLHttpRequest.prototype.send;

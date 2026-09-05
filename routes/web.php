@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\ThemeService;
+use App\Support\ContentLocale;
 use Illuminate\Http\Request;
 
 /*
@@ -21,10 +22,14 @@ Route::get('/', function (Request $request) {
         }
     }
     $renderParams = [
-        'title' => config('v2board.app_name', 'V2Board'),
+        'title' => ContentLocale::value(config('v2board.app_name', 'V2Board'), config('v2board.app_name_en'), $request),
+        'title_zh' => config('v2board.app_name', 'V2Board'),
+        'title_en' => config('v2board.app_name_en'),
         'theme' => config('v2board.frontend_theme', 'default'),
         'version' => config('app.version'),
-        'description' => config('v2board.app_description', 'V2Board is best'),
+        'description' => ContentLocale::value(config('v2board.app_description', 'V2Board is best'), config('v2board.app_description_en'), $request),
+        'description_zh' => config('v2board.app_description', 'V2Board is best'),
+        'description_en' => config('v2board.app_description_en'),
         'logo' => config('v2board.logo')
     ];
 

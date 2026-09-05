@@ -9,10 +9,12 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\CouponService;
+use App\Services\DepositOrderPresenter;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +30,9 @@ class OrderController extends Controller
         }
         $order = $model->get();
         $plan = Plan::get();
+        $plan->each(function ($item) use ($request) {
+            ContentLocale::localize($item, ['name', 'content'], $request);
+        });
         for ($i = 0; $i < count($order); $i++) {
             for ($x = 0; $x < count($plan); $x++) {
                 if ($order[$i]['plan_id'] === $plan[$x]['id']) {
@@ -40,7 +45,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function detail(Request $request)
+    public function detail(Request $request, DepositOrderPresenter $depositPresenter)
     {
         $order = Order::where('user_id', $request->user['id'])
             ->where('trade_no', $request->input('trade_no'))
@@ -49,15 +54,8 @@ class OrderController extends Controller
             abort(500, __('Order does not exist or has been paid'));
         }
         if ($order->plan_id == 0) {
-            $order['plan'] = [
-                'id' => 0,
-                'name' => 'deposit'
-            ];
-            $order->bounus = $this->getbounus($order->total_amount);
-            $order->get_amount = $order->total_amount + $order->bounus;
-
             return response([
-                'data' => $order
+                'data' => $depositPresenter->decorate($order)
             ]);
         }
         $order['plan'] = Plan::find($order->plan_id);
@@ -65,6 +63,7 @@ class OrderController extends Controller
         if (!$order['plan']) {
             abort(500, __('Subscription plan does not exist'));
         }
+        ContentLocale::localize($order['plan'], ['name', 'content'], $request);
         if ($order->surplus_order_ids) {
             $order['surplus_orders'] = Order::whereIn('id', $order->surplus_order_ids)->get();
         }
@@ -238,11 +237,52 @@ class OrderController extends Controller
             'total_amount' => isset($order->handling_amount) ? ($order->total_amount + $order->handling_amount) : $order->total_amount,
             'user_id' => $order->user_id,
             'stripe_token' => $request->input('token')
-        ]);
+        ], $this->getPaymentReturnUrl($request, $tradeNo));
         return response([
             'type' => $result['type'],
             'data' => $result['data']
         ]);
+    }
+
+    private function getPaymentReturnUrl(Request $request, $tradeNo)
+    {
+        foreach ([$request->header('origin'), $request->header('referer')] as $source) {
+            $origin = $this->normalizePaymentReturnOrigin($source);
+            if ($origin) {
+                return $origin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
+            }
+        }
+
+        $defaultOrigin = $this->normalizePaymentReturnOrigin(config('v2board.app_url'));
+        if ($defaultOrigin) {
+            return $defaultOrigin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
+        }
+
+        return url('/#/payment?trade_no=' . rawurlencode($tradeNo));
+    }
+
+    private function normalizePaymentReturnOrigin($url)
+    {
+        if (!is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (!$parts || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $origin = $scheme . '://' . strtolower($parts['host']);
+        if (isset($parts['port'])) {
+            $origin .= ':' . $parts['port'];
+        }
+
+        return $origin;
     }
 
     public function check(Request $request)
@@ -259,11 +299,12 @@ class OrderController extends Controller
         ]);
     }
 
-    public function getPaymentMethod()
+    public function getPaymentMethod(Request $request)
     {
         $methods = Payment::select([
             'id',
             'name',
+            'name_en',
             'payment',
             'icon',
             'handling_fee_fixed',
@@ -272,6 +313,10 @@ class OrderController extends Controller
             ->where('enable', 1)
             ->orderBy('sort', 'ASC')
             ->get();
+
+        $methods->each(function ($method) use ($request) {
+            ContentLocale::localize($method, ['name'], $request);
+        });
 
         return response([
             'data' => $methods
@@ -301,22 +346,4 @@ class OrderController extends Controller
         ]);
     }
 
-    private function getbounus($total_amount) {
-        $deposit_bounus = config('v2board.deposit_bounus', []);
-        if (empty($deposit_bounus) || $deposit_bounus[0] === null) {
-            return 0;
-        }
-        $add = 0;
-        foreach ($deposit_bounus as $tier) {
-            list($amount, $bounus) = explode(':', $tier);
-            $amount = (float)$amount * 100;
-            $bounus = (float)$bounus * 100;
-            $amount = (int)$amount;
-            $bounus = (int)$bounus;
-            if ($total_amount >= $amount) {
-                $add = max($add, $bounus);
-            }
-        }
-        return $add;
-    }
 }

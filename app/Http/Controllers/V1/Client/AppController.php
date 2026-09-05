@@ -5,6 +5,8 @@ namespace App\Http\Controllers\V1\Client;
 use App\Http\Controllers\Controller;
 use App\Services\ServerService;
 use App\Services\UserService;
+use App\Services\NodeSecurity\AuditService;
+use App\Services\NodeSecurity\UaClassifierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Yaml\Yaml;
@@ -18,8 +20,11 @@ class AppController extends Controller
         $userService = new UserService();
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
-            $servers = $serverService->getAvailableServers($user);
+            $client = (new UaClassifierService())->classify($request->userAgent());
+            $servers = $serverService->getAvailableServers($user, $client);
         }
+        $audit = new AuditService();
+        $servers = $audit->prepare($request, $servers, 'client.app.config');
         $defaultConfig = base_path() . '/resources/rules/app.clash.yaml';
         $customConfig = base_path() . '/resources/rules/custom.app.clash.yaml';
         if (File::exists($customConfig)) {
@@ -56,9 +61,12 @@ class AppController extends Controller
         foreach ($config['proxy-groups'] as $k => $v) {
             $config['proxy-groups'][$k]['proxies'] = array_merge($config['proxy-groups'][$k]['proxies'], $proxies);
         }
+        \App\Services\NodeEntryPoolService::applyClashFallbackGroups($config, $servers);
         $yamlContent = Yaml::dump($config);
-        return response($yamlContent, 200)
+        $response = response($yamlContent, 200)
             ->header('Content-Type', 'text/yaml');
+        $audit->record($request, $response);
+        return $response;
     }
 
     public function getVersion(Request $request)

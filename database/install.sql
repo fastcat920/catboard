@@ -70,6 +70,25 @@ CREATE TABLE `v2_giftcard` (
                              PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+DROP TABLE IF EXISTS `v2_giftcard_redemption`;
+CREATE TABLE `v2_giftcard_redemption` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+    `giftcard_id` int unsigned NOT NULL,
+    `user_id` int unsigned NOT NULL,
+    `code_snapshot` varchar(255) NOT NULL,
+    `name_snapshot` varchar(255) NOT NULL,
+    `type` tinyint unsigned NOT NULL,
+    `value` int DEFAULT NULL,
+    `plan_id` int unsigned DEFAULT NULL,
+    `redeemed_at` int unsigned NOT NULL,
+    `created_at` int unsigned NOT NULL,
+    `updated_at` int unsigned NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `giftcard_user_unique` (`giftcard_id`,`user_id`),
+    KEY `giftcard_redemption_giftcard_id_index` (`giftcard_id`),
+    KEY `giftcard_redemption_user_redeemed_index` (`user_id`,`redeemed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 DROP TABLE IF EXISTS `v2_invite_code`;
 CREATE TABLE `v2_invite_code` (
@@ -133,7 +152,9 @@ DROP TABLE IF EXISTS `v2_notice`;
 CREATE TABLE `v2_notice` (
                              `id` int(11) NOT NULL AUTO_INCREMENT,
                              `title` varchar(255) NOT NULL,
+                             `title_en` varchar(255) DEFAULT NULL,
                              `content` text NOT NULL,
+                             `content_en` text DEFAULT NULL,
                              `show` tinyint(1) NOT NULL DEFAULT '0',
                              `img_url` varchar(255) DEFAULT NULL,
                              `tags` varchar(255) DEFAULT NULL,
@@ -182,6 +203,7 @@ CREATE TABLE `v2_payment` (
                               `uuid` char(32) NOT NULL,
                               `payment` varchar(16) NOT NULL,
                               `name` varchar(255) NOT NULL,
+                              `name_en` varchar(255) DEFAULT NULL,
                               `icon` varchar(255) DEFAULT NULL,
                               `config` text NOT NULL,
                               `notify_domain` varchar(128) DEFAULT NULL,
@@ -202,11 +224,13 @@ CREATE TABLE `v2_plan` (
                            `transfer_enable` int(11) NOT NULL,
                            `device_limit` int(11) DEFAULT NULL,
                            `name` varchar(255) NOT NULL,
+                           `name_en` varchar(255) DEFAULT NULL,
                            `speed_limit` int(11) DEFAULT NULL,
                            `show` tinyint(1) NOT NULL DEFAULT '0',
                            `sort` int(11) DEFAULT NULL,
                            `renew` tinyint(1) NOT NULL DEFAULT '1',
                            `content` text,
+                           `content_en` text,
                            `month_price` int(11) DEFAULT NULL,
                            `quarter_price` int(11) DEFAULT NULL,
                            `half_year_price` int(11) DEFAULT NULL,
@@ -578,12 +602,45 @@ CREATE TABLE `v2_user` (
                            `token` char(32) NOT NULL,
                            `expired_at` bigint(20) DEFAULT '0',
                            `remarks` text,
+                           `deleted_at` int(11) DEFAULT NULL,
+                           `deletion_type` varchar(16) DEFAULT NULL,
+                           `deletion_reason` text,
+                           `deleted_by_admin_id` int(11) DEFAULT NULL,
                            `created_at` int(11) NOT NULL,
                            `updated_at` int(11) NOT NULL,
                            PRIMARY KEY (`id`),
                            UNIQUE KEY `email` (`email`),
-                           UNIQUE KEY `token` (`token`)
+                           UNIQUE KEY `token` (`token`),
+                           KEY `deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+DROP TABLE IF EXISTS `v2_trial_claim`;
+CREATE TABLE `v2_trial_claim` (
+                                  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                                  `email_hash` char(64) NOT NULL,
+                                  `user_id` int(10) unsigned DEFAULT NULL,
+                                  `claimed_at` int(10) unsigned NOT NULL,
+                                  `created_at` int(10) unsigned NOT NULL,
+                                  `updated_at` int(10) unsigned NOT NULL,
+                                  PRIMARY KEY (`id`),
+                                  UNIQUE KEY `email_hash` (`email_hash`),
+                                  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+DROP TABLE IF EXISTS `v2_account_deletion_log`;
+CREATE TABLE `v2_account_deletion_log` (
+                                          `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                                          `user_id` int(10) unsigned NOT NULL,
+                                          `email_hash` char(64) NOT NULL,
+                                          `deletion_type` varchar(16) NOT NULL,
+                                          `admin_id` int(10) unsigned DEFAULT NULL,
+                                          `reason` text,
+                                          `created_at` int(10) unsigned NOT NULL,
+                                          PRIMARY KEY (`id`),
+                                          KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- 2025-09-12 10:05:00

@@ -1,0 +1,1019 @@
+<?php
+
+namespace App\Http\Controllers\V1\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Models\ServerGroup;
+use App\Services\AuthService;
+use App\Services\NodeSecurity\ExperimentService;
+use App\Services\NodeSecurity\EventWindowService;
+use App\Services\NodeSecurity\EntrySyncService;
+use App\Services\NodeSecurity\RiskService;
+use App\Services\NodeSecurity\SettingsService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Schema;
+use App\Utils\Helper;
+
+class NodeSecurityController extends Controller
+{
+    public function dashboard(Request $request)
+    {
+        $from = $this->from($request);
+        $top = $this->userRankQuery()->orderByDesc('s.risk_score')->limit(10)->get();
+        $daily = DB::table('v2_node_access_log')->where('requested_at', '>=', $from)
+            ->selectRaw('FROM_UNIXTIME(requested_at, "%Y-%m-%d") as day, COUNT(*) as requests, COUNT(DISTINCT user_id) as users')
+            ->groupBy('day')->orderBy('day')->get();
+        return response(['data' => [
+            'summary' => [
+                'requests' => DB::table('v2_node_access_log')->where('requested_at', '>=', $from)->count(),
+                'users' => DB::table('v2_node_access_log')->where('requested_at', '>=', $from)->distinct('user_id')->count('user_id'),
+                'events' => DB::table('v2_node_block_event')->where('first_failed_at', '>=', $from)->count(),
+                'high_risk_users' => DB::table('v2_security_user_score')->where('risk_score', '>=', 70)->count(),
+                'unread_alerts' => DB::table('v2_security_alert')->whereNull('read_at')->count(),
+                'active_experiments' => DB::table('v2_watermark_experiment')->where('status', 'active')->count(),
+            ],
+            'daily' => $daily,
+            'top_users' => $top,
+            'recent_events' => DB::table('v2_node_block_event')->orderByDesc('first_failed_at')->limit(8)->get(),
+            'alerts' => DB::table('v2_security_alert')->orderByDesc('created_at')->limit(8)->get(),
+        ]]);
+    }
+
+    public function events(Request $request)
+    {
+        $query = DB::table('v2_node_block_event as e')
+            ->leftJoin('v2_node_snapshot as s', 's.id', '=', 'e.snapshot_id')
+            ->select('e.*', 's.server_name', 's.version as snapshot_version');
+        if ($request->filled('status')) $query->where('e.status', $request->input('status'));
+        return response(['data' => $query->orderByDesc('e.first_failed_at')->paginate($this->perPage($request))]);
+    }
+
+    public function eventDetail(Request $request)
+    {
+        $event = DB::table('v2_node_block_event')->where('id', $request->input('id'))->first();
+        if (!$event) abort(404, '事件不存在');
+        $eventEvidence = json_decode($event->evidence ?? '', true) ?: [];
+        $event->detected_at = isset($eventEvidence['detected_at']) ? (int)$eventEvidence['detected_at'] : null;
+        $snapshot = $event->snapshot_id
+            ? DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'published_at')->where('id', $event->snapshot_id)->first()
+            : null;
+        $window = (int)(new SettingsService())->get('risk_window_seconds', 300);
+        $eventWindow = (new EventWindowService())->calculate($event, $window);
+        $logs = collect();
+        if ($event->snapshot_id) {
+            $logs = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id')
+                ->whereBetween('l.requested_at', [$eventWindow['start_at'], $eventWindow['end_at']])
+                ->select('l.*', 'u.email', 'u.banned')->orderBy('l.requested_at')->get()
+                ->filter(function ($log) use ($event) {
+                    return in_array((int)$event->snapshot_id, json_decode($log->snapshot_ids, true) ?: [], true);
+                })->values()->map(function ($log) use ($event) {
+                    $log->seconds_before_failure = max(0, (int)$event->first_failed_at - (int)$log->requested_at);
+                    return $log;
+                });
+        }
+        $candidates = $logs->groupBy('user_id')->map(function ($items) {
+            $closest = $items->sortBy('seconds_before_failure')->first();
+            return [
+                'user_id' => (int)$closest->user_id,
+                'email' => $closest->email,
+                'banned' => (bool)$closest->banned,
+                'access_count' => $items->count(),
+                'first_access_at' => (int)$items->min('requested_at'),
+                'last_access_at' => (int)$items->max('requested_at'),
+                'closest_seconds' => (int)$items->min('seconds_before_failure'),
+                'unique_ips' => $items->pluck('request_ip')->filter()->unique()->count(),
+                'unique_devices' => $items->pluck('device_hash')->filter()->unique()->count(),
+            ];
+        })->sort(function ($left, $right) {
+            $countOrder = $right['access_count'] <=> $left['access_count'];
+            if ($countOrder !== 0) return $countOrder;
+            $distanceOrder = $left['closest_seconds'] <=> $right['closest_seconds'];
+            return $distanceOrder !== 0 ? $distanceOrder : ($left['user_id'] <=> $right['user_id']);
+        })->values();
+        return response(['data' => [
+            'event' => $event,
+            'snapshot' => $snapshot,
+            'evidence' => [
+                'snapshot_linked' => !empty($event->snapshot_id),
+                'level' => $event->snapshot_id ? 'exact_snapshot' : 'network_only',
+                'message' => $event->snapshot_id
+                    ? '候选用户仅包含访问记录中精确命中该节点快照的用户'
+                    : '事件未关联节点下发快照，无法证明任何用户获取过该节点',
+            ],
+            'summary' => [
+                'window_seconds' => $eventWindow['effective_seconds'],
+                'configured_window_seconds' => $eventWindow['configured_seconds'],
+                'window_start_at' => $eventWindow['start_at'],
+                'window_end_at' => $eventWindow['end_at'],
+                'window_source' => $eventWindow['source'],
+                'has_monitoring_baseline' => $eventWindow['has_baseline'],
+                'access_count' => $logs->count(),
+                'user_count' => $logs->pluck('user_id')->unique()->count(),
+                'unique_ips' => $logs->pluck('request_ip')->filter()->unique()->count(),
+                'first_access_at' => $logs->count() ? (int)$logs->min('requested_at') : null,
+                'last_access_at' => $logs->count() ? (int)$logs->max('requested_at') : null,
+            ],
+            'candidates' => $candidates,
+            'access_logs' => $logs,
+        ]]);
+    }
+
+    public function saveEvent(Request $request)
+    {
+        $request->validate([
+            'server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1',
+            'event_type' => 'nullable|in:blocked,outage,carrier,excluded',
+            'status' => 'nullable|in:suspected,confirmed,excluded,resolved',
+            'first_failed_at' => 'required|integer', 'snapshot_id' => 'nullable|integer', 'watermark_group_id' => 'nullable|integer',
+        ]);
+        $now = time();
+        $payload = $request->only('server_type', 'server_id', 'snapshot_id', 'watermark_group_id', 'event_type', 'status', 'first_failed_at', 'confirmed_at', 'evidence', 'remark');
+        $payload['event_type'] = $payload['event_type'] ?? 'blocked';
+        $payload['status'] = $payload['status'] ?? 'suspected';
+        if (empty($payload['snapshot_id'])) {
+            $snapshotQuery = DB::table('v2_node_snapshot')
+                ->where('server_type', $payload['server_type'])
+                ->where('server_id', $payload['server_id'])
+                ->where('published_at', '<=', $payload['first_failed_at']);
+            if (!empty($payload['watermark_group_id'])) {
+                $snapshotQuery->where('watermark_group_id', $payload['watermark_group_id']);
+            } else {
+                $snapshotQuery->whereNull('watermark_group_id');
+            }
+            $payload['snapshot_id'] = $snapshotQuery->orderByDesc('published_at')->value('id');
+        }
+        $payload['created_by'] = $request->user['id'];
+        $payload['created_at'] = $now; $payload['updated_at'] = $now;
+        $id = DB::table('v2_node_block_event')->insertGetId($payload);
+        (new RiskService())->recompute();
+        $this->adminLog($request, 'event.create', 'event', $id, $payload);
+        return response(['data' => ['id' => $id]]);
+    }
+
+    public function updateEvent(Request $request)
+    {
+        $request->validate(['id' => 'required|integer', 'status' => 'required|in:suspected,confirmed,excluded,resolved']);
+        $data = $request->only('status', 'event_type', 'confirmed_at', 'evidence', 'remark');
+        $data = array_filter($data, function ($value) { return $value !== null; });
+        if ($data['status'] === 'confirmed' && empty($data['confirmed_at'])) $data['confirmed_at'] = time();
+        $data['updated_at'] = time();
+        DB::table('v2_node_block_event')->where('id', $request->input('id'))->update($data);
+        (new RiskService())->recompute();
+        $this->adminLog($request, 'event.update', 'event', $request->input('id'), $data);
+        return response(['data' => true]);
+    }
+
+    public function users(Request $request)
+    {
+        $query = $this->userRankQuery();
+        if ($request->filled('risk_min')) $query->where('s.risk_score', '>=', (int)$request->input('risk_min'));
+        if ($request->filled('risk_max')) $query->where('s.risk_score', '<=', (int)$request->input('risk_max'));
+        if ($request->filled('status')) $query->where('s.status', $request->input('status'));
+        if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
+        if ($request->filled('event_hits_min')) $query->where('s.event_hits', '>=', (int)$request->input('event_hits_min'));
+        if ($request->filled('watermark_hits_min')) $query->where('s.watermark_hits', '>=', (int)$request->input('watermark_hits_min'));
+        if ($request->filled('banned')) $query->where('u.banned', (int)$request->boolean('banned'));
+        if ($request->filled('plan_id')) $query->where('u.plan_id', (int)$request->input('plan_id'));
+        $sorts = [
+            'risk_score' => 's.risk_score', 'event_hits' => 's.event_hits',
+            'watermark_hits' => 's.watermark_hits', 'unique_ips' => 's.unique_ips', 'unique_devices' => 's.unique_devices',
+            'last_risk_at' => 's.last_risk_at', 'registered_at' => 'u.created_at',
+        ];
+        $sort = $sorts[$request->input('sort_by')] ?? 's.risk_score';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+        return response(['data' => $query->orderBy($sort, $direction)->orderByDesc('s.user_id')->paginate($this->perPage($request))]);
+    }
+
+    public function userDetail(Request $request)
+    {
+        $userId = (int)$request->input('id');
+        $user = User::select('id', 'email', 'plan_id', 'group_id', 'banned', 'created_at')->find($userId);
+        if (!$user) abort(404, '用户不存在');
+        return response(['data' => [
+            'user' => $user,
+            'score' => DB::table('v2_security_user_score')->where('user_id', $userId)->first(),
+            'logs' => DB::table('v2_node_access_log')->where('user_id', $userId)->orderByDesc('requested_at')->limit(100)->get(),
+            'groups' => DB::table('v2_watermark_group_user as gu')->join('v2_watermark_group as g', 'g.id', '=', 'gu.group_id')
+                ->join('v2_watermark_experiment as e', 'e.id', '=', 'g.experiment_id')->where('gu.user_id', $userId)
+                ->select('g.id', 'g.name', 'g.is_control', 'g.server_type', 'g.server_id', 'e.name as experiment_name', 'e.round', 'e.status')->get(),
+        ]]);
+    }
+
+    public function userAction(Request $request)
+    {
+        $request->validate(['user_id' => 'required|integer', 'action' => 'required|in:watch,trust,suspend,ban,clear_sessions,recompute']);
+        $user = User::find($request->input('user_id'));
+        if (!$user) abort(404, '用户不存在');
+        $action = $request->input('action');
+        if ($action === 'ban') $user->update(['banned' => 1]);
+        if ($action === 'clear_sessions') (new AuthService($user))->removeAllSession();
+        if ($action === 'recompute') (new RiskService())->recompute($user->id);
+        if (in_array($action, ['watch', 'trust', 'suspend'], true)) {
+            $now = time();
+            DB::table('v2_security_user_score')->updateOrInsert(['user_id' => $user->id], [
+                'status' => $action === 'trust' ? 'trusted' : ($action === 'watch' ? 'watching' : 'suspended'),
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+        }
+        $this->adminLog($request, 'user.' . $action, 'user', $user->id, []);
+        return response(['data' => true]);
+    }
+
+    public function batchBanUsers(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array|min:1|max:500',
+            'user_ids.*' => 'required|integer|min:1|distinct',
+            'action' => 'required|in:ban,unban',
+        ]);
+        $userIds = collect($request->input('user_ids'))->map(function ($id) {
+            return (int)$id;
+        })->unique()->values();
+        $existingIds = User::whereIn('id', $userIds)->pluck('id');
+        $banned = $request->input('action') === 'ban' ? 1 : 0;
+        $affected = User::whereIn('id', $existingIds)->where('banned', '!=', $banned)->update(['banned' => $banned]);
+        $this->adminLog($request, 'user.batch_' . $request->input('action'), 'user', null, [
+            'user_ids' => $existingIds->values()->all(), 'requested' => $userIds->count(), 'affected' => $affected,
+        ]);
+        return response(['data' => [
+            'requested' => $userIds->count(), 'matched' => $existingIds->count(), 'affected' => $affected,
+        ]]);
+    }
+
+    public function groups()
+    {
+        return response(['data' => ServerGroup::orderBy('id')->get(['id', 'name'])]);
+    }
+
+    public function batchGroupUsers(Request $request)
+    {
+        $request->validate([
+            'user_ids' => 'required|array|min:1|max:500',
+            'user_ids.*' => 'required|integer|min:1|distinct',
+            'group_id' => 'required|integer|min:1',
+        ]);
+        $group = ServerGroup::find($request->input('group_id'));
+        if (!$group) abort(422, '权限组不存在');
+        $userIds = collect($request->input('user_ids'))->map(function ($id) {
+            return (int)$id;
+        })->unique()->values();
+        $existingIds = User::whereIn('id', $userIds)->pluck('id');
+        $affected = User::whereIn('id', $existingIds)->where(function ($query) use ($group) {
+            $query->whereNull('group_id')->orWhere('group_id', '!=', $group->id);
+        })
+            ->update(['group_id' => $group->id, 'updated_at' => time()]);
+        $this->adminLog($request, 'user.batch_group', 'user', null, [
+            'user_ids' => $existingIds->values()->all(), 'group_id' => $group->id,
+            'group_name' => $group->name, 'requested' => $userIds->count(), 'affected' => $affected,
+        ]);
+        return response(['data' => [
+            'requested' => $userIds->count(), 'matched' => $existingIds->count(), 'affected' => $affected,
+            'group_id' => $group->id, 'group_name' => $group->name,
+        ]]);
+    }
+
+    public function accessLogs(Request $request)
+    {
+        $query = DB::table('v2_node_access_log as l')->join('v2_user as u', 'u.id', '=', 'l.user_id');
+        $this->applyAccessLogFilters($query, $request);
+
+        if ($request->input('view') === 'users') {
+            $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+            $sort = $request->input('sort_by') === 'access_count' ? 'access_count' : 'last_access_at';
+            return response(['data' => $query->select(
+                'l.user_id', 'u.email',
+                DB::raw('COUNT(*) as access_count'),
+                DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'),
+                DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
+                DB::raw('MIN(l.requested_at) as first_access_at'),
+                DB::raw('MAX(l.requested_at) as last_access_at'),
+                DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_family, '未分类') ORDER BY l.client_family SEPARATOR '、') as client_families"),
+                DB::raw("GROUP_CONCAT(DISTINCT COALESCE(l.client_platform, '未知') ORDER BY l.client_platform SEPARATOR '、') as client_platforms")
+            )->groupBy('l.user_id', 'u.email')->orderBy($sort, $direction)->orderByDesc('l.user_id')->paginate($this->perPage($request))]);
+        }
+
+        if ($request->input('view') === 'clients') {
+            $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+            $sort = $request->input('sort_by') === 'last_access_at' ? 'last_access_at' : 'access_count';
+            return response(['data' => $query->select(
+                'l.client_family', 'l.client_version', 'l.client_platform',
+                DB::raw('COUNT(*) as access_count'),
+                DB::raw('COUNT(DISTINCT l.user_id) as user_count'),
+                DB::raw('MIN(l.requested_at) as first_access_at'),
+                DB::raw('MAX(l.requested_at) as last_access_at')
+            )->groupBy('l.client_family', 'l.client_version', 'l.client_platform')
+                ->orderBy($sort, $direction)->orderByDesc('last_access_at')->paginate($this->perPage($request))]);
+        }
+
+        $query->select('l.*', 'u.email');
+        $sorts = [
+            'requested_at' => 'l.requested_at', 'duration_ms' => 'l.duration_ms', 'response_bytes' => 'l.response_bytes',
+            'response_status' => 'l.response_status', 'user_id' => 'l.user_id',
+        ];
+        $sort = $sorts[$request->input('sort_by')] ?? 'l.requested_at';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+        return response(['data' => $query->orderBy($sort, $direction)->orderByDesc('l.id')->paginate($this->perPage($request))]);
+    }
+
+    private function applyAccessLogFilters($query, Request $request): void
+    {
+        if ($request->filled('user_id')) $query->where('l.user_id', $request->input('user_id'));
+        if ($request->filled('search')) $query->where('u.email', 'like', '%' . $request->input('search') . '%');
+        if ($request->filled('endpoint')) $query->where('l.endpoint', $request->input('endpoint'));
+        if ($request->filled('ip')) $query->where('l.request_ip', $request->input('ip'));
+        if ($request->filled('client_family')) $query->where('l.client_family', $request->input('client_family'));
+        if ($request->filled('client_version')) $query->where('l.client_version', 'like', '%' . $request->input('client_version') . '%');
+        if ($request->filled('client_platform')) $query->where('l.client_platform', $request->input('client_platform'));
+        if ($request->filled('ua')) {
+            $ua = $request->input('ua');
+            $mode = $request->input('ua_match', 'contains');
+            if ($mode === 'exact') {
+                $query->where('l.user_agent', $ua);
+            } elseif ($mode === 'exclude') {
+                $query->where(function ($nested) use ($ua) {
+                    $nested->whereNull('l.user_agent')->orWhere('l.user_agent', 'not like', '%' . $ua . '%');
+                });
+            } else {
+                $query->where('l.user_agent', 'like', '%' . $ua . '%');
+            }
+        }
+        if ($request->filled('response_status')) $query->where('l.response_status', (int)$request->input('response_status'));
+        if ($request->filled('duration_min')) $query->where('l.duration_ms', '>=', (int)$request->input('duration_min'));
+        if ($request->filled('duration_max')) $query->where('l.duration_ms', '<=', (int)$request->input('duration_max'));
+        if ($request->filled('date_from')) $query->where('l.requested_at', '>=', (int)$request->input('date_from'));
+        if ($request->filled('date_to')) $query->where('l.requested_at', '<=', (int)$request->input('date_to'));
+    }
+
+    public function snapshots(Request $request)
+    {
+        $query = DB::table('v2_node_snapshot')->select('id', 'version', 'server_type', 'server_id', 'server_name', 'host_hash', 'port', 'published_at');
+        return response(['data' => $query->orderByDesc('published_at')->paginate($this->perPage($request))]);
+    }
+
+    public function snapshotAnalysisCatalog(Request $request)
+    {
+        $this->ensureSnapshotAccessIndex();
+        $query = DB::table('v2_node_snapshot as s')->leftJoin('v2_node_access_snapshot as x', 'x.snapshot_id', '=', 's.id')
+            ->select('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
+                DB::raw('COUNT(DISTINCT x.user_id) as user_count'), DB::raw('COUNT(x.access_log_id) as access_count'));
+        if ($request->filled('server_type')) $query->where('s.server_type', $request->input('server_type'));
+        if ($request->filled('server_id')) $query->where('s.server_id', (int)$request->input('server_id'));
+        if ($request->filled('search')) $query->where(function ($nested) use ($request) {
+            $search = '%' . $request->input('search') . '%';
+            $nested->where('s.server_name', 'like', $search)->orWhere('s.id', $request->input('search'));
+        });
+        return response(['data' => $query->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
+            ->orderByDesc('s.published_at')->paginate(min(100, $this->perPage($request)))]);
+    }
+
+    public function snapshotComparison(Request $request)
+    {
+        $this->ensureSnapshotAccessIndex();
+        $snapshotIds = collect(explode(',', (string)$request->input('snapshot_ids')))->map(function ($id) {
+            return (int)$id;
+        })->filter()->unique()->values();
+        if ($snapshotIds->count() < 2 || $snapshotIds->count() > 10) abort(422, '请选择 2～10 个快照');
+        $snapshots = DB::table('v2_node_snapshot')->whereIn('id', $snapshotIds)->get(['id', 'version', 'server_type', 'server_id', 'server_name', 'port', 'published_at'])->keyBy('id');
+        if ($snapshots->count() !== $snapshotIds->count()) abort(422, '包含不存在的快照');
+        $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
+        $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
+        if ($from > $to) abort(422, '开始时间不能晚于结束时间');
+
+        $grouped = DB::table('v2_node_access_snapshot as x')->whereIn('x.snapshot_id', $snapshotIds)
+            ->whereBetween('x.requested_at', [$from, $to])
+            ->select('x.user_id', DB::raw('COUNT(*) as access_count'), DB::raw('COUNT(DISTINCT x.snapshot_id) as snapshot_count'),
+                DB::raw('MIN(x.requested_at) as first_access_at'), DB::raw('MAX(x.requested_at) as last_access_at'))
+            ->groupBy('x.user_id');
+        $scope = (string)$request->input('scope', 'all');
+        if ($scope === 'common') $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) = ?', [$snapshotIds->count()]);
+        if ($scope === 'differences') $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) < ?', [$snapshotIds->count()]);
+        if (strpos($scope, 'only:') === 0) {
+            $onlyId = (int)substr($scope, 5);
+            if (!$snapshotIds->contains($onlyId)) abort(422, '独有快照不在对比范围内');
+            $grouped->havingRaw('COUNT(DISTINCT x.snapshot_id) = 1')->havingRaw('SUM(CASE WHEN x.snapshot_id = ? THEN 1 ELSE 0 END) > 0', [$onlyId]);
+        }
+
+        $allGrouped = DB::table('v2_node_access_snapshot as x')->whereIn('x.snapshot_id', $snapshotIds)
+            ->whereBetween('x.requested_at', [$from, $to])->select('x.user_id', DB::raw('COUNT(DISTINCT x.snapshot_id) as snapshot_count'))->groupBy('x.user_id');
+        $summary = DB::query()->fromSub($allGrouped, 'm')->selectRaw('COUNT(*) as any_users, SUM(CASE WHEN snapshot_count = ? THEN 1 ELSE 0 END) as common_users, SUM(CASE WHEN snapshot_count < ? THEN 1 ELSE 0 END) as different_users', [$snapshotIds->count(), $snapshotIds->count()])->first();
+        $users = DB::query()->fromSub($grouped, 'm')->join('v2_user as u', 'u.id', '=', 'm.user_id')
+            ->leftJoin('v2_server_group as g', 'g.id', '=', 'u.group_id')
+            ->select('m.*', 'u.email', 'u.group_id', 'u.banned', 'g.name as group_name')
+            ->orderByDesc('m.access_count')->orderByDesc('m.last_access_at')->paginate($this->perPage($request));
+        $pageUserIds = collect($users->items())->pluck('user_id');
+        $hits = $pageUserIds->isEmpty() ? collect() : DB::table('v2_node_access_snapshot')->whereIn('snapshot_id', $snapshotIds)
+            ->whereIn('user_id', $pageUserIds)->whereBetween('requested_at', [$from, $to])
+            ->select('user_id', 'snapshot_id', DB::raw('COUNT(*) as access_count'), DB::raw('MAX(requested_at) as last_access_at'))
+            ->groupBy('user_id', 'snapshot_id')->get()->groupBy('user_id');
+        foreach ($users->items() as $user) {
+            $user->snapshot_hits = $hits->get($user->user_id, collect())->keyBy('snapshot_id');
+        }
+        return response(['data' => [
+            'snapshots' => $snapshotIds->map(function ($id) use ($snapshots) { return $snapshots->get($id); })->values(),
+            'summary' => ['any_users' => (int)($summary->any_users ?? 0), 'common_users' => (int)($summary->common_users ?? 0), 'different_users' => (int)($summary->different_users ?? 0), 'from' => $from, 'to' => $to],
+            'users' => $users,
+        ]]);
+    }
+
+    public function userSnapshotTrajectory(Request $request)
+    {
+        $this->ensureSnapshotAccessIndex();
+        $identityInput = $request->query('identity', $request->query('user'));
+        $identity = trim((string)$identityInput);
+        if ($identity === '') return response(['data' => ['lookup_error' => '请输入用户 ID 或邮箱']]);
+        if (ctype_digit($identity)) {
+            $user = User::find((int)$identity);
+        } else {
+            $user = User::where('email', $identity)->first();
+            if (!$user) {
+                $matches = User::where('email', 'like', '%' . $identity . '%')->orderBy('id')->limit(2)->get();
+                if ($matches->count() > 1) return response(['data' => ['lookup_error' => '匹配到多个用户，请输入完整邮箱或用户 ID']]);
+                $user = $matches->first();
+            }
+        }
+        if (!$user) return response(['data' => ['lookup_error' => '没有找到该用户，请检查邮箱或改用用户 ID']]);
+        $from = $request->filled('date_from') ? (int)$request->input('date_from') : time() - 30 * 86400;
+        $to = $request->filled('date_to') ? (int)$request->input('date_to') : time();
+        if ($from > $to) abort(422, '开始时间不能晚于结束时间');
+        $base = DB::table('v2_node_access_snapshot as x')->where('x.user_id', $user->id)->whereBetween('x.requested_at', [$from, $to]);
+        if ($request->filled('snapshot_id')) $base->where('x.snapshot_id', (int)$request->input('snapshot_id'));
+        $summary = (clone $base)->selectRaw('COUNT(DISTINCT x.access_log_id) as access_count, COUNT(DISTINCT x.snapshot_id) as snapshot_count, MIN(x.requested_at) as first_access_at, MAX(x.requested_at) as last_access_at')->first();
+        $sorts = ['snapshot_id' => 'snapshot_id', 'server_name' => 's.server_name', 'access_count' => 'access_count',
+            'unique_ips' => 'unique_ips', 'last_access_at' => 'last_access_at'];
+        $sort = $sorts[$request->input('sort_by')] ?? 'last_access_at';
+        $direction = $request->input('sort_order') === 'asc' ? 'asc' : 'desc';
+        $rows = $base->join('v2_node_snapshot as s', 's.id', '=', 'x.snapshot_id')->join('v2_node_access_log as l', 'l.id', '=', 'x.access_log_id')
+            ->select('s.id as snapshot_id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at',
+                DB::raw('COUNT(DISTINCT x.access_log_id) as access_count'), DB::raw('MIN(x.requested_at) as first_access_at'), DB::raw('MAX(x.requested_at) as last_access_at'),
+                DB::raw('COUNT(DISTINCT l.request_ip) as unique_ips'), DB::raw('COUNT(DISTINCT l.device_hash) as unique_devices'),
+                DB::raw("GROUP_CONCAT(DISTINCT l.endpoint ORDER BY l.endpoint SEPARATOR '、') as endpoints"))
+            ->groupBy('s.id', 's.version', 's.server_type', 's.server_id', 's.server_name', 's.port', 's.published_at')
+            ->orderBy($sort, $direction)->when($sort === 'unique_ips', function ($query) use ($direction) {
+                $query->orderBy('unique_devices', $direction);
+            });
+        if ($sort === 'last_access_at') {
+            // A single subscription request creates many rows with the same timestamp.
+            // Keep tied rows moving in the selected direction so the sort remains visible.
+            $rows->orderBy('first_access_at', $direction)->orderBy('snapshot_id', $direction);
+        } else {
+            $rows->orderByDesc('last_access_at')->orderByDesc('snapshot_id');
+        }
+        $rows = $rows->paginate($this->perPage($request));
+        $groupName = $user->group_id ? ServerGroup::where('id', $user->group_id)->value('name') : null;
+        return response(['data' => ['user' => ['id' => $user->id, 'email' => $user->email, 'group_id' => $user->group_id, 'group_name' => $groupName, 'banned' => (bool)$user->banned],
+            'summary' => ['access_count' => (int)($summary->access_count ?? 0), 'snapshot_count' => (int)($summary->snapshot_count ?? 0), 'first_access_at' => $summary->first_access_at ?? null, 'last_access_at' => $summary->last_access_at ?? null, 'from' => $from, 'to' => $to], 'snapshots' => $rows]]);
+    }
+
+    public function experiments(Request $request)
+    {
+        $experiments = DB::table('v2_watermark_experiment')->orderByDesc('created_at')->get();
+        foreach ($experiments as $experiment) {
+            $experiment->groups = DB::table('v2_watermark_group as g')->where('experiment_id', $experiment->id)
+                ->select('g.*')->get()->map(function ($group) {
+                    $group->user_count = DB::table('v2_watermark_group_user')->where('group_id', $group->id)->count();
+                    unset($group->watermark_host_encrypted);
+                    return $group;
+                });
+        }
+        return response(['data' => $experiments]);
+    }
+
+    public function createExperiment(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:255', 'groups' => 'required|array|min:1', 'user_ids' => 'required|array|min:1']);
+        $id = (new ExperimentService())->create($request->all(), $request->user['id']);
+        $this->adminLog($request, 'experiment.create', 'experiment', $id, ['name' => $request->input('name')]);
+        return response(['data' => ['id' => $id]]);
+    }
+
+    public function splitExperiment(Request $request)
+    {
+        $request->validate(['group_id' => 'required|integer', 'name' => 'required|string', 'groups' => 'required|array|min:2']);
+        $id = (new ExperimentService())->split((int)$request->input('group_id'), $request->all(), $request->user['id']);
+        $this->adminLog($request, 'experiment.split', 'experiment', $id, ['source_group' => $request->input('group_id')]);
+        return response(['data' => ['id' => $id]]);
+    }
+
+    public function updateExperiment(Request $request)
+    {
+        $request->validate(['id' => 'required|integer', 'status' => 'required|in:draft,active,paused,completed']);
+        $data = ['status' => $request->input('status'), 'updated_at' => time()];
+        if ($data['status'] === 'active') $data['started_at'] = time();
+        if ($data['status'] === 'completed') $data['ended_at'] = time();
+        DB::table('v2_watermark_experiment')->where('id', $request->input('id'))->update($data);
+        $this->adminLog($request, 'experiment.update', 'experiment', $request->input('id'), $data);
+        return response(['data' => true]);
+    }
+
+    public function settings(Request $request) { return response(['data' => (new SettingsService())->all()]); }
+
+    public function saveSettings(Request $request)
+    {
+        $settings = (new SettingsService())->save($request->all());
+        $this->adminLog($request, 'settings.update', 'settings', null, $request->all());
+        return response(['data' => $settings]);
+    }
+
+    public function alerts(Request $request)
+    {
+        return response(['data' => DB::table('v2_security_alert')->orderByDesc('created_at')->paginate($this->perPage($request))]);
+    }
+
+    public function readAlert(Request $request)
+    {
+        DB::table('v2_security_alert')->where('id', $request->input('id'))->update(['read_at' => time()]);
+        return response(['data' => true]);
+    }
+
+    public function readAllAlerts(Request $request)
+    {
+        $affected = DB::table('v2_security_alert')->whereNull('read_at')->update(['read_at' => time()]);
+        $this->adminLog($request, 'alert.read_all', 'security_alert', null, ['affected' => $affected]);
+        return response(['data' => ['affected' => $affected]]);
+    }
+
+    public function probes(Request $request)
+    {
+        return response(['data' => DB::table('v2_security_probe')
+            ->select('id', 'name', 'region', 'carrier', 'status', 'last_ip', 'version', 'last_seen_at', 'created_at')
+            ->orderByDesc('created_at')->get()]);
+    }
+
+    public function createProbe(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:96', 'region' => 'required|string|max:32', 'carrier' => 'required|string|max:32']);
+        $secret = Helper::guid() . Helper::guid(); $now = time();
+        $id = DB::table('v2_security_probe')->insertGetId([
+            'name' => $request->input('name'), 'region' => strtoupper($request->input('region')),
+            'carrier' => strtolower($request->input('carrier')), 'secret_hash' => hash('sha256', $secret),
+            'secret_encrypted' => Crypt::encryptString($secret), 'status' => 'active',
+            'created_by' => $request->user['id'], 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        $this->adminLog($request, 'probe.create', 'probe', $id, ['name' => $request->input('name')]);
+        $binaryPath = public_path('downloads/node-security-probe-linux-amd64');
+        $binaryUrl = rtrim(url('/'), '/') . '/downloads/node-security-probe-linux-amd64';
+        $checksum = is_file($binaryPath) ? hash_file('sha256', $binaryPath) : '';
+        $download = 'curl -fsSL ' . escapeshellarg($binaryUrl) . ' -o /tmp/node-security-probe';
+        $verify = $checksum ? ' && echo ' . escapeshellarg($checksum . '  /tmp/node-security-probe') . ' | sha256sum -c -' : '';
+        $install = ' && chmod +x /tmp/node-security-probe && sudo /tmp/node-security-probe install --panel=' . escapeshellarg(rtrim(url('/'), '/')) . ' --id=' . $id . ' --secret=' . escapeshellarg($secret);
+        return response(['data' => [
+            'id' => $id, 'secret' => $secret,
+            'install_command' => $download . $verify . $install,
+        ]]);
+    }
+
+    public function updateProbe(Request $request)
+    {
+        $request->validate(['id' => 'required|integer', 'status' => 'required|in:active,paused,revoked']);
+        DB::table('v2_security_probe')->where('id', $request->input('id'))->update(['status' => $request->input('status'), 'updated_at' => time()]);
+        $this->adminLog($request, 'probe.update', 'probe', $request->input('id'), ['status' => $request->input('status')]);
+        return response(['data' => true]);
+    }
+
+    public function editProbe(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer|min:1',
+            'name' => 'required|string|max:96',
+            'region' => 'required|in:CN,HK,US,SG,JP',
+            'carrier' => 'required|in:telecom,unicom,mobile,overseas,unknown',
+        ]);
+        $probe = DB::table('v2_security_probe')->where('id', $request->input('id'))->first();
+        if (!$probe) abort(404, '探测点不存在或已被删除');
+        $data = [
+            'name' => trim($request->input('name')),
+            'region' => strtoupper($request->input('region')),
+            'carrier' => strtolower($request->input('carrier')),
+            'updated_at' => time(),
+        ];
+        DB::table('v2_security_probe')->where('id', $probe->id)->update($data);
+        $this->adminLog($request, 'probe.edit', 'probe', $probe->id, [
+            'before' => ['name' => $probe->name, 'region' => $probe->region, 'carrier' => $probe->carrier],
+            'after' => $data,
+        ]);
+        return response(['data' => true]);
+    }
+
+    public function deleteProbe(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|integer|min:1',
+            'name' => 'required|string|max:96',
+            'delete_results' => 'required|boolean',
+        ]);
+        $probe = DB::table('v2_security_probe')->where('id', $request->input('id'))->first();
+        if (!$probe) abort(404, '探测点不存在或已被删除');
+        if ($probe->status !== 'paused') abort(422, '探测点必须先暂停才能删除');
+        if (!hash_equals((string)$probe->name, (string)$request->input('name'))) abort(422, '探测点名称不匹配');
+
+        $deleteResults = $request->boolean('delete_results');
+        DB::transaction(function () use ($probe, $deleteResults) {
+            if ($deleteResults) {
+                DB::table('v2_security_probe_result')->where('probe_id', $probe->id)->delete();
+            } else {
+                DB::table('v2_security_probe_result')->where('probe_id', $probe->id)->update(['probe_id' => null]);
+            }
+            DB::table('v2_security_probe')->where('id', $probe->id)->delete();
+        });
+        $this->adminLog($request, 'probe.delete', 'probe', $probe->id, [
+            'name' => $probe->name,
+            'delete_results' => $deleteResults,
+        ]);
+        return response(['data' => true]);
+    }
+
+    public function nodeStates(Request $request)
+    {
+        $servers = collect((new \App\Services\ServerService())->getAllServers())->mapWithKeys(function ($server) {
+            return [($server['type'] ?? '') . ':' . ($server['id'] ?? '') => $server];
+        });
+        $stateMap = DB::table('v2_security_node_state')->get()->mapWithKeys(function ($state) {
+            return [$state->server_type . ':' . $state->server_id => $state];
+        });
+        $targets = DB::table('v2_security_probe_target')->orderByDesc('created_at')->get()->map(function ($target) use ($servers, $stateMap) {
+            $key = $target->server_type . ':' . $target->server_id;
+            $server = $servers->get($key);
+            $state = $stateMap->get($key);
+            return (object)[
+                'target_id' => $target->id,
+                'target_status' => $target->status,
+                'server_type' => $target->server_type,
+                'server_id' => $target->server_id,
+                'server_name' => $server['name'] ?? '源节点已删除',
+                'server_address' => $server
+                    ? $this->formatServerAddress((string)($server['host'] ?? ''), (string)($server['port'] ?? ''))
+                    : '-',
+                'source_available' => (bool)$server,
+                'status' => $state->status ?? 'waiting_first_probe',
+                'domestic_ok' => $state->domestic_ok ?? 0,
+                'domestic_failed' => $state->domestic_failed ?? 0,
+                'overseas_ok' => $state->overseas_ok ?? 0,
+                'overseas_failed' => $state->overseas_failed ?? 0,
+                'consecutive_failures' => $state->consecutive_failures ?? 0,
+                'first_healthy_at' => $state->first_healthy_at ?? null,
+                'last_checked_at' => $state->last_checked_at ?? null,
+                'last_analyzed_at' => $state->updated_at ?? null,
+            ];
+        });
+        return response(['data' => $targets]);
+    }
+
+    public function probeTargetCandidates(Request $request)
+    {
+        $monitored = DB::table('v2_security_probe_target')->get()->mapWithKeys(function ($target) {
+            return [$target->server_type . ':' . $target->server_id => $target->status];
+        });
+        $servers = collect((new \App\Services\ServerService())->getAllServers())
+            ->filter(function ($server) { return $this->probeCompatible($server); })
+            ->map(function ($server) use ($monitored) {
+                $key = $server['type'] . ':' . $server['id'];
+                return [
+                    'server_type' => $server['type'],
+                    'server_id' => (int)$server['id'],
+                    'server_name' => $server['name'] ?? '未命名节点',
+                    'port' => (string)$server['port'],
+                    'monitored_status' => $monitored->get($key),
+                ];
+            })->sortBy('server_name')->values();
+        return response(['data' => $servers]);
+    }
+
+    public function batchProbeTargets(Request $request)
+    {
+        $request->validate([
+            'action' => 'required|in:add,pause,resume,remove',
+            'targets' => 'required|array|min:1|max:500',
+            'targets.*.server_type' => 'required|string|max:32',
+            'targets.*.server_id' => 'required|integer|min:1',
+        ]);
+        $action = $request->input('action');
+        $targets = collect($request->input('targets'))->unique(function ($target) {
+            return $target['server_type'] . ':' . $target['server_id'];
+        })->values();
+        if ($action === 'add') {
+            $valid = collect((new \App\Services\ServerService())->getAllServers())
+                ->filter(function ($server) { return $this->probeCompatible($server); })
+                ->mapWithKeys(function ($server) { return [$server['type'] . ':' . $server['id'] => true]; });
+            foreach ($targets as $target) {
+                if (!$valid->has($target['server_type'] . ':' . $target['server_id'])) abort(422, '包含不存在、未启用或不支持 TCP 探测的节点');
+            }
+        }
+        $now = time();
+        DB::transaction(function () use ($targets, $action, $request, $now) {
+            foreach ($targets as $target) {
+                $where = ['server_type' => $target['server_type'], 'server_id' => (int)$target['server_id']];
+                if ($action === 'add') {
+                    DB::table('v2_security_probe_target')->updateOrInsert($where, [
+                        'status' => 'active', 'created_by' => $request->user['id'], 'created_at' => $now, 'updated_at' => $now,
+                    ]);
+                } elseif ($action === 'remove') {
+                    DB::table('v2_security_probe_target')->where($where)->delete();
+                    DB::table('v2_security_node_state')->where($where)->delete();
+                } else {
+                    DB::table('v2_security_probe_target')->where($where)->update([
+                        'status' => $action === 'pause' ? 'paused' : 'active', 'updated_at' => $now,
+                    ]);
+                }
+            }
+        });
+        $this->adminLog($request, 'probe_target.' . $action, 'probe_target', null, ['targets' => $targets->all()]);
+        return response(['data' => ['affected' => $targets->count()]]);
+    }
+
+    public function probeResults(Request $request)
+    {
+        $query = DB::table('v2_security_probe_result as r')->leftJoin('v2_security_probe as p', 'p.id', '=', 'r.probe_id')
+            ->select('r.*', 'p.name as probe_name');
+        if ($request->filled('server_type')) $query->where('r.server_type', $request->input('server_type'));
+        if ($request->filled('server_id')) $query->where('r.server_id', $request->input('server_id'));
+        return response(['data' => $query->orderByDesc('r.checked_at')->paginate($this->perPage($request))]);
+    }
+
+    public function entryPools(Request $request)
+    {
+        $servers = collect((new \App\Services\ServerService())->getAllServers())->map(function ($server) {
+            return [
+                'server_type' => $server['type'], 'server_id' => (int)$server['id'],
+                'server_name' => $server['name'] ?? '未命名节点',
+                'original_address' => $this->formatServerAddress((string)($server['host'] ?? ''), (string)($server['port'] ?? '')),
+            ];
+        })->filter(function ($server) use ($request) {
+            if ($request->filled('server_type') && $server['server_type'] !== $request->input('server_type')) return false;
+            if ($request->filled('server_id') && $server['server_id'] !== (int)$request->input('server_id')) return false;
+            return true;
+        })->keyBy(function ($server) { return $server['server_type'] . ':' . $server['server_id']; });
+        $settings = DB::table('v2_node_entry_setting')->get()->keyBy(function ($row) {
+            return $row->server_type . ':' . $row->server_id;
+        });
+        $entries = DB::table('v2_node_entry_pool')->orderBy('priority')->orderBy('id')->get()->groupBy(function ($row) {
+            return $row->server_type . ':' . $row->server_id;
+        });
+        try {
+            $clientPolicies = DB::table('v2_node_entry_client_policy')->orderBy('priority')->orderBy('id')->get()->groupBy(function ($row) {
+                return $row->server_type . ':' . $row->server_id;
+            });
+        } catch (\Throwable $e) {
+            $clientPolicies = collect();
+        }
+        $data = $servers->map(function ($server, $key) use ($settings, $entries, $clientPolicies) {
+            $setting = $settings->get($key);
+            $server['delivery_mode'] = $setting->delivery_mode ?? 'primary_only';
+            $server['check_url'] = $setting->check_url ?? 'http://www.gstatic.com/generate_204';
+            $server['check_interval'] = $setting->check_interval ?? 60;
+            $server['client_visibility_mode'] = $setting->client_visibility_mode ?? 'all';
+            $server['sync_primary_host'] = (bool)($setting->sync_primary_host ?? false);
+            $server['sync_primary_port'] = (bool)($setting->sync_primary_port ?? false);
+            $server['entries'] = $entries->get($key, collect())->map(function ($entry) {
+                try { $host = Crypt::decryptString($entry->host_encrypted); } catch (\Throwable $e) { $host = '解密失败'; }
+                return [
+                    'id' => $entry->id, 'name' => $entry->name, 'host' => $host, 'port' => $entry->port,
+                    'priority' => $entry->priority, 'is_primary' => (bool)$entry->is_primary,
+                    'enabled' => (bool)$entry->enabled, 'health_status' => $entry->health_status,
+                    'last_checked_at' => $entry->last_checked_at, 'last_healthy_at' => $entry->last_healthy_at,
+                ];
+            })->values();
+            $server['client_policies'] = $clientPolicies->get($key, collect())->map(function ($policy) {
+                return [
+                    'id' => (int)$policy->id, 'client_family' => $policy->client_family,
+                    'client_platform' => $policy->client_platform, 'min_version' => $policy->min_version,
+                    'max_version' => $policy->max_version, 'delivery_mode' => $policy->delivery_mode,
+                    'visibility' => $policy->visibility ?? 'show',
+                    'check_url' => $policy->check_url, 'check_interval' => (int)$policy->check_interval,
+                    'priority' => (int)$policy->priority, 'enabled' => (bool)$policy->enabled,
+                ];
+            })->values();
+            return $server;
+        })->sortBy(function ($server) {
+            return sprintf('%010d:%s', (int)$server['server_id'], $server['server_type']);
+        })->values();
+        $perPage = $this->perPage($request);
+        $currentPage = max(1, (int)$request->input('page', 1));
+        $total = $data->count();
+        $lastPage = max(1, (int)ceil($total / $perPage));
+        if ($currentPage > $lastPage) $currentPage = $lastPage;
+        return response(['data' => [
+            'current_page' => $currentPage,
+            'data' => $data->forPage($currentPage, $perPage)->values(),
+            'from' => $total ? (($currentPage - 1) * $perPage + 1) : null,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'to' => $total ? min($currentPage * $perPage, $total) : null,
+            'total' => $total,
+        ]]);
+    }
+
+    public function saveEntrySetting(Request $request)
+    {
+        $request->validate([
+            'server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1',
+            'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
+            'client_visibility_mode' => 'required|in:all,allowlist,denylist',
+            'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
+            'sync_primary_host' => 'required|boolean', 'sync_primary_port' => 'required|boolean',
+        ]);
+        $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
+        $syncService = new EntrySyncService();
+        if ($request->boolean('sync_primary_port') && !$syncService->validPort($server['port'] ?? null)) {
+            abort(422, '节点当前使用端口范围，入口池只支持单端口，无法开启端口同步');
+        }
+        $now = time();
+        $settingWhere = ['server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id')];
+        $imported = false;
+        DB::transaction(function () use ($request, $server, $settingWhere, $now, $syncService, &$imported) {
+            DB::table('v2_node_entry_setting')->updateOrInsert($settingWhere,
+                ['delivery_mode' => $request->input('delivery_mode'), 'client_visibility_mode' => $request->input('client_visibility_mode'),
+                    'sync_primary_host' => $request->boolean('sync_primary_host'),
+                    'sync_primary_port' => $request->boolean('sync_primary_port'),
+                    'check_url' => $request->input('check_url'),
+                    'check_interval' => (int)$request->input('check_interval'), 'created_at' => $now, 'updated_at' => $now]
+            );
+            $imported = $this->importOriginalEntryIfEmpty($server, $settingWhere, $now);
+            $syncService->syncServerToPrimary($settingWhere['server_type'], $settingWhere['server_id'], $server);
+        });
+        $this->adminLog($request, 'entry_setting.save', 'node', $request->input('server_id'), $request->only('server_type', 'delivery_mode', 'client_visibility_mode', 'check_interval', 'sync_primary_host', 'sync_primary_port'));
+        return response(['data' => ['saved' => true, 'original_entry_imported' => $imported]]);
+    }
+
+    public function saveEntry(Request $request)
+    {
+        $request->validate([
+            'id' => 'nullable|integer', 'server_type' => 'required|string|max:32', 'server_id' => 'required|integer|min:1',
+            'name' => 'required|string|max:96', 'host' => 'required|string|max:255', 'port' => 'required|integer|min:1|max:65535',
+            'priority' => 'required|integer|min:1|max:10000', 'is_primary' => 'required|boolean', 'enabled' => 'required|boolean',
+        ]);
+        $server = $this->findServer($request->input('server_type'), (int)$request->input('server_id'));
+        $where = ['id' => (int)$request->input('id')];
+        if ($request->filled('id') && !DB::table('v2_node_entry_pool')->where($where)->exists()) abort(404, '入口不存在');
+        $now = time();
+        $payload = [
+            'server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id'),
+            'name' => $request->input('name'), 'host_encrypted' => Crypt::encryptString($request->input('host')),
+            'host_hash' => hash('sha256', strtolower($request->input('host'))), 'port' => (int)$request->input('port'),
+            'priority' => (int)$request->input('priority'), 'is_primary' => $request->boolean('is_primary'),
+            'enabled' => $request->boolean('enabled'), 'updated_at' => $now,
+        ];
+        if (!$request->filled('id') && !DB::table('v2_node_entry_pool')->where('server_type', $payload['server_type'])->where('server_id', $payload['server_id'])->exists()) {
+            $originalHost = trim((string)($server['host'] ?? ''));
+            $originalPort = (string)($server['port'] ?? '');
+            if ($originalHost !== '' && ctype_digit($originalPort) && hash('sha256', strtolower($originalHost)) === $payload['host_hash'] && (int)$originalPort === $payload['port']) {
+                $payload['is_primary'] = true;
+            }
+        }
+        DB::transaction(function () use ($request, $where, $payload, $server, $now) {
+            $settingWhere = ['server_type' => $payload['server_type'], 'server_id' => $payload['server_id']];
+            if (!DB::table('v2_node_entry_setting')->where($settingWhere)->exists()) {
+                DB::table('v2_node_entry_setting')->insert($settingWhere + [
+                    'delivery_mode' => 'primary_only', 'check_url' => 'http://www.gstatic.com/generate_204',
+                    'check_interval' => 60, 'created_at' => $now, 'updated_at' => $now,
+                ]);
+            }
+            if (!$request->filled('id')) {
+                $this->importOriginalEntryIfEmpty($server, $settingWhere, $now, $payload['host_hash'], $payload['port']);
+            }
+            if ($payload['is_primary']) DB::table('v2_node_entry_pool')->where('server_type', $payload['server_type'])->where('server_id', $payload['server_id'])->update(['is_primary' => 0, 'updated_at' => $now]);
+            if ($request->filled('id')) DB::table('v2_node_entry_pool')->where($where)->update($payload);
+            else DB::table('v2_node_entry_pool')->insert($payload + ['health_status' => 'waiting', 'created_at' => $now]);
+            if ($payload['is_primary']) (new EntrySyncService())->syncPrimaryToServer($payload['server_type'], $payload['server_id']);
+        });
+        $this->adminLog($request, 'entry.save', 'node_entry', $request->input('id'), ['server_type' => $payload['server_type'], 'server_id' => $payload['server_id'], 'host_hash' => $payload['host_hash']]);
+        return response(['data' => true]);
+    }
+
+    public function deleteEntry(Request $request)
+    {
+        $request->validate(['id' => 'required|integer']);
+        $entry = DB::table('v2_node_entry_pool')->where('id', $request->input('id'))->first();
+        if (!$entry) abort(404, '入口不存在');
+        DB::table('v2_node_entry_pool')->where('id', $entry->id)->delete();
+        $this->adminLog($request, 'entry.delete', 'node_entry', $entry->id, ['server_type' => $entry->server_type, 'server_id' => $entry->server_id, 'host_hash' => $entry->host_hash]);
+        return response(['data' => true]);
+    }
+
+    public function saveEntryClientPolicy(Request $request)
+    {
+        $request->validate([
+            'id' => 'nullable|integer', 'server_type' => 'required|string|max:32',
+            'server_id' => 'required|integer|min:1', 'client_family' => 'required|string|max:64',
+            'client_platform' => 'nullable|string|max:24', 'min_version' => 'nullable|string|max:32',
+            'max_version' => 'nullable|string|max:32',
+            'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
+            'visibility' => 'required|in:show,hide',
+            'check_url' => 'required|url|max:255', 'check_interval' => 'required|integer|min:30|max:86400',
+            'priority' => 'required|integer|min:1|max:10000', 'enabled' => 'required|boolean',
+        ]);
+        $minVersion = trim((string)$request->input('min_version'));
+        $maxVersion = trim((string)$request->input('max_version'));
+        if ($minVersion !== '' && $maxVersion !== '' && version_compare($minVersion, $maxVersion, '>')) {
+            abort(422, '最低版本不能高于最高版本');
+        }
+        $this->ensureServerExists($request->input('server_type'), (int)$request->input('server_id'));
+        $where = ['id' => (int)$request->input('id')];
+        if ($request->filled('id') && !DB::table('v2_node_entry_client_policy')->where($where)->exists()) abort(404, '客户端规则不存在');
+        $now = time();
+        $payload = [
+            'server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id'),
+            'client_family' => trim($request->input('client_family')),
+            'client_platform' => trim((string)$request->input('client_platform')) ?: null,
+            'min_version' => $minVersion ?: null, 'max_version' => $maxVersion ?: null,
+            'delivery_mode' => $request->input('delivery_mode'), 'visibility' => $request->input('visibility'),
+            'check_url' => $request->input('check_url'),
+            'check_interval' => (int)$request->input('check_interval'), 'priority' => (int)$request->input('priority'),
+            'enabled' => $request->boolean('enabled'), 'updated_at' => $now,
+        ];
+        if ($request->filled('id')) DB::table('v2_node_entry_client_policy')->where($where)->update($payload);
+        else DB::table('v2_node_entry_client_policy')->insert($payload + ['created_at' => $now]);
+        $this->adminLog($request, 'entry_client_policy.save', 'node', $request->input('server_id'), [
+            'server_type' => $payload['server_type'], 'client_family' => $payload['client_family'],
+            'client_platform' => $payload['client_platform'], 'delivery_mode' => $payload['delivery_mode'],
+            'visibility' => $payload['visibility'],
+        ]);
+        return response(['data' => true]);
+    }
+
+    public function deleteEntryClientPolicy(Request $request)
+    {
+        $request->validate(['id' => 'required|integer']);
+        $policy = DB::table('v2_node_entry_client_policy')->where('id', $request->input('id'))->first();
+        if (!$policy) abort(404, '客户端规则不存在');
+        DB::table('v2_node_entry_client_policy')->where('id', $policy->id)->delete();
+        $this->adminLog($request, 'entry_client_policy.delete', 'node', $policy->server_id, [
+            'server_type' => $policy->server_type, 'client_family' => $policy->client_family,
+        ]);
+        return response(['data' => true]);
+    }
+
+    private function ensureServerExists(string $type, int $id): void
+    {
+        $this->findServer($type, $id);
+    }
+
+    private function findServer(string $type, int $id): array
+    {
+        $server = collect((new \App\Services\ServerService())->getAllServers())->first(function ($server) use ($type, $id) {
+            return ($server['type'] ?? '') === $type && (int)($server['id'] ?? 0) === $id;
+        });
+        if (!$server) abort(422, '节点不存在');
+        return $server;
+    }
+
+    private function importOriginalEntryIfEmpty(array $server, array $where, int $now, ?string $candidateHash = null, ?int $candidatePort = null): bool
+    {
+        if (DB::table('v2_node_entry_pool')->where($where)->exists()) return false;
+        $host = trim((string)($server['host'] ?? ''));
+        $port = (string)($server['port'] ?? '');
+        if ($host === '' || !ctype_digit($port) || (int)$port < 1 || (int)$port > 65535) return false;
+        $hostHash = hash('sha256', strtolower($host));
+        if ($candidateHash === $hostHash && $candidatePort === (int)$port) return false;
+        DB::table('v2_node_entry_pool')->insert($where + [
+            'name' => '原始主入口', 'host_encrypted' => Crypt::encryptString($host),
+            'host_hash' => $hostHash, 'port' => (int)$port, 'priority' => 1,
+            'is_primary' => 1, 'enabled' => 1, 'health_status' => 'waiting',
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+        return true;
+    }
+
+    private function userRankQuery()
+    {
+        return DB::table('v2_security_user_score as s')->join('v2_user as u', 'u.id', '=', 's.user_id')
+            ->select('s.*', 'u.email', 'u.plan_id', 'u.banned', 'u.created_at as registered_at');
+    }
+
+    private function probeCompatible(array $server): bool
+    {
+        if (empty($server['show']) || empty($server['host']) || empty($server['port'])) return false;
+        if (in_array($server['type'] ?? '', ['tuic', 'hysteria'], true)) return false;
+        if (($server['type'] ?? '') === 'v2node' && in_array($server['protocol'] ?? '', ['tuic', 'hysteria'], true)) return false;
+        $port = (string)$server['port'];
+        return strpos($port, '-') === false && ctype_digit($port);
+    }
+
+    private function formatServerAddress(string $host, string $port): string
+    {
+        if ($host === '') return '-';
+        if (strpos($host, ':') !== false && substr($host, 0, 1) !== '[') $host = '[' . $host . ']';
+        return $port === '' ? $host : $host . ':' . $port;
+    }
+
+    private function from(Request $request): int { return time() - max(1, min(90, (int)$request->input('days', 7))) * 86400; }
+    private function perPage(Request $request): int { return max(10, min(100, (int)$request->input('per_page', 25))); }
+
+    private function ensureSnapshotAccessIndex(): void
+    {
+        if (!Schema::hasTable('v2_node_access_snapshot')) {
+            abort(503, '快照访问索引尚未安装，请重新执行 ./update.sh 完成数据库升级');
+        }
+    }
+
+    private function adminLog(Request $request, string $action, ?string $targetType, $targetId, array $payload): void
+    {
+        DB::table('v2_security_admin_log')->insert([
+            'admin_id' => $request->user['id'], 'action' => $action, 'target_type' => $targetType,
+            'target_id' => $targetId === null ? null : (string)$targetId,
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE), 'request_ip' => $request->ip(), 'created_at' => time(),
+        ]);
+    }
+}

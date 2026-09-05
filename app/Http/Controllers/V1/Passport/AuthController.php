@@ -11,11 +11,13 @@ use App\Models\InviteCode;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\AuthService;
+use App\Services\TrialClaimService;
 use App\Utils\CacheKey;
 use App\Utils\Dict;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use ReCaptcha\ReCaptcha;
 
 class AuthController extends Controller
@@ -76,44 +78,55 @@ class AuthController extends Controller
         if ($exist) {
             abort(500, __('Email already exists'));
         }
-        $user = new User();
-        $user->email = $email;
-        $user->password = password_hash($password, PASSWORD_DEFAULT);
-        $user->uuid = Helper::guid(true);
-        $user->token = Helper::guid();
-        if ($request->input('invite_code')) {
-            $inviteCode = InviteCode::where('code', $request->input('invite_code'))
-                ->where('status', 0)
-                ->first();
-            if (!$inviteCode) {
-                if ((int)config('v2board.invite_force', 0)) {
-                    abort(500, __('Invalid invitation code'));
-                }
-            } else {
-                $user->invite_user_id = $inviteCode->user_id ? $inviteCode->user_id : null;
-                if (!(int)config('v2board.invite_never_expire', 0)) {
-                    $inviteCode->status = 1;
-                    $inviteCode->save();
+        $user = DB::transaction(function () use ($request, $email, $password) {
+            $user = new User();
+            $user->email = strtolower(trim($email));
+            $user->password = password_hash($password, PASSWORD_DEFAULT);
+            $user->uuid = Helper::guid(true);
+            $user->token = Helper::guid();
+            if ($request->input('invite_code')) {
+                $inviteCode = InviteCode::where('code', $request->input('invite_code'))
+                    ->where('status', 0)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$inviteCode) {
+                    if ((int)config('v2board.invite_force', 0)) {
+                        abort(500, __('Invalid invitation code'));
+                    }
+                } else {
+                    $user->invite_user_id = $inviteCode->user_id ? $inviteCode->user_id : null;
+                    if (!(int)config('v2board.invite_never_expire', 0)) {
+                        $inviteCode->status = 1;
+                        $inviteCode->save();
+                    }
                 }
             }
-        }
 
-        // try out
-        if ((int)config('v2board.try_out_plan_id', 0)) {
-            $plan = Plan::find(config('v2board.try_out_plan_id'));
-            if ($plan) {
-                $user->transfer_enable = $plan->transfer_enable * 1073741824;
-                $user->device_limit = $plan->device_limit;
-                $user->plan_id = $plan->id;
-                $user->group_id = $plan->group_id;
-                $user->expired_at = time() + (config('v2board.try_out_hour', 1) * 3600);
-                $user->speed_limit = $plan->speed_limit;
+            $trialGranted = false;
+            if ((int)config('v2board.try_out_plan_id', 0)) {
+                $plan = Plan::find(config('v2board.try_out_plan_id'));
+                if ($plan) {
+                    $trialClaims = app(TrialClaimService::class);
+                    $trialGranted = $trialClaims->claim($user->email);
+                    if ($trialGranted) {
+                        $user->transfer_enable = $plan->transfer_enable * 1073741824;
+                        $user->device_limit = $plan->device_limit;
+                        $user->plan_id = $plan->id;
+                        $user->group_id = $plan->group_id;
+                        $user->expired_at = time() + (config('v2board.try_out_hour', 1) * 3600);
+                        $user->speed_limit = $plan->speed_limit;
+                    }
+                }
             }
-        }
 
-        if (!$user->save()) {
-            abort(500, __('Register failed'));
-        }
+            if (!$user->save()) {
+                abort(500, __('Register failed'));
+            }
+            if ($trialGranted) {
+                $trialClaims->claim($user->email, (int)$user->id);
+            }
+            return $user;
+        });
         if ((int)config('v2board.email_verify', 0)) {
             Cache::forget(CacheKey::get('EMAIL_VERIFY_CODE', $cacheKeyEmail));
         }

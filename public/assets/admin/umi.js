@@ -5681,6 +5681,15 @@
                     defaultValue: t.app_name,
                     onChange: e=>this.set("site", "app_name", e.target.value)
                 })), f.a.createElement(m, {
+                    title: "站点名称（英文）",
+                    description: "用于英文界面显示站点名称，留空时使用中文站点名称。"
+                }, f.a.createElement("input", {
+                    type: "text",
+                    className: "form-control",
+                    placeholder: "Please enter the site name in English",
+                    defaultValue: t.app_name_en,
+                    onChange: e=>this.set("site", "app_name_en", e.target.value)
+                })), f.a.createElement(m, {
                     title: "\u7ad9\u70b9\u63cf\u8ff0",
                     description: "\u7528\u4e8e\u663e\u793a\u9700\u8981\u7ad9\u70b9\u63cf\u8ff0\u7684\u5730\u65b9\u3002"
                 }, f.a.createElement("input", {
@@ -5689,6 +5698,15 @@
                     placeholder: "\u8bf7\u8f93\u5165\u7ad9\u70b9\u63cf\u8ff0",
                     defaultValue: t.app_description,
                     onChange: e=>this.set("site", "app_description", e.target.value)
+                })), f.a.createElement(m, {
+                    title: "站点描述（英文）",
+                    description: "用于英文界面显示站点描述，留空时使用中文站点描述。"
+                }, f.a.createElement("input", {
+                    type: "text",
+                    className: "form-control",
+                    placeholder: "Please enter the site description in English",
+                    defaultValue: t.app_description_en,
+                    onChange: e=>this.set("site", "app_description_en", e.target.value)
                 })), f.a.createElement(m, {
                     title: "\u7ad9\u70b9\u7f51\u5740",
                     description: "\u5f53\u524d\u7f51\u7ad9\u6700\u65b0\u7f51\u5740\uff0c\u5c06\u4f1a\u5728\u90ae\u4ef6\u7b49\u9700\u8981\u7528\u4e8e\u7f51\u5740\u5904\u4f53\u73b0\u3002"
@@ -31414,6 +31432,21 @@
                 })), g.a.createElement("div", {
                     className: "form-group"
                 }, g.a.createElement("label", {
+                    for: "notice-title-en"
+                }, "标题（英文）"), g.a.createElement(s["a"], {
+                    id: "notice-title-en",
+                    placeholder: "Notice title in English",
+                    value: this.state.submit.title_en,
+                    onChange: e=>{
+                        this.setState({
+                            submit: p()({}, this.state.submit, {
+                                title_en: e.target.value
+                            })
+                        })
+                    }
+                })), g.a.createElement("div", {
+                    className: "form-group"
+                }, g.a.createElement("label", {
                     for: "example-text-input-alt"
                 }, "\u516c\u544a\u5185\u5bb9"), g.a.createElement(s["a"].TextArea, {
                     rows: 12,
@@ -31423,6 +31456,22 @@
                         this.setState({
                             submit: p()({}, this.state.submit, {
                                 content: e.target.value
+                            })
+                        })
+                    }
+                })), g.a.createElement("div", {
+                    className: "form-group"
+                }, g.a.createElement("label", {
+                    for: "notice-content-en"
+                }, "公告内容（英文）"), g.a.createElement(s["a"].TextArea, {
+                    id: "notice-content-en",
+                    rows: 12,
+                    value: this.state.submit.content_en,
+                    placeholder: "Notice content in English",
+                    onChange: e=>{
+                        this.setState({
+                            submit: p()({}, this.state.submit, {
+                                content_en: e.target.value
                             })
                         })
                     }
@@ -71081,6 +71130,17 @@
                             value: e.id
                         }))]
                     }, {
+                        key: "group_id",
+                        title: "\u6743\u9650\u7ec4",
+                        condition: ["="],
+                        type: "select",
+                        options:[{
+                            key: "\u65e0\u6743\u9650\u7ec4",
+                            value: "null" }, ...M.map(e=>({
+                            key: e.name,
+                            value: e.id
+                        }))]
+                    }, {
                         key: "transfer_enable",
                         title: "\u6d41\u91cf",
                         condition: [">=", ">", "<", "<="]
@@ -71150,6 +71210,13 @@
                     }), " \u5bfc\u51faCSV")), g.a.createElement(c["a"].Item, null, g.a.createElement(y["a"], null, g.a.createElement("a", null, g.a.createElement(u["a"], {
                         type: "mail"
                     }), " \u53d1\u9001\u90ae\u4ef6"))), g.a.createElement(c["a"].Item, {
+                        disabled: !E.length
+                    }, g.a.createElement("a", {
+                        disabled: !E.length,
+                        onClick: ()=>window.FastCatBatchGroup && window.FastCatBatchGroup.open(E, x.total)
+                    }, g.a.createElement(u["a"], {
+                        type: "team"
+                    }), " \u6279\u91cf\u4fee\u6539\u6743\u9650\u7ec4")), g.a.createElement(c["a"].Item, {
                         disabled: !E.length
                     }, g.a.createElement("a", {
                         disabled: !E.length,
@@ -73769,6 +73836,15 @@
                     placeholder: "\u7528\u4e8e\u524d\u7aef\u663e\u793a\u4f7f\u7528",
                     defaultValue: a.name,
                     onChange: e=>this.submitOnChange("name", e.target.value)
+                })), d.a.createElement("div", {
+                    className: "form-group"
+                }, d.a.createElement("label", {
+                    for: "payment-name-en"
+                }, "显示名称（英文）"), d.a.createElement(v["a"], {
+                    id: "payment-name-en",
+                    placeholder: "Payment method name in English",
+                    defaultValue: a.name_en,
+                    onChange: e=>this.submitOnChange("name_en", e.target.value)
                 })), d.a.createElement("div", {
                     className: "form-group"
                 }, d.a.createElement("label", {
@@ -81962,7 +82038,7 @@
                                     }
                                     return e.abrupt("return");
                                 case 13:
-                                    r["a"].success("\u5df2\u52a0\u5165\u961f\u5217\u6267\u884c"),
+                                    r["a"].success(n.send_at ? "\u5df2\u5b89\u6392\u5b9a\u65f6\u53d1\u9001" : "\u5df2\u52a0\u5165\u961f\u5217\u6267\u884c"),
                                     "function" === typeof i && i();
                                 case 15:
                                 case "end":
@@ -82531,6 +82607,21 @@
                 })), m.a.createElement("div", {
                     className: "form-group"
                 }, m.a.createElement("label", {
+                    for: "plan-name-en"
+                }, "套餐名称（英文）"), m.a.createElement(C["a"], {
+                    id: "plan-name-en",
+                    placeholder: "Plan name in English",
+                    value: this.state.record.name_en,
+                    onChange: e=>{
+                        this.setState({
+                            record: d()({}, this.state.record, {
+                                name_en: e.target.value
+                            })
+                        })
+                    }
+                })), m.a.createElement("div", {
+                    className: "form-group"
+                }, m.a.createElement("label", {
                     for: "example-text-input-alt"
                 }, "\u5957\u9910\u63cf\u8ff0"), m.a.createElement(C["a"].TextArea, {
                     rows: 4,
@@ -82540,6 +82631,22 @@
                         this.setState({
                             record: d()({}, this.state.record, {
                                 content: e.target.value
+                            })
+                        })
+                    }
+                })), m.a.createElement("div", {
+                    className: "form-group"
+                }, m.a.createElement("label", {
+                    for: "plan-content-en"
+                }, "套餐描述（英文）"), m.a.createElement(C["a"].TextArea, {
+                    id: "plan-content-en",
+                    rows: 4,
+                    value: this.state.record.content_en,
+                    placeholder: "Plan description in English; HTML is supported",
+                    onChange: e=>{
+                        this.setState({
+                            record: d()({}, this.state.record, {
+                                content_en: e.target.value
                             })
                         })
                     }
@@ -87636,7 +87743,9 @@
                 super(e),
                 this.state = {
                     visible: !1,
-                    submit: {}
+                    submit: {},
+                    sendMode: "now",
+                    sendAt: ""
                 }
             }
             show() {
@@ -87650,9 +87759,15 @@
                 })
             }
             send() {
+                var e = this.state.sendMode === "scheduled"
+                  , t = e ? Math.floor(new Date(this.state.sendAt).getTime() / 1e3) : null;
+                if (e && (!t || t <= Math.floor(Date.now() / 1e3) + 59))
+                    return void window.alert("\u8bf7\u9009\u62e9\u81f3\u5c11\u4e00\u5206\u949f\u540e\u7684\u53d1\u9001\u65f6\u95f4");
                 this.props.dispatch({
                     type: "user/sendMail",
-                    params: this.state.submit,
+                    params: o()({}, this.state.submit, e ? {
+                        send_at: t
+                    } : {}),
                     callback: ()=>{
                         this.hide()
                     }
@@ -87709,6 +87824,28 @@
                             })
                         })
                     }
+                })), l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, "\u53d1\u9001\u65b9\u5f0f"), l.a.createElement("select", {
+                    className: "form-control",
+                    value: this.state.sendMode,
+                    onChange: e=>this.setState({
+                        sendMode: e.target.value
+                    })
+                }, l.a.createElement("option", {
+                    value: "now"
+                }, "\u7acb\u5373\u53d1\u9001"), l.a.createElement("option", {
+                    value: "scheduled"
+                }, "\u5b9a\u65f6\u53d1\u9001"))), "scheduled" === this.state.sendMode && l.a.createElement("div", {
+                    className: "form-group"
+                }, l.a.createElement("label", null, "\u8ba1\u5212\u53d1\u9001\u65f6\u95f4\uff08\u672c\u5730\u65f6\u95f4\uff09"), l.a.createElement("input", {
+                    type: "datetime-local",
+                    className: "form-control",
+                    min: new Date(Date.now() + 12e4 - 6e4 * (new Date).getTimezoneOffset()).toISOString().slice(0, 16),
+                    value: this.state.sendAt,
+                    onChange: e=>this.setState({
+                        sendAt: e.target.value
+                    })
                 }))))
             }
         }
@@ -98480,7 +98617,16 @@
                     className: "display-4 text-black font-w300 mb-2"
                 }, t.day_income ? (t.day_income / 100).toFixed(2) : "0.00", l.a.createElement("span", {
                     className: "font-size-h5 font-w600 text-muted"
-                }, n.site.currency))) , l.a.createElement("div", {
+                }, n.site.currency))), l.a.createElement("div", {
+                    className: "pr-4 pr-sm-5 pl-0 pl-sm-3 "
+                }, l.a.createElement("i", {
+                    className: "fa fa-shopping-cart fa-2x text-gray-light float-right"
+                }), l.a.createElement("div", {
+                    className: "text-muted mb-1",
+                    style: { width: '120px' }
+                }, "\u4eca\u65e5\u8ba2\u5355"), l.a.createElement("div", {
+                    className: "display-4 text-black font-w300 mb-2"
+                }, t.day_paid_count ? t.day_paid_count : "0")), l.a.createElement("div", {
                     className: "pr-4 pr-sm-5 pl-0 pl-sm-3 "
                 }, l.a.createElement("i", {
                     className: "fa fa-user fa-2x text-gray-light float-right"
@@ -106808,6 +106954,12 @@
                     }, y.a.createElement(m["a"], {
                         type: "copy"
                     }), " \u590d\u5236"), y.a.createElement(p["a"].Item, {
+                        onClick: ()=>window.FastCatEntryPool && window.FastCatEntryPool.open(e.type, e.id, e.name, ()=>this.props.dispatch({
+                            type: "serverManage/getNodes"
+                        }))
+                    }, y.a.createElement(m["a"], {
+                        type: "cluster"
+                    }), " \u5165\u53e3\u6c60"), y.a.createElement(p["a"].Item, {
                         style: {
                             color: "#ff4d4f"
                         },
@@ -114473,6 +114625,7 @@
           , S = n.n(E)
           , k = n("/MKj")
           , C = n("tI4l")
+          , A = n("t3Un")
           , O = n("v32e");
         class T extends b.a.Component {
             constructor(e) {
@@ -114482,6 +114635,13 @@
                 },
                 this.state = {
                     visible: !1,
+                    redemptionVisible: !1,
+                    redemptionLoading: !1,
+                    redemptions: [],
+                    redemptionTotal: 0,
+                    redemptionPage: 1,
+                    redemptionSearch: "",
+                    redemptionGiftcardId: null,
                     submit: v()({}, this.defaultValue)
                 }
             }
@@ -114503,6 +114663,48 @@
                     })
                 }
                 )
+            }
+            openRedemptions(e) {
+                this.setState({
+                    redemptionVisible: !0,
+                    redemptionGiftcardId: e || null,
+                    redemptionPage: 1
+                }, ()=>this.fetchRedemptions(1))
+            }
+            fetchRedemptions(e) {
+                var t = "current=" + e + "&pageSize=10"
+                  , n = this.state.redemptionSearch.trim();
+                n && (t += "&search=" + encodeURIComponent(n)),
+                this.state.redemptionGiftcardId && (t += "&giftcard_id=" + this.state.redemptionGiftcardId),
+                this.setState({
+                    redemptionLoading: !0
+                }),
+                Object(A["a"])("/" + window.settings.secure_path + "/giftcard/redemptions?" + t).then(t=>{
+                    200 === t.code && this.setState({
+                        redemptions: t.data || [],
+                        redemptionTotal: t.total || 0,
+                        redemptionPage: e
+                    }),
+                    this.setState({
+                        redemptionLoading: !1
+                    })
+                })
+            }
+            redemptionValue(e) {
+                switch (e.type) {
+                case 1:
+                    return "账户余额 ¥" + (e.value / 100).toFixed(2);
+                case 2:
+                    return e.value + " 天订阅时长";
+                case 3:
+                    return e.value + " GB 套餐流量";
+                case 4:
+                    return "重置套餐流量";
+                case 5:
+                    return (e.plan_name || "订阅套餐") + (0 === e.value ? "（永久）" : "（" + e.value + " 天）");
+                default:
+                    return "-"
+                }
             }
             generate() {
                 var e = v()({}, this.state.submit);
@@ -114675,7 +114877,12 @@
                     onClick: ()=>this.modalVisible()
                 }, b.a.createElement(u["a"], {
                     type: "plus"
-                }), "\u6dfb\u52a0\u793c\u54c1\u5361")), b.a.createElement(l["a"], {
+                }), "\u6dfb\u52a0\u793c\u54c1\u5361"), b.a.createElement(c["a"], {
+                    style: {
+                        marginLeft: 8
+                    },
+                    onClick: ()=>this.openRedemptions(null)
+                }, "全部兑换记录")), b.a.createElement(l["a"], {
                     tableLayout: "auto",
                     dataSource: t,
                     columns: x,
@@ -114689,6 +114896,71 @@
                     }),
                     onChange: (e,t,n)=>this.tableOnChange(e, n)
                 })))), b.a.createElement(h["a"], {
+                    title: this.state.redemptionGiftcardId ? "礼品卡兑换记录 #" + this.state.redemptionGiftcardId : "全部礼品卡兑换记录",
+                    visible: this.state.redemptionVisible,
+                    footer: null,
+                    width: 980,
+                    onCancel: ()=>this.setState({
+                        redemptionVisible: !1,
+                        redemptionGiftcardId: null,
+                        redemptionSearch: ""
+                    })
+                }, b.a.createElement("div", {
+                    className: "mb-3",
+                    style: {
+                        display: "flex"
+                    }
+                }, b.a.createElement(s["a"], {
+                    placeholder: "搜索用户ID、邮箱、礼品卡名称或卡密尾号",
+                    value: this.state.redemptionSearch,
+                    onPressEnter: ()=>this.fetchRedemptions(1),
+                    onChange: e=>this.setState({
+                        redemptionSearch: e.target.value
+                    })
+                }), b.a.createElement(c["a"], {
+                    type: "primary",
+                    style: {
+                        marginLeft: 8
+                    },
+                    onClick: ()=>this.fetchRedemptions(1)
+                }, "查询")), b.a.createElement(l["a"], {
+                    rowKey: "id",
+                    loading: this.state.redemptionLoading,
+                    dataSource: this.state.redemptions,
+                    columns: [{
+                        title: "用户",
+                        key: "user",
+                        render: e=>b.a.createElement("div", null, b.a.createElement("div", null, e.user_email || "用户已删除"), b.a.createElement("small", {
+                            className: "text-muted"
+                        }, "ID: ", e.user_id))
+                    }, {
+                        title: "礼品卡",
+                        key: "giftcard",
+                        render: e=>b.a.createElement("div", null, b.a.createElement("div", null, e.name_snapshot), b.a.createElement("small", {
+                            className: "text-muted"
+                        }, e.code_snapshot))
+                    }, {
+                        title: "兑换内容",
+                        key: "value",
+                        render: e=>this.redemptionValue(e)
+                    }, {
+                        title: "兑换时间",
+                        dataIndex: "redeemed_at",
+                        key: "redeemed_at",
+                        render: e=>_()(1e3 * e).format("YYYY/MM/DD HH:mm")
+                    }],
+                    pagination: {
+                        size: "small",
+                        current: this.state.redemptionPage,
+                        pageSize: 10,
+                        total: this.state.redemptionTotal,
+                        showSizeChanger: !1
+                    },
+                    onChange: e=>this.fetchRedemptions(e.current),
+                    scroll: {
+                        x: 800
+                    }
+                })), b.a.createElement(h["a"], {
                     title: "".concat(this.state.submit.id ? "\u7f16\u8f91\u793c\u54c1\u5361" : "\u65b0\u5efa\u793c\u54c1\u5361"),
                     visible: this.state.visible,
                     onCancel: ()=>this.modalVisible(),

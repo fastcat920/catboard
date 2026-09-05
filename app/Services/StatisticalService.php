@@ -53,20 +53,12 @@ class StatisticalService {
             $startAt = strtotime(date('Y-m-d'));
             $endAt = strtotime('+1 day', $startAt);
         }
-        $data = [];
+        $data = $this->generatePaidStatData($startAt, $endAt);
         $data['order_count'] = Order::where('created_at', '>=', $startAt)
             ->where('created_at', '<', $endAt)
             ->count();
         $data['order_total'] = Order::where('created_at', '>=', $startAt)
             ->where('created_at', '<', $endAt)
-            ->sum('total_amount');
-        $data['paid_count'] = Order::where('paid_at', '>=', $startAt)
-            ->where('paid_at', '<', $endAt)
-            ->whereNotIn('status', [0, 2])
-            ->count();
-        $data['paid_total'] = Order::where('paid_at', '>=', $startAt)
-            ->where('paid_at', '<', $endAt)
-            ->whereNotIn('status', [0, 2])
             ->sum('total_amount');
         $commissionLogBuilder = CommissionLog::where('created_at', '>=', $startAt)
             ->where('created_at', '<', $endAt);
@@ -84,6 +76,23 @@ class StatisticalService {
                 ->select(DB::raw('SUM(u) + SUM(d) as total'))
                 ->value('total') ?? 0;
         return $data;
+    }
+
+    public function generatePaidStatData($startAt = null, $endAt = null): array
+    {
+        $startAt = $startAt ?? $this->startAt ?? strtotime(date('Y-m-d'));
+        $endAt = $endAt ?? $this->endAt ?? strtotime('+1 day', $startAt);
+
+        $statistics = Order::where('paid_at', '>=', $startAt)
+            ->where('paid_at', '<', $endAt)
+            ->whereNotIn('status', [0, 2])
+            ->selectRaw('COUNT(*) as paid_count, COALESCE(SUM(total_amount), 0) as paid_total')
+            ->first();
+
+        return [
+            'paid_count' => (int)$statistics->paid_count,
+            'paid_total' => (int)$statistics->paid_total
+        ];
     }
 
     public function statServer($serverId, $serverType, $u, $d)

@@ -83889,6 +83889,15 @@
                 })), f.a.createElement("div", {
                     className: "form-group"
                 }, f.a.createElement("label", {
+                    htmlFor: "knowledge-title-en"
+                }, "标题（英文）"), f.a.createElement(w["a"], {
+                    id: "knowledge-title-en",
+                    placeholder: "Knowledge title in English",
+                    value: n.title_en,
+                    onChange: e=>this.formChange("title_en", e.target.value)
+                })), f.a.createElement("div", {
+                    className: "form-group"
+                }, f.a.createElement("label", {
                     htmlFor: "example-text-input-alt"
                 }, "\u5206\u7c7b"), f.a.createElement(w["a"], {
                     placeholder: "\u8bf7\u8f93\u5165\u5206\u7c7b\uff0c\u5206\u7c7b\u5c06\u4f1a\u81ea\u52a8\u5f52\u96c6",
@@ -83897,21 +83906,13 @@
                 })), f.a.createElement("div", {
                     className: "form-group"
                 }, f.a.createElement("label", {
-                    htmlFor: "example-text-input-alt"
-                }, "\u8bed\u8a00"), f.a.createElement(b["a"], {
-                    placeholder: "\u8bf7\u9009\u62e9\u77e5\u8bc6\u8bed\u8a00",
-                    defaultValue: n.language || 1,
-                    style: {
-                        width: "100%"
-                    },
-                    value: n.language,
-                    onChange: e=>this.formChange("language", e)
-                }, Object.keys(C["a"].i18nText).sort().map(e=>{
-                    return f.a.createElement(b["a"].Option, {
-                        value: e
-                    }, C["a"].i18nText[e])
-                }
-                ))), f.a.createElement("div", {
+                    htmlFor: "knowledge-category-en"
+                }, "分类（英文）"), f.a.createElement(w["a"], {
+                    id: "knowledge-category-en",
+                    placeholder: "Knowledge category in English",
+                    value: n.category_en,
+                    onChange: e=>this.formChange("category_en", e.target.value)
+                })), f.a.createElement("div", {
                     className: "form-group"
                 }, f.a.createElement("label", {
                     htmlFor: "example-text-input-alt"
@@ -83923,6 +83924,26 @@
                     renderHTML: e=>A.render(e),
                     value: n.body,
                     onChange: e=>this.formChange("body", e.text),
+                    config: {
+                        view: {
+                            menu: !0,
+                            md: !0,
+                            fullScreen: !0,
+                            hideMenu: !0
+                        }
+                    }
+                })), f.a.createElement("div", {
+                    className: "form-group"
+                }, f.a.createElement("label", {
+                    htmlFor: "knowledge-body-en"
+                }, "内容（英文）"), f.a.createElement(L, {
+                    key: this.key + "-en",
+                    style: {
+                        height: "500px"
+                    },
+                    renderHTML: e=>A.render(e),
+                    value: n.body_en,
+                    onChange: e=>this.formChange("body_en", e.text),
                     config: {
                         view: {
                             menu: !0,

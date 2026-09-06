@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Knowledge;
 use App\Models\User;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 
@@ -16,16 +17,18 @@ class KnowledgeController extends Controller
         if ($request->input('id')) {
             $knowledge = Knowledge::where('id', $request->input('id'))
                 ->where('show', 1)
-                ->first()
-                ->toArray();
+                ->first();
             if (!$knowledge) abort(500, __('Article does not exist'));
+            ContentLocale::localize($knowledge, ['title', 'category', 'body'], $request);
+            $knowledge = $knowledge->toArray();
             $user = User::find($request->user['id']);
             $userService = new UserService();
             if (!$userService->isAvailable($user)) {
                 $this->formatAccessData($knowledge['body']);
             }
             $subscribeUrl = Helper::getSubscribeUrl($user['token']);
-            $knowledge['body'] = str_replace('{{siteName}}', config('v2board.app_name', 'V2Board'), $knowledge['body']);
+            $siteName = ContentLocale::value(config('v2board.app_name', 'V2Board'), config('v2board.app_name_en'), $request);
+            $knowledge['body'] = str_replace('{{siteName}}', $siteName, $knowledge['body']);
             $knowledge['body'] = str_replace('{{subscribeUrl}}', $subscribeUrl, $knowledge['body']);
             $knowledge['body'] = str_replace('{{urlEncodeSubscribeUrl}}', urlencode($subscribeUrl), $knowledge['body']);
             $knowledge['body'] = str_replace(
@@ -42,20 +45,25 @@ class KnowledgeController extends Controller
                 'data' => $knowledge
             ]);
         }
-        $builder = Knowledge::select(['id', 'category', 'title', 'updated_at'])
-            ->where('language', $request->input('language'))
+        $builder = Knowledge::select(['id', 'category', 'category_en', 'title', 'title_en', 'updated_at'])
+            ->where('language', 'zh-CN')
             ->where('show', 1)
             ->orderBy('sort', 'ASC');
         $keyword = $request->input('keyword');
         if ($keyword) {
             $builder = $builder->where(function ($query) use ($keyword) {
                 $query->where('title', 'LIKE', "%{$keyword}%")
-                    ->orWhere('body', 'LIKE', "%{$keyword}%");
+                    ->orWhere('body', 'LIKE', "%{$keyword}%")
+                    ->orWhere('title_en', 'LIKE', "%{$keyword}%")
+                    ->orWhere('body_en', 'LIKE', "%{$keyword}%");
             });
         }
 
-        $knowledges = $builder->get()
-            ->groupBy('category');
+        $knowledges = $builder->get();
+        $knowledges->each(function ($knowledge) use ($request) {
+            ContentLocale::localize($knowledge, ['title', 'category'], $request);
+        });
+        $knowledges = $knowledges->groupBy('category');
         return response([
             'data' => $knowledges
         ]);

@@ -3,6 +3,7 @@
     var root;
     var tab = "overview";
     var responseCache = {};
+    var listState = { relations: { current: 1, pageSize: 20, keyword: "", status: "" }, rewards: { current: 1, pageSize: 20, keyword: "", status: "", type: "", from: "", to: "" } };
     var dashboardPreloaded = false;
     var previousHeaderTitle = null;
 
@@ -33,6 +34,9 @@
         if (row.reward_type === "effective_invite") return "-";
         return row.reward_type === "level" ? row.reward_value + "%" : "¥" + money(row.reward_value);
     }
+    function rewardStatus(value) {
+        return ({ pending: "待发放", granted: "已发放", reversed: "已撤销", rejected: "已拒绝" })[value] || value || "-";
+    }
     function field(name, label, value, type) { return '<div class="form-group"><label>' + label + '</label><input class="form-control" name="' + name + '" type="' + (type || "number") + '" value="' + esc(value == null ? "" : value) + '"></div>'; }
     function cachedApi(path) {
         var cached = responseCache[path];
@@ -49,6 +53,7 @@
         return promise;
     }
     function clearCache(path) { if (path) delete responseCache[path]; else responseCache = {}; }
+    function queryString(data) { return Object.keys(data).filter(function (key) { return data[key] !== "" && data[key] !== null; }).map(function (key) { return encodeURIComponent(key) + "=" + encodeURIComponent(data[key]); }).join("&"); }
 
     function setMenuActive(active) {
         document.querySelectorAll(".referral-admin-menu-link").forEach(function (link) {
@@ -132,14 +137,21 @@
     }
 
     function editRule(kind, row) {
-        row=row||{}; var milestone=kind==='milestone'; var data={id:row.id||undefined,name:prompt('名称',row.name||'')}; if(!data.name)return;
-        data.required_invites=Number(prompt('所需有效邀请人数',row.required_invites||0)); data.enabled=confirm('是否启用这条规则？')?1:0;
-        if(milestone){data.reward_type=confirm('确定=账户余额，取消=推广佣金')?'balance':'commission_balance';data.reward_value=Math.round(Number(prompt('奖励金额（元）',money(row.reward_value))||0)*100);}else{data.commission_rate=Number(prompt('返佣比例（%）',row.commission_rate||10));}
-        api('/'+kind+'/save',{method:'POST',body:JSON.stringify(data)}).then(function(){clearCache(kind === 'level' ? '/levels' : '/milestones');loadTab();}).catch(function(e){alert(e.message);});
+        row=row||{}; var milestone=kind==='milestone';
+        var modal=document.createElement('div');modal.className='referral-modal';
+        modal.innerHTML='<div class="referral-modal-dialog"><div class="referral-modal-head"><h3>'+(row.id?'编辑':'新增')+(milestone?'里程碑':'推广等级')+'</h3><button type="button" data-cancel>×</button></div><form><div class="referral-modal-body">'+
+            '<div class="form-group"><label>名称</label><input class="form-control" name="name" required maxlength="100" value="'+esc(row.name||'')+'"></div>'+field('required_invites','所需有效邀请人数',row.required_invites||0)+
+            (milestone?'<div class="form-group"><label>奖励类型</label><select class="form-control" name="reward_type"><option value="balance" '+(row.reward_type==='balance'?'selected':'')+'>账户余额</option><option value="commission_balance" '+(row.reward_type==='commission_balance'?'selected':'')+'>推广佣金</option></select></div>'+field('reward_value','奖励金额（元）',row.id?money(row.reward_value):'') : field('commission_rate','返佣比例（%）',row.commission_rate||10))+
+            '<div class="custom-control custom-switch"><input class="custom-control-input" id="referral-rule-enabled" name="enabled" type="checkbox" '+(row.enabled===0?'':'checked')+'><label class="custom-control-label" for="referral-rule-enabled">启用规则</label></div></div><div class="referral-modal-foot"><button class="btn btn-light" type="button" data-cancel>取消</button><button class="btn btn-primary" type="submit">保存</button></div></form></div>';
+        root.appendChild(modal);modal.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){modal.remove();};});
+        modal.querySelector('form').onsubmit=function(event){event.preventDefault();var form=new FormData(event.target);var data=Object.fromEntries(form.entries());if(row.id)data.id=row.id;data.required_invites=Number(data.required_invites||0);data.enabled=event.target.enabled.checked?1:0;if(milestone)data.reward_value=Math.round(Number(data.reward_value||0)*100);else data.commission_rate=Number(data.commission_rate||0);var submit=event.target.querySelector('[type="submit"]');submit.disabled=true;api('/'+kind+'/save',{method:'POST',body:JSON.stringify(data)}).then(function(){clearCache(kind==='level'?'/levels':'/milestones');modal.remove();loadTab();}).catch(function(e){submit.disabled=false;alert(e.message);});};
     }
 
-    function loadRelations(){cachedApi('/relations').then(function(p){if(tab !== 'relations')return;content(table(['受邀用户','邀请人','注册时间','状态'],p.data.map(function(x){return [x.email,x.inviter_email,dateTime(x.created_at),x.effective?'有效邀请':'待首购'];})));}).catch(fail);}
-    function loadRewards(){cachedApi('/rewards').then(function(p){if(tab !== 'rewards')return;content(table(['用户','来源用户','类型','奖励','说明','时间'],p.data.map(function(x){return [x.user_email,x.invited_user_email,rewardType(x.reward_type),rewardValue(x),x.description,dateTime(x.created_at)];})));}).catch(fail);}
+    function loadRelations(){var state=listState.relations;api('/relations?'+queryString(state)).then(function(p){if(tab!=='relations')return;content('<div class="referral-filters"><input class="form-control" name="keyword" placeholder="搜索用户或邀请人邮箱" value="'+esc(state.keyword)+'"><select class="form-control" name="status"><option value="">全部状态</option><option value="effective" '+(state.status==='effective'?'selected':'')+'>有效邀请</option><option value="pending" '+(state.status==='pending'?'selected':'')+'>待首购</option></select><button class="btn btn-primary" data-search>查询</button></div>'+table(['受邀用户','邀请人','注册时间','状态'],p.data.map(function(x){return [x.email,x.inviter_email,dateTime(x.created_at),x.effective?'有效邀请':'待首购'];}))+pagination('relations',p.total));bindListControls('relations');}).catch(fail);}
+    function loadRewards(){var state=listState.rewards;api('/rewards?'+queryString(state)).then(function(p){if(tab!=='rewards')return;content('<div class="referral-filters"><input class="form-control" name="keyword" placeholder="搜索用户邮箱" value="'+esc(state.keyword)+'"><select class="form-control" name="type"><option value="">全部类型</option><option value="effective_invite">有效邀请</option><option value="balance">账户余额奖励</option><option value="commission_balance">佣金奖励</option><option value="level">推广等级调整</option></select><select class="form-control" name="status"><option value="">全部状态</option><option value="granted">已发放</option><option value="pending">待发放</option><option value="reversed">已撤销</option><option value="rejected">已拒绝</option></select><input class="form-control" name="from" type="date" value="'+esc(state.from)+'"><input class="form-control" name="to" type="date" value="'+esc(state.to)+'"><button class="btn btn-primary" data-search>查询</button></div>'+table(['用户','来源用户','类型','奖励','状态','说明','时间','操作'],p.data.map(function(x){return [x.user_email,x.invited_user_email,rewardType(x.reward_type),rewardValue(x),rewardStatus(x.status),x.description,dateTime(x.created_at),''];}))+pagination('rewards',p.total));['type','status'].forEach(function(k){var el=root.querySelector('[name="'+k+'"]');if(el)el.value=state[k];});root.querySelectorAll('tbody tr').forEach(function(tr,index){var row=p.data[index],cell=tr.lastElementChild;if(row&&row.status==='granted'&&row.order_id){cell.innerHTML='<button class="btn btn-sm btn-light text-danger" data-reverse>撤销</button>';cell.querySelector('[data-reverse]').onclick=function(){reverseReward(row);};}else cell.textContent='-';});bindListControls('rewards');}).catch(fail);}
+    function pagination(kind,total){var state=listState[kind],pages=Math.max(Math.ceil(total/state.pageSize),1);return '<div class="referral-pagination"><span>共 '+total+' 条</span><button class="btn btn-light" data-page="'+(state.current-1)+'" '+(state.current<=1?'disabled':'')+'>上一页</button><span>'+state.current+' / '+pages+'</span><button class="btn btn-light" data-page="'+(state.current+1)+'" '+(state.current>=pages?'disabled':'')+'>下一页</button></div>';}
+    function bindListControls(kind){var state=listState[kind];root.querySelector('[data-search]').onclick=function(){root.querySelectorAll('.referral-filters [name]').forEach(function(el){state[el.name]=el.value.trim();});state.current=1;loadTab();};root.querySelectorAll('[data-page]').forEach(function(button){button.onclick=function(){state.current=Number(button.dataset.page);loadTab();};});}
+    function reverseReward(row){var modal=document.createElement('div');modal.className='referral-modal';modal.innerHTML='<div class="referral-modal-dialog"><div class="referral-modal-head"><h3>撤销订单相关奖励</h3><button type="button" data-cancel>×</button></div><form><div class="referral-modal-body"><div class="alert alert-warning">本操作会撤销该订单产生的全部邀请奖励，并扣回已发放余额。余额不足时系统会拒绝操作。</div><div class="form-group"><label>撤销原因</label><textarea class="form-control" name="reason" maxlength="200" rows="3" required placeholder="例如：订单退款"></textarea></div></div><div class="referral-modal-foot"><button class="btn btn-light" type="button" data-cancel>取消</button><button class="btn btn-danger" type="submit">确认撤销</button></div></form></div>';root.appendChild(modal);modal.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){modal.remove();};});modal.querySelector('form').onsubmit=function(event){event.preventDefault();var submit=event.target.querySelector('[type="submit"]');submit.disabled=true;api('/reward/reverse',{method:'POST',body:JSON.stringify({id:row.id,reason:event.target.reason.value.trim()})}).then(function(){modal.remove();loadRewards();}).catch(function(e){submit.disabled=false;alert(e.message);});};}
     function table(heads,rows){return '<div class="block block-rounded"><div class="block-content p-0"><div class="table-responsive"><table class="table table-hover table-vcenter mb-0"><thead><tr>'+heads.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(x){return '<td>'+esc(x)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div></div></div>';}
 
     function mountSidebarMenu() {

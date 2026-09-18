@@ -9,10 +9,54 @@ use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 class ReferralProgramService
 {
+    public function reverseOrderRewards(int $orderId, string $reason = ''): int
+    {
+        if (!Schema::hasTable('v2_referral_reward')) return 0;
+
+        $count = DB::transaction(function () use ($orderId, $reason) {
+            $rewards = ReferralReward::where('order_id', $orderId)
+                ->where('status', 'granted')
+                ->lockForUpdate()
+                ->get();
+            if ($rewards->isEmpty()) return 0;
+
+            foreach ($rewards as $reward) {
+                if (in_array($reward->reward_type, ['balance', 'commission_balance'], true) && $reward->reward_value > 0) {
+                    $user = User::where('id', $reward->user_id)->lockForUpdate()->first();
+                    if (!$user) throw new \RuntimeException('奖励用户不存在，无法撤销');
+                    $field = $reward->reward_type === 'commission_balance' ? 'commission_balance' : 'balance';
+                    if ((int)$user->{$field} < (int)$reward->reward_value) {
+                        throw new \RuntimeException('用户可用余额不足，无法自动撤销奖励');
+                    }
+                    $user->{$field} -= (int)$reward->reward_value;
+                    $user->save();
+                }
+                $reward->status = 'reversed';
+                $reward->description = trim(($reward->description ?: '') . ($reason ? '；撤销原因：' . $reason : '；管理员撤销'));
+                $reward->save();
+            }
+
+            foreach ($rewards->where('reward_type', 'level')->pluck('user_id')->unique() as $userId) {
+                $user = User::where('id', $userId)->lockForUpdate()->first();
+                if (!$user) continue;
+                $remainingRate = (int)ReferralReward::where('user_id', $userId)
+                    ->where('reward_type', 'level')->where('status', 'granted')->max('reward_value');
+                $setting = $this->setting();
+                $user->commission_rate = $remainingRate ?: (int)($setting ? $setting->base_commission_rate : config('v2board.invite_commission', 10));
+                $user->save();
+            }
+
+            return $rewards->count();
+        });
+        Cache::forget('admin_referral_dashboard');
+        return $count;
+    }
+
     public function setting()
     {
         if (!Schema::hasTable('v2_referral_setting')) return null;
@@ -37,10 +81,9 @@ class ReferralProgramService
 
         DB::transaction(function () use ($order, $setting) {
             $effectiveKey = 'effective_invite:' . $order->user_id;
-            if (ReferralReward::where('event_key', $effectiveKey)->lockForUpdate()->exists()) return;
-
-            ReferralReward::create([
-                'event_key' => $effectiveKey,
+            $effectiveReward = ReferralReward::where('event_key', $effectiveKey)->lockForUpdate()->first();
+            if ($effectiveReward && $effectiveReward->status !== 'reversed') return;
+            $effectiveData = [
                 'user_id' => $order->invite_user_id,
                 'invited_user_id' => $order->user_id,
                 'order_id' => $order->id,
@@ -48,7 +91,9 @@ class ReferralProgramService
                 'status' => 'granted',
                 'description' => '好友完成首笔有效订单',
                 'granted_at' => time(),
-            ]);
+            ];
+            if ($effectiveReward) $effectiveReward->fill($effectiveData)->save();
+            else ReferralReward::create(array_merge(['event_key' => $effectiveKey], $effectiveData));
 
             if ($setting->invitee_reward > 0) {
                 $this->grantMoney(
@@ -68,6 +113,7 @@ class ReferralProgramService
             $this->grantMilestones($order, $effectiveCount, $setting);
             $this->upgradeLevel($order->invite_user_id, $effectiveCount, $order);
         });
+        Cache::forget('admin_referral_dashboard');
     }
 
     private function grantMilestones(Order $order, int $effectiveCount, ReferralSetting $setting): void
@@ -100,7 +146,7 @@ class ReferralProgramService
         if (!$user || (int)$user->commission_rate >= (int)$level->commission_rate) return;
         $user->commission_rate = $level->commission_rate;
         $user->save();
-        ReferralReward::firstOrCreate(['event_key' => 'level:' . $level->id . ':' . $userId], [
+        ReferralReward::updateOrCreate(['event_key' => 'level:' . $level->id . ':' . $userId], [
             'user_id' => $userId,
             'invited_user_id' => $order->user_id,
             'order_id' => $order->id,
@@ -114,12 +160,13 @@ class ReferralProgramService
 
     private function grantMoney($user, string $type, int $amount, string $eventKey, Order $order, string $description): void
     {
-        if (!$user || $amount <= 0 || ReferralReward::where('event_key', $eventKey)->exists()) return;
+        if (!$user || $amount <= 0) return;
+        $existing = ReferralReward::where('event_key', $eventKey)->lockForUpdate()->first();
+        if ($existing && $existing->status !== 'reversed') return;
         if ($type === 'commission_balance') $user->commission_balance += $amount;
         else $user->balance += $amount;
         $user->save();
-        ReferralReward::create([
-            'event_key' => $eventKey,
+        $data = [
             'user_id' => $user->id,
             'invited_user_id' => $order->user_id,
             'order_id' => $order->id,
@@ -128,7 +175,9 @@ class ReferralProgramService
             'status' => 'granted',
             'description' => $description,
             'granted_at' => time(),
-        ]);
+        ];
+        if ($existing) $existing->fill($data)->save();
+        else ReferralReward::create(array_merge(['event_key' => $eventKey], $data));
     }
 
     private function withinMonthlyLimit(int $userId, int $amount, ReferralSetting $setting): bool

@@ -9,26 +9,29 @@ use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\User;
+use App\Services\ReferralProgramService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ReferralController extends Controller
 {
     public function dashboard()
     {
-        $invitees = User::whereNotNull('invite_user_id')->count();
-        $effective = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')->count();
-        $revenue = Order::whereNotNull('invite_user_id')->where('status', 3)->sum('total_amount');
-        $rewards = ReferralReward::whereIn('reward_type', ['balance', 'commission_balance'])
-            ->where('status', 'granted')->sum('reward_value');
-        return response(['data' => [
-            'setting' => ReferralSetting::current(),
-            'registered_invites' => $invitees,
-            'effective_invites' => $effective,
-            'conversion_rate' => $invitees ? round($effective * 100 / $invitees, 2) : 0,
-            'referral_revenue' => (int)$revenue,
-            'reward_total' => (int)$rewards,
-            'active_promoters' => User::whereIn('id', ReferralReward::where('reward_type', 'effective_invite')->pluck('user_id')->unique())->count(),
-        ]]);
+        $data = Cache::remember('admin_referral_dashboard', 30, function () {
+            $invitees = User::whereNotNull('invite_user_id')->count();
+            $effectiveQuery = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted');
+            $effective = (clone $effectiveQuery)->count();
+            return [
+                'setting' => ReferralSetting::current(),
+                'registered_invites' => $invitees,
+                'effective_invites' => $effective,
+                'conversion_rate' => $invitees ? round($effective * 100 / $invitees, 2) : 0,
+                'referral_revenue' => (int)Order::whereNotNull('invite_user_id')->where('status', 3)->sum('total_amount'),
+                'reward_total' => (int)ReferralReward::whereIn('reward_type', ['balance', 'commission_balance'])->where('status', 'granted')->sum('reward_value'),
+                'active_promoters' => (clone $effectiveQuery)->distinct()->count('user_id'),
+            ];
+        });
+        return response(['data' => $data]);
     }
 
     public function saveSetting(Request $request)
@@ -44,6 +47,7 @@ class ReferralController extends Controller
         $setting = ReferralSetting::first();
         if ($setting) $setting->update($data);
         else $setting = ReferralSetting::create($data);
+        Cache::forget('admin_referral_dashboard');
         return response(['data' => $setting]);
     }
 
@@ -99,6 +103,15 @@ class ReferralController extends Controller
         $pageSize = min(max((int)$request->input('pageSize', 20), 1), 100);
         $builder = ReferralReward::orderBy('id', 'DESC');
         if ($request->input('status')) $builder->where('status', $request->input('status'));
+        if ($request->input('type')) $builder->where('reward_type', $request->input('type'));
+        if ($request->input('keyword')) {
+            $userIds = User::where('email', 'like', '%' . trim($request->input('keyword')) . '%')->pluck('id');
+            $builder->where(function ($query) use ($userIds) {
+                $query->whereIn('user_id', $userIds)->orWhereIn('invited_user_id', $userIds);
+            });
+        }
+        if ($request->input('from')) $builder->where('created_at', '>=', strtotime($request->input('from')) ?: 0);
+        if ($request->input('to')) $builder->where('created_at', '<', (strtotime($request->input('to')) ?: time()) + 86400);
         $total = $builder->count();
         $rows = $builder->forPage(max((int)$request->input('current', 1), 1), $pageSize)->get();
         $users = User::whereIn('id', $rows->pluck('user_id')->merge($rows->pluck('invited_user_id'))->filter()->unique())
@@ -110,10 +123,38 @@ class ReferralController extends Controller
         return response(['data' => $rows, 'total' => $total]);
     }
 
+    public function reverseReward(Request $request, ReferralProgramService $service)
+    {
+        $data = $request->validate([
+            'id' => 'required|integer',
+            'reason' => 'nullable|string|max:200',
+        ]);
+        $reward = ReferralReward::findOrFail($data['id']);
+        if (!$reward->order_id) abort(422, '该流水没有关联订单，无法按订单撤销');
+        try {
+            $count = $service->reverseOrderRewards((int)$reward->order_id, trim($data['reason'] ?? ''));
+        } catch (\RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        return response(['data' => ['reversed' => $count]]);
+    }
+
     public function relations(Request $request)
     {
         $pageSize = min(max((int)$request->input('pageSize', 20), 1), 100);
         $builder = User::whereNotNull('invite_user_id')->orderBy('id', 'DESC');
+        if ($request->input('keyword')) {
+            $keyword = trim($request->input('keyword'));
+            $inviterIds = User::where('email', 'like', '%' . $keyword . '%')->pluck('id');
+            $builder->where(function ($query) use ($keyword, $inviterIds) {
+                $query->where('email', 'like', '%' . $keyword . '%')->orWhereIn('invite_user_id', $inviterIds);
+            });
+        }
+        if ($request->input('status') === 'effective') {
+            $builder->whereIn('id', ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')->pluck('invited_user_id'));
+        } elseif ($request->input('status') === 'pending') {
+            $builder->whereNotIn('id', ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')->pluck('invited_user_id'));
+        }
         $total = $builder->count();
         $rows = $builder->forPage(max((int)$request->input('current', 1), 1), $pageSize)->get(['id', 'email', 'invite_user_id', 'created_at']);
         $inviters = User::whereIn('id', $rows->pluck('invite_user_id')->unique())->pluck('email', 'id');

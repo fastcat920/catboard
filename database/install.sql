@@ -76,7 +76,7 @@ CREATE TABLE `v2_referral_reward` (
   `reward_value` int unsigned NOT NULL DEFAULT '0', `status` enum('pending','granted','reversed','rejected') NOT NULL DEFAULT 'pending',
   `description` varchar(255) DEFAULT NULL, `meta` text, `granted_at` int unsigned DEFAULT NULL,
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `status` (`status`)
+  PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `status` (`status`), KEY `referral_type_status_created_idx` (`reward_type`,`status`,`created_at`), KEY `referral_order_status_idx` (`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -243,6 +243,7 @@ CREATE TABLE `v2_order` (
                             PRIMARY KEY (`id`),
                             UNIQUE KEY `trade_no` (`trade_no`),
                             INDEX idx_user (`user_id`),
+                            KEY `referral_order_status_inviter_idx` (`status`,`invite_user_id`),
                             INDEX idx_user_status (`user_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -661,7 +662,8 @@ CREATE TABLE `v2_user` (
                            PRIMARY KEY (`id`),
                            UNIQUE KEY `email` (`email`),
                            UNIQUE KEY `token` (`token`),
-                           KEY `deleted_at` (`deleted_at`)
+                           KEY `deleted_at` (`deleted_at`),
+                           KEY `referral_user_inviter_idx` (`invite_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 

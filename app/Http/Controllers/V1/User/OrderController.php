@@ -28,7 +28,8 @@ class OrderController extends Controller
         $user=User::findOrFail($request->user['id']);$order=new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$data['period'],'total_amount'=>$plan[$data['period']]]);(new OrderService($order))->setOrderType($user);$original=(int)$order->total_amount;
         $available=$couponService->available($user,$plan->id,$data['period'],$original,(int)$order->type);$selected=$request->boolean('disable_auto_coupon')?null:($request->input('user_coupon_id')?$available->firstWhere('id',(int)$request->input('user_coupon_id')):$available->first());
         if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$original-$couponDiscount;$vipDiscount=(!$selected||$selected->template->stackable)&&$user->discount?(int)round($afterCoupon*$user->discount/100):0;
-        return response(['data'=>['original_amount'=>$original,'coupon_discount'=>$couponDiscount,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available]]);
+        $unavailable=$couponService->unavailable($user,$plan->id,$data['period'],$original,(int)$order->type);
+        return response(['data'=>['original_amount'=>$original,'coupon_discount'=>$couponDiscount,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available,'unavailable_coupons'=>$unavailable]]);
     }
 
     public function fetch(Request $request)

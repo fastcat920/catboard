@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class CouponWalletService
 {
+    private $paidOrderCache = [];
     public function issue(CouponTemplate $template, User $user, string $source, string $reference): ?UserCoupon
     {
         return DB::transaction(function () use ($template, $user, $source, $reference) {
@@ -40,9 +41,17 @@ class CouponWalletService
     {
         $this->refreshStatuses($user->id);
         return UserCoupon::with('template')->where('user_id', $user->id)->where('status', 'available')->get()
-            ->filter(function ($coupon) use ($user, $planId, $period, $amount, $orderType) { return $this->eligible($coupon, $user, $planId, $period, $amount, $orderType); })
+            ->filter(function ($coupon) use ($user, $planId, $period, $amount, $orderType) { return $this->eligibilityReason($coupon, $user, $planId, $period, $amount, $orderType)===null; })
             ->map(function ($coupon) use ($amount) { $coupon->calculated_discount = $this->discount($coupon->template, $amount); return $coupon; })
             ->sort(function ($a, $b) { return $a->calculated_discount === $b->calculated_discount ? $a->expires_at <=> $b->expires_at : $b->calculated_discount <=> $a->calculated_discount; })->values();
+    }
+
+    public function unavailable(User $user, int $planId, string $period, int $amount, ?int $orderType = null)
+    {
+        $this->refreshStatuses($user->id);
+        return UserCoupon::with('template')->where('user_id',$user->id)->where('status','available')->get()
+            ->map(function($coupon)use($user,$planId,$period,$amount,$orderType){$coupon->unavailable_reason=$this->eligibilityReason($coupon,$user,$planId,$period,$amount,$orderType);return $coupon;})
+            ->filter(function($coupon){return $coupon->unavailable_reason!==null;})->values();
     }
 
     public function lockForOrder(Order $order, User $user, ?int $selectedId, bool $disableAuto): ?UserCoupon
@@ -93,15 +102,17 @@ class CouponWalletService
         });
     }
 
-    private function eligible(UserCoupon $coupon, User $user, int $planId, string $period, int $amount, ?int $orderType): bool
+    private function eligibilityReason(UserCoupon $coupon, User $user, int $planId, string $period, int $amount, ?int $orderType): ?string
     {
-        $t=$coupon->template; if(!$t || $amount<$t->minimum_amount) return false;
-        if($t->plan_ids && !in_array($planId,array_map('intval',$t->plan_ids),true)) return false;
-        if($t->periods && !in_array($period,$t->periods,true)) return false;
-        $hasPaid=Order::where('user_id',$user->id)->where('status',3)->where('plan_id','>',0)->exists();
-        if(($t->first_order_only || $t->new_user_only) && $hasPaid) return false;
-        if(!$t->allow_renewal && (int)$orderType===2) return false;
-        return true;
+        $t=$coupon->template;if(!$t||!$t->enabled)return 'template_disabled';
+        if($amount<$t->minimum_amount)return 'minimum_amount';
+        if($t->plan_ids && !in_array($planId,array_map('intval',$t->plan_ids),true))return 'plan_not_supported';
+        if($t->periods && !in_array($period,$t->periods,true))return 'period_not_supported';
+        if(!array_key_exists($user->id,$this->paidOrderCache))$this->paidOrderCache[$user->id]=Order::where('user_id',$user->id)->where('status',3)->where('plan_id','>',0)->exists();
+        $hasPaid=$this->paidOrderCache[$user->id];
+        if(($t->first_order_only || $t->new_user_only) && $hasPaid)return 'first_order_only';
+        if(!$t->allow_renewal && (int)$orderType===2)return 'renewal_not_supported';
+        return null;
     }
     private function discount(CouponTemplate $t,int $amount): int { $value=$t->discount_type==='fixed'?$t->discount_value:(int)round($amount*$t->discount_value/100); if($t->maximum_discount)$value=min($value,$t->maximum_discount); return min($amount,max(0,$value)); }
     private function refreshStatuses(int $userId): void { UserCoupon::where('user_id',$userId)->where('status','pending')->where('starts_at','<=',time())->update(['status'=>'available','updated_at'=>time()]); UserCoupon::where('user_id',$userId)->whereIn('status',['pending','available'])->where('expires_at','<',time())->update(['status'=>'expired','updated_at'=>time()]); }

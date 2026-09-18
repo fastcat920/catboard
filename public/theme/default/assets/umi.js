@@ -33123,7 +33123,8 @@
                     className: "sr-only"
                 }, "Loading...")) : t.renew || u.plan_id !== t.id ? f.a.createElement("div", {
                     className: "row",
-                    id: "cashier"
+                    id: "cashier",
+                    "data-coupon-plan": t.id
                 }, f.a.createElement("div", {
                     className: "col-md-8 col-sm-12"
                 }, f.a.createElement("div", {
@@ -33180,6 +33181,7 @@
                 }, Object.keys(h["a"].periodText).map(e=>{
                     if ("reset_price" !== e)
                         return null !== t[e] ? f.a.createElement("div", {
+                            "data-coupon-period": e,
                             onClick: ()=>this.props.dispatch({
                                 type: "plan/setState",
                                 payload: {

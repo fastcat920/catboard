@@ -19,15 +19,6 @@
     align-items: center;
     flex-wrap: wrap;
 }
-.coupon-preference {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-}
-.coupon-preference .form-control {
-    width: auto;
-}
 .coupon-list {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -88,9 +79,5 @@
     .coupon-card {
         align-items: flex-start;
         flex-wrap: wrap;
-    }
-    .coupon-preference {
-        width: 100%;
-        margin-left: 0;
     }
 }

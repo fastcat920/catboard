@@ -25,7 +25,8 @@ class CouponController extends Controller
         $order=new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$data['period'],'total_amount'=>$plan[$data['period']]]);
         (new OrderService($order))->setOrderType($user);
         $coupons=$service->available($user,$plan->id,$data['period'],(int)$order->total_amount,(int)$order->type);
-        return response(['data'=>['original_amount'=>(int)$order->total_amount,'recommended'=>$coupons->first(),'available_coupons'=>$coupons]]);
+        $unavailable=$service->unavailable($user,$plan->id,$data['period'],(int)$order->total_amount,(int)$order->type);
+        return response(['data'=>['original_amount'=>(int)$order->total_amount,'recommended'=>$coupons->first(),'available_coupons'=>$coupons,'unavailable_coupons'=>$unavailable]]);
     }
 
 }

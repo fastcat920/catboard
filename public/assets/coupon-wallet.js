@@ -46,6 +46,21 @@
             }[v] || v
         );
     }
+    function sourceLabel(source) {
+        var labels = {
+            manual: ["后台手动发放", "Manual issuance"],
+            newcomer: ["新人邀请奖励", "Newcomer referral reward"],
+            referral_newcomer: ["新人邀请奖励", "Newcomer referral reward"],
+            distribution_task: [
+                "平台批量发放",
+                "Platform bulk distribution",
+            ],
+            campaign: ["邀请活动奖励", "Referral campaign reward"],
+        };
+        return labels[source]
+            ? text(labels[source][0], labels[source][1])
+            : source;
+    }
     function open() {
         if (!root || !root.isConnected) {
             root = document.createElement("div");
@@ -74,9 +89,7 @@
                                   x.status,
                               ) >= 0
                             : x.status === current;
-                    }),
-                    preference =
-                        localStorage.getItem("coupon_preference") || "auto";
+                    });
                 root.innerHTML =
                     '<div class="coupon-wallet-shell"><div class="block"><div class="block-header block-header-default"><h3 class="block-title">' +
                     text("我的优惠券", "My coupons") +
@@ -92,13 +105,7 @@
                     (current === "history" ? "btn-primary" : "btn-light") +
                     '" data-status="history">' +
                     text("历史记录", "History") +
-                    '</button><div class="coupon-preference"><label>' +
-                    text("下单默认：", "Checkout default:") +
-                    '</label><select class="form-control" data-preference><option value="auto">' +
-                    text("自动选择最优惠", "Auto-select best") +
-                    '</option><option value="none">' +
-                    text("不使用优惠券", "Do not use") +
-                    '</option></select></div></div><div class="coupon-list">' +
+                    '</button></div><div class="coupon-list">' +
                     (shown.length
                         ? shown
                               .map(function (x) {
@@ -137,15 +144,8 @@
                                       "</span><small>" +
                                       status(x.status) +
                                       " · " +
-                                      esc(x.source) +
+                                      esc(sourceLabel(x.source)) +
                                       "</small></div>" +
-                                      (x.status === "available"
-                                          ? '<button class="btn btn-sm btn-light" data-prefer="' +
-                                            x.id +
-                                            '">' +
-                                            text("优先使用", "Prefer") +
-                                            "</button>"
-                                          : "") +
                                       "</article>"
                                   );
                               })
@@ -157,36 +157,6 @@
                 root.querySelectorAll("[data-status]").forEach(function (b) {
                     b.onclick = function () {
                         current = b.dataset.status;
-                        load();
-                    };
-                });
-                var select = root.querySelector("[data-preference]");
-                if (/^coupon:/.test(preference)) {
-                    var id = preference.split(":")[1],
-                        coupon = rows.find(function (x) {
-                            return (
-                                String(x.id) === id && x.status === "available"
-                            );
-                        });
-                    if (coupon) {
-                        var o = document.createElement("option");
-                        o.value = preference;
-                        o.textContent =
-                            text("优先：", "Prefer: ") +
-                            (coupon.template && coupon.template.name);
-                        select.appendChild(o);
-                    }
-                }
-                select.value = preference;
-                select.onchange = function () {
-                    localStorage.setItem("coupon_preference", select.value);
-                };
-                root.querySelectorAll("[data-prefer]").forEach(function (b) {
-                    b.onclick = function () {
-                        localStorage.setItem(
-                            "coupon_preference",
-                            "coupon:" + b.dataset.prefer,
-                        );
                         load();
                     };
                 });
@@ -223,42 +193,6 @@
             };
         }
     }
-    var originalOpen = XMLHttpRequest.prototype.open,
-        originalSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.open = function (method, url) {
-        this.__couponOrderSave =
-            typeof url === "string" && url.indexOf("/user/order/save") >= 0;
-        return originalOpen.apply(this, arguments);
-    };
-    XMLHttpRequest.prototype.send = function (body) {
-        if (this.__couponOrderSave) {
-            var pref = localStorage.getItem("coupon_preference") || "auto";
-            try {
-                if (body instanceof FormData) {
-                    if (pref === "none")
-                        body.append("disable_auto_coupon", "1");
-                    else if (/^coupon:/.test(pref))
-                        body.append("user_coupon_id", pref.split(":")[1]);
-                } else if (typeof body === "string") {
-                    var data;
-                    try {
-                        data = JSON.parse(body);
-                        if (pref === "none") data.disable_auto_coupon = true;
-                        else if (/^coupon:/.test(pref))
-                            data.user_coupon_id = Number(pref.split(":")[1]);
-                        body = JSON.stringify(data);
-                    } catch (e) {
-                        var q = new URLSearchParams(body);
-                        if (pref === "none") q.set("disable_auto_coupon", "1");
-                        else if (/^coupon:/.test(pref))
-                            q.set("user_coupon_id", pref.split(":")[1]);
-                        body = q.toString();
-                    }
-                }
-            } catch (e) {}
-        }
-        return originalSend.call(this, body);
-    };
     function start() {
         mount();
         document.addEventListener("click", function (e) {

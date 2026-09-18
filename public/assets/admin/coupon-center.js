@@ -37,6 +37,19 @@
               })
             : "-";
     }
+    function sourceLabel(source) {
+        return (
+            {
+                manual: "后台手动发放 / Manual issuance",
+                newcomer: "新人邀请奖励 / Newcomer referral reward",
+                referral_newcomer:
+                    "新人邀请奖励 / Newcomer referral reward",
+                distribution_task:
+                    "平台批量发放 / Platform bulk distribution",
+                campaign: "邀请活动奖励 / Referral campaign reward",
+            }[source] || source
+        );
+    }
     function field(n, l, v, t) {
         return (
             '<div class="form-group"><label>' +
@@ -557,7 +570,7 @@
                                 return [
                                     x.user_email,
                                     x.template && x.template.name,
-                                    x.source,
+                                    sourceLabel(x.source),
                                     x.status,
                                     dt(x.starts_at),
                                     dt(x.expires_at),

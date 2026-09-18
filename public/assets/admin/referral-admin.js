@@ -2,6 +2,7 @@
     "use strict";
     var root;
     var tab = "overview";
+    var responseCache = {};
 
     function api(path, options) {
         options = options || {};
@@ -17,7 +18,26 @@
 
     function money(value) { return (Number(value || 0) / 100).toFixed(2); }
     function esc(value) { var d = document.createElement("div"); d.textContent = value == null ? "" : value; return d.innerHTML; }
+    function dateTime(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        var numeric = Number(value);
+        var date = Number.isFinite(numeric) ? new Date(numeric < 1000000000000 ? numeric * 1000 : numeric) : new Date(value);
+        return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("zh-CN", { hour12: false });
+    }
+    function rewardType(value) {
+        return ({ effective_invite: "有效邀请", balance: "账户余额奖励", commission_balance: "佣金奖励", level: "推广等级调整" })[value] || value || "-";
+    }
+    function rewardValue(row) {
+        if (row.reward_type === "effective_invite") return "-";
+        return row.reward_type === "level" ? row.reward_value + "%" : "¥" + money(row.reward_value);
+    }
     function field(name, label, value, type) { return '<div class="form-group"><label>' + label + '</label><input class="form-control" name="' + name + '" type="' + (type || "number") + '" value="' + esc(value == null ? "" : value) + '"></div>'; }
+    function cachedApi(path) {
+        var cached = responseCache[path];
+        if (cached && Date.now() - cached.time < 30000) return Promise.resolve(cached.payload);
+        return api(path).then(function (payload) { responseCache[path] = { time: Date.now(), payload: payload }; return payload; });
+    }
+    function clearCache(path) { if (path) delete responseCache[path]; else responseCache = {}; }
 
     function setMenuActive(active) {
         document.querySelectorAll(".referral-admin-menu-link").forEach(function (link) {
@@ -45,17 +65,25 @@
                 return '<button data-tab="' + item[0] + '" class="nav-link ' + (tab === item[0] ? "active" : "") + '">' + item[1] + '</button>';
             }).join("") + '</nav></div></div><main data-content><div class="block block-rounded"><div class="block-content referral-loading">加载中…</div></div></main></div>';
         root.querySelector("[data-close]").onclick = close;
-        root.querySelectorAll("[data-tab]").forEach(function (button) { button.onclick = function () { tab = button.dataset.tab; renderShell(); loadTab(); }; });
+        root.querySelectorAll("[data-tab]").forEach(function (button) { button.onclick = function () { switchTab(button.dataset.tab); }; });
     }
 
     function content(html) { root.querySelector("[data-content]").innerHTML = html; }
     function fail(error) { content('<div class="alert alert-danger">' + esc(error.message) + '</div>'); }
+    function switchTab(nextTab) {
+        if (tab === nextTab) return;
+        tab = nextTab;
+        root.querySelectorAll("[data-tab]").forEach(function (button) { button.classList.toggle("active", button.dataset.tab === tab); });
+        content('<div class="block block-rounded"><div class="block-content referral-loading">加载中…</div></div>');
+        loadTab();
+    }
     function loadTab() {
         ({ overview: loadOverview, setting: loadSetting, levels: loadLevels, milestones: loadMilestones, relations: loadRelations, rewards: loadRewards }[tab] || loadOverview)();
     }
 
     function loadOverview() {
-        api("/dashboard").then(function (payload) { var d = payload.data;
+        var requestedTab = tab;
+        cachedApi("/dashboard").then(function (payload) { if (tab !== requestedTab) return; var d = payload.data;
             content('<div class="referral-cards">' + [
                 ["邀请注册", d.registered_invites], ["有效邀请", d.effective_invites], ["首购转化率", d.conversion_rate + "%"],
                 ["邀请订单收入", "¥" + money(d.referral_revenue)], ["额外奖励支出", "¥" + money(d.reward_total)], ["活跃推广者", d.active_promoters]
@@ -64,52 +92,55 @@
     }
 
     function loadSetting() {
-        api("/dashboard").then(function (payload) { var s = payload.data.setting || {};
+        var requestedTab = tab;
+        cachedApi("/dashboard").then(function (payload) { if (tab !== requestedTab) return; var s = payload.data.setting || {};
             content('<div class="block block-rounded"><div class="block-header block-header-default"><h3 class="block-title">基础奖励规则</h3></div><div class="block-content"><form data-setting class="referral-form"><div class="custom-control custom-switch mb-4"><input class="custom-control-input" id="referral-enabled" name="enabled" type="checkbox" ' + (s.enabled ? "checked" : "") + '><label class="custom-control-label" for="referral-enabled">启用新版邀请计划</label></div>' +
                 field("first_order_min", "有效首单最低金额（分）", s.first_order_min) + field("invitee_reward", "被邀请人首单奖励（分）", s.invitee_reward) +
                 field("base_commission_rate", "基础返佣比例（%）", s.base_commission_rate) + field("freeze_days", "佣金冻结天数", s.freeze_days) +
                 field("monthly_reward_limit", "每人每月额外奖励上限（分，留空不限）", s.monthly_reward_limit) + '<button class="btn btn-primary" type="submit"><i class="fa fa-save mr-1"></i>保存规则</button></form></div></div>');
-            root.querySelector("[data-setting]").onsubmit = function (event) { event.preventDefault(); var f = new FormData(event.target); var data = Object.fromEntries(f.entries()); data.enabled = event.target.enabled.checked ? 1 : 0; ["first_order_min","invitee_reward","base_commission_rate","freeze_days"].forEach(function(k){data[k]=Number(data[k]||0);}); data.monthly_reward_limit = data.monthly_reward_limit === "" ? null : Number(data.monthly_reward_limit); api("/setting/save", { method:"POST", body:JSON.stringify(data) }).then(function(){ alert("保存成功"); loadSetting(); }).catch(function(e){alert(e.message);}); };
+            root.querySelector("[data-setting]").onsubmit = function (event) { event.preventDefault(); var f = new FormData(event.target); var data = Object.fromEntries(f.entries()); data.enabled = event.target.enabled.checked ? 1 : 0; ["first_order_min","invitee_reward","base_commission_rate","freeze_days"].forEach(function(k){data[k]=Number(data[k]||0);}); data.monthly_reward_limit = data.monthly_reward_limit === "" ? null : Number(data.monthly_reward_limit); api("/setting/save", { method:"POST", body:JSON.stringify(data) }).then(function(){ clearCache("/dashboard"); alert("保存成功"); loadSetting(); }).catch(function(e){alert(e.message);}); };
         }).catch(fail);
     }
 
-    function loadLevels() { api("/levels").then(function (p) { renderRuleTable("推广等级", p.data, "level", ["名称","有效邀请数","返佣比例"], function(x){return [x.name,x.required_invites,x.commission_rate+"%"];}); }).catch(fail); }
-    function loadMilestones() { api("/milestones").then(function (p) { renderRuleTable("里程碑奖励", p.data, "milestone", ["名称","有效邀请数","奖励"], function(x){return [x.name,x.required_invites,(x.reward_type === "balance" ? "余额 " : "佣金 ")+"¥"+money(x.reward_value)];}); }).catch(fail); }
+    function loadLevels() { cachedApi("/levels").then(function (p) { if(tab !== "levels") return; renderRuleTable("推广等级", p.data, "level", ["名称","有效邀请数","返佣比例"], function(x){return [x.name,x.required_invites,x.commission_rate+"%"];}); }).catch(fail); }
+    function loadMilestones() { cachedApi("/milestones").then(function (p) { if(tab !== "milestones") return; renderRuleTable("里程碑奖励", p.data, "milestone", ["名称","有效邀请数","奖励"], function(x){return [x.name,x.required_invites,(x.reward_type === "balance" ? "余额 " : "佣金 ")+"¥"+money(x.reward_value)];}); }).catch(fail); }
     function renderRuleTable(title, rows, kind, heads, values) {
         content('<div class="block block-rounded"><div class="block-header block-header-default"><h3 class="block-title">'+title+'</h3><button class="btn btn-sm btn-primary" data-add><i class="fa fa-plus mr-1"></i>新增</button></div><div class="block-content p-0"><div class="table-responsive"><table class="table table-hover table-vcenter mb-0"><thead><tr>'+heads.map(function(x){return '<th>'+x+'</th>';}).join('')+'<th>状态</th><th>操作</th></tr></thead><tbody>'+rows.map(function(row){return '<tr>'+values(row).map(function(x){return '<td>'+esc(x)+'</td>';}).join('')+'<td><span class="badge badge-'+(row.enabled?'success':'secondary')+'">'+(row.enabled?'启用':'停用')+'</span></td><td><button class="btn btn-sm btn-light" data-edit="'+row.id+'">编辑</button><button class="btn btn-sm btn-light text-danger" data-drop="'+row.id+'">删除</button></td></tr>';}).join('')+'</tbody></table></div></div></div>');
         root.querySelector('[data-add]').onclick=function(){ editRule(kind, null); };
         root.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){editRule(kind,rows.find(function(x){return String(x.id)===b.dataset.edit;}));};});
-        root.querySelectorAll('[data-drop]').forEach(function(b){b.onclick=function(){if(confirm('确认删除？'))api('/'+kind+'/drop',{method:'POST',body:JSON.stringify({id:Number(b.dataset.drop)})}).then(loadTab).catch(function(e){alert(e.message);});};});
+        root.querySelectorAll('[data-drop]').forEach(function(b){b.onclick=function(){if(confirm('确认删除？'))api('/'+kind+'/drop',{method:'POST',body:JSON.stringify({id:Number(b.dataset.drop)})}).then(function(){clearCache(kind === 'level' ? '/levels' : '/milestones');loadTab();}).catch(function(e){alert(e.message);});};});
     }
 
     function editRule(kind, row) {
         row=row||{}; var milestone=kind==='milestone'; var data={id:row.id||undefined,name:prompt('名称',row.name||'')}; if(!data.name)return;
         data.required_invites=Number(prompt('所需有效邀请人数',row.required_invites||0)); data.enabled=confirm('是否启用这条规则？')?1:0;
         if(milestone){data.reward_type=confirm('确定=账户余额，取消=推广佣金')?'balance':'commission_balance';data.reward_value=Math.round(Number(prompt('奖励金额（元）',money(row.reward_value))||0)*100);}else{data.commission_rate=Number(prompt('返佣比例（%）',row.commission_rate||10));}
-        api('/'+kind+'/save',{method:'POST',body:JSON.stringify(data)}).then(loadTab).catch(function(e){alert(e.message);});
+        api('/'+kind+'/save',{method:'POST',body:JSON.stringify(data)}).then(function(){clearCache(kind === 'level' ? '/levels' : '/milestones');loadTab();}).catch(function(e){alert(e.message);});
     }
 
-    function loadRelations(){api('/relations').then(function(p){content(table(['受邀用户','邀请人','注册时间','状态'],p.data.map(function(x){return [x.email,x.inviter_email,new Date(x.created_at*1000).toLocaleString(),x.effective?'有效邀请':'待首购'];})));}).catch(fail);}
-    function loadRewards(){api('/rewards').then(function(p){content(table(['用户','来源用户','类型','奖励','说明','时间'],p.data.map(function(x){return [x.user_email,x.invited_user_email,x.reward_type,x.reward_type==='level'?x.reward_value+'%':'¥'+money(x.reward_value),x.description,new Date(x.created_at*1000).toLocaleString()];})));}).catch(fail);}
+    function loadRelations(){cachedApi('/relations').then(function(p){if(tab !== 'relations')return;content(table(['受邀用户','邀请人','注册时间','状态'],p.data.map(function(x){return [x.email,x.inviter_email,dateTime(x.created_at),x.effective?'有效邀请':'待首购'];})));}).catch(fail);}
+    function loadRewards(){cachedApi('/rewards').then(function(p){if(tab !== 'rewards')return;content(table(['用户','来源用户','类型','奖励','说明','时间'],p.data.map(function(x){return [x.user_email,x.invited_user_email,rewardType(x.reward_type),rewardValue(x),x.description,dateTime(x.created_at)];})));}).catch(fail);}
     function table(heads,rows){return '<div class="block block-rounded"><div class="block-content p-0"><div class="table-responsive"><table class="table table-hover table-vcenter mb-0"><thead><tr>'+heads.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(x){return '<td>'+esc(x)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div></div></div>';}
 
     function mountSidebarMenu() {
         var nav = document.querySelector("#sidebar ul.nav-main");
         if (!nav) return false;
-        if (nav.querySelector(".referral-admin-menu-item")) return true;
-
-        var item = document.createElement("li");
-        item.className = "nav-main-item referral-admin-menu-item";
-        item.innerHTML = '<a class="nav-main-link referral-admin-menu-link" href="javascript:void(0);" title="邀请管理">' +
-            '<i class="nav-main-link-icon si si-present"></i>' +
-            '<span class="nav-main-link-name">邀请管理</span></a>';
-        item.querySelector("a").onclick = function (event) { event.preventDefault(); open(); };
-
         var subscriptionMenu = Array.prototype.find.call(nav.querySelectorAll(".nav-main-link-name"), function (name) {
             return name.textContent.trim() === "订阅管理";
         });
         var subscriptionItem = subscriptionMenu && subscriptionMenu.closest(".nav-main-item");
-        nav.insertBefore(item, subscriptionItem || null);
+        if (!subscriptionItem) return false;
+
+        var item = nav.querySelector(".referral-admin-menu-item");
+        if (!item) {
+            item = document.createElement("li");
+            item.className = "nav-main-item referral-admin-menu-item";
+            item.innerHTML = '<a class="nav-main-link referral-admin-menu-link" href="javascript:void(0);" title="邀请管理">' +
+                '<i class="nav-main-link-icon si si-present"></i>' +
+                '<span class="nav-main-link-name">邀请管理</span></a>';
+            item.querySelector("a").onclick = function (event) { event.preventDefault(); open(); };
+        }
+        if (item.nextElementSibling !== subscriptionItem) nav.insertBefore(item, subscriptionItem);
         return true;
     }
 

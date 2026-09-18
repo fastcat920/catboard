@@ -129,6 +129,7 @@ class AdminRoute
             $router->get ('/referral/rewards', 'V1\\Admin\\ReferralController@rewards');
             $router->post('/referral/reward/reverse', 'V1\\Admin\\ReferralController@reverseReward');
             $router->get ('/referral/relations', 'V1\\Admin\\ReferralController@relations');
+            $router->get ('/referral/audits', 'V1\\Admin\\ReferralController@audits');
             // Stat
             $router->get ('/stat/getStat', 'V1\\Admin\\StatController@getStat');
             $router->get ('/stat/getOverride', 'V1\\Admin\\StatController@getOverride');

@@ -19,6 +19,12 @@
     function esc(value) { var d = document.createElement("div"); d.textContent = value == null ? "" : value; return d.innerHTML; }
     function field(name, label, value, type) { return '<label>' + label + '<input name="' + name + '" type="' + (type || "number") + '" value="' + esc(value == null ? "" : value) + '"></label>'; }
 
+    function setMenuActive(active) {
+        document.querySelectorAll(".referral-admin-menu-link").forEach(function (link) {
+            link.classList.toggle("active", active);
+        });
+    }
+
     function open() {
         if (!root) {
             root = document.createElement("div");
@@ -26,11 +32,12 @@
             document.body.appendChild(root);
         }
         root.hidden = false;
+        setMenuActive(true);
         renderShell();
         loadTab();
     }
 
-    function close() { if (root) root.hidden = true; }
+    function close() { if (root) root.hidden = true; setMenuActive(false); }
 
     function renderShell() {
         root.innerHTML = '<div class="referral-admin-head"><div><b>邀请管理</b><small>双向奖励、推广等级与增长数据</small></div><button data-close>×</button></div>' +
@@ -86,11 +93,39 @@
     function loadRewards(){api('/rewards').then(function(p){content(table(['用户','来源用户','类型','奖励','说明','时间'],p.data.map(function(x){return [x.user_email,x.invited_user_email,x.reward_type,x.reward_type==='level'?x.reward_value+'%':'¥'+money(x.reward_value),x.description,new Date(x.created_at*1000).toLocaleString()];})));}).catch(fail);}
     function table(heads,rows){return '<table><thead><tr>'+heads.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(x){return '<td>'+esc(x)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';}
 
-    function mount() {
-        if (!window.settings || !window.settings.secure_path) return;
-        var host = document.querySelector(".content-header-section:last-child");
+    function mountSidebarMenu() {
+        var nav = document.querySelector("#sidebar ul.nav-main");
+        if (!nav) return false;
+        if (nav.querySelector(".referral-admin-menu-item")) return true;
+
+        var item = document.createElement("li");
+        item.className = "nav-main-item referral-admin-menu-item";
+        item.innerHTML = '<a class="nav-main-link referral-admin-menu-link" href="javascript:void(0);" title="邀请管理">' +
+            '<i class="nav-main-link-icon si si-present"></i>' +
+            '<span class="nav-main-link-name">邀请管理</span></a>';
+        item.querySelector("a").onclick = function (event) { event.preventDefault(); open(); };
+
+        var userMenu = Array.prototype.find.call(nav.querySelectorAll(".nav-main-link-name"), function (name) {
+            return name.textContent.trim() === "用户管理";
+        });
+        var userItem = userMenu && userMenu.closest(".nav-main-item");
+        nav.insertBefore(item, userItem || null);
+        return true;
+    }
+
+    function mountHeaderFallback() {
+        var host = document.querySelector(".content-header .content-header-section:last-child, .content-header-section:last-child");
         if (!host || host.querySelector(".referral-admin-entry")) return;
         var link=document.createElement("a"); link.className="referral-admin-entry"; link.href="javascript:void(0)"; link.textContent="邀请管理"; link.onclick=open; host.appendChild(link);
+    }
+
+    function mount() {
+        if (!window.settings || !window.settings.secure_path) return;
+        if (mountSidebarMenu()) {
+            document.querySelectorAll(".referral-admin-entry").forEach(function (entry) { entry.remove(); });
+            return;
+        }
+        mountHeaderFallback();
     }
     function start(){mount();new MutationObserver(function(){requestAnimationFrame(mount);}).observe(document.getElementById("root")||document.body,{childList:true,subtree:true});}
     if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();

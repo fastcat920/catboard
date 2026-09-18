@@ -99,6 +99,11 @@ class OrderService
         }
 
         DB::commit();
+        try {
+            app(ReferralProgramService::class)->processCompletedOrder($order->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
 
@@ -157,11 +162,8 @@ class OrderService
         }
 
         if (!$isCommission) return;
-        if ($inviter && $inviter->commission_rate) {
-            $order->commission_balance = $order->total_amount * ($inviter->commission_rate / 100);
-        } else {
-            $order->commission_balance = $order->total_amount * (config('v2board.invite_commission', 10) / 100);
-        }
+        $commissionRate = app(ReferralProgramService::class)->commissionRate($inviter);
+        $order->commission_balance = $order->total_amount * ($commissionRate / 100);
     }
 
     private function haveValidOrder(User $user)

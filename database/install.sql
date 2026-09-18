@@ -32,6 +32,53 @@ CREATE TABLE `v2_commission_log` (
                                      PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+DROP TABLE IF EXISTS `v2_referral_setting`;
+CREATE TABLE `v2_referral_setting` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `first_order_min` int unsigned NOT NULL DEFAULT '0',
+  `invitee_reward` int unsigned NOT NULL DEFAULT '0',
+  `base_commission_rate` tinyint unsigned NOT NULL DEFAULT '10',
+  `freeze_days` smallint unsigned NOT NULL DEFAULT '3',
+  `monthly_reward_limit` int unsigned DEFAULT NULL,
+  `created_at` int unsigned NOT NULL,
+  `updated_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO `v2_referral_setting` (`enabled`,`first_order_min`,`invitee_reward`,`base_commission_rate`,`freeze_days`,`created_at`,`updated_at`) VALUES (1,0,0,10,3,UNIX_TIMESTAMP(),UNIX_TIMESTAMP());
+
+DROP TABLE IF EXISTS `v2_referral_level`;
+CREATE TABLE `v2_referral_level` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL,
+  `required_invites` int unsigned NOT NULL DEFAULT '0', `commission_rate` tinyint unsigned NOT NULL DEFAULT '10',
+  `sort` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO `v2_referral_level` (`name`,`required_invites`,`commission_rate`,`sort`,`enabled`,`created_at`,`updated_at`) VALUES
+('推广大使',5,12,1,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),('高级推广',10,15,2,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),('合作伙伴',20,20,3,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP());
+
+DROP TABLE IF EXISTS `v2_referral_milestone`;
+CREATE TABLE `v2_referral_milestone` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL,
+  `required_invites` int unsigned NOT NULL, `reward_type` enum('balance','commission_balance') NOT NULL DEFAULT 'balance',
+  `reward_value` int unsigned NOT NULL, `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `required_invites` (`required_invites`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO `v2_referral_milestone` (`name`,`required_invites`,`reward_type`,`reward_value`,`enabled`,`created_at`,`updated_at`) VALUES
+('邀请 3 人奖励',3,'balance',500,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),('邀请 5 人奖励',5,'balance',1000,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),('邀请 10 人奖励',10,'balance',2000,0,UNIX_TIMESTAMP(),UNIX_TIMESTAMP());
+
+DROP TABLE IF EXISTS `v2_referral_reward`;
+CREATE TABLE `v2_referral_reward` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT, `event_key` varchar(255) NOT NULL,
+  `user_id` int unsigned NOT NULL, `invited_user_id` int unsigned DEFAULT NULL, `order_id` int unsigned DEFAULT NULL,
+  `reward_type` enum('balance','commission_balance','level','effective_invite') NOT NULL,
+  `reward_value` int unsigned NOT NULL DEFAULT '0', `status` enum('pending','granted','reversed','rejected') NOT NULL DEFAULT 'pending',
+  `description` varchar(255) DEFAULT NULL, `meta` text, `granted_at` int unsigned DEFAULT NULL,
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 DROP TABLE IF EXISTS `v2_coupon`;
 CREATE TABLE `v2_coupon` (

@@ -117,6 +117,17 @@ class AdminRoute
             $router->post('/user/allDel', 'V1\\Admin\\UserController@allDel');
             $router->post('/user/batchGroup', 'V1\\Admin\\UserController@batchGroup');
             $router->post('/user/setInviteUser', 'V1\\Admin\\UserController@setInviteUser');
+            // Referral growth program
+            $router->get ('/referral/dashboard', 'V1\\Admin\\ReferralController@dashboard');
+            $router->post('/referral/setting/save', 'V1\\Admin\\ReferralController@saveSetting');
+            $router->get ('/referral/levels', 'V1\\Admin\\ReferralController@levels');
+            $router->post('/referral/level/save', 'V1\\Admin\\ReferralController@saveLevel');
+            $router->post('/referral/level/drop', 'V1\\Admin\\ReferralController@dropLevel');
+            $router->get ('/referral/milestones', 'V1\\Admin\\ReferralController@milestones');
+            $router->post('/referral/milestone/save', 'V1\\Admin\\ReferralController@saveMilestone');
+            $router->post('/referral/milestone/drop', 'V1\\Admin\\ReferralController@dropMilestone');
+            $router->get ('/referral/rewards', 'V1\\Admin\\ReferralController@rewards');
+            $router->get ('/referral/relations', 'V1\\Admin\\ReferralController@relations');
             // Stat
             $router->get ('/stat/getStat', 'V1\\Admin\\StatController@getStat');
             $router->get ('/stat/getOverride', 'V1\\Admin\\StatController@getOverride');

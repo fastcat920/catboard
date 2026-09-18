@@ -4,6 +4,7 @@
 <head>
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/components.chunk.css?v={{$version}}">
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/umi.css?v={{$version}}">
+    <link rel="stylesheet" href="/assets/referral-user.css?v={{$version}}-{{filemtime(public_path('assets/referral-user.css'))}}">
     @if (file_exists(public_path("/theme/{$theme}/assets/custom.css")))
         <link rel="stylesheet" href="/theme/{{$theme}}/assets/custom.css?v={{$version}}">
     @endif
@@ -55,6 +56,7 @@
 <script src="/assets/locale-request.js?v={{$version}}-{{filemtime(public_path('assets/locale-request.js'))}}"></script>
 <script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}"></script>
 <script src="/theme/{{$theme}}/assets/account-deletion.js?v={{$version}}"></script>
+<script src="/assets/referral-user.js?v={{$version}}-{{filemtime(public_path('assets/referral-user.js'))}}"></script>
 @if (file_exists(public_path("/theme/{$theme}/assets/custom.js")))
     <script src="/theme/{{$theme}}/assets/custom.js?v={{$version}}"></script>
 @endif

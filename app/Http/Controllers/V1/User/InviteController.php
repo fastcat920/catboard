@@ -7,8 +7,13 @@ use App\Models\CommissionLog;
 use App\Models\InviteCode;
 use App\Models\Order;
 use App\Models\User;
+use App\Models\ReferralLevel;
+use App\Models\ReferralMilestone;
+use App\Models\ReferralReward;
+use App\Models\ReferralSetting;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class InviteController extends Controller
 {
@@ -78,10 +83,32 @@ class InviteController extends Controller
             //可用佣金
             (int)$user->commission_balance
         ];
+        $program = null;
+        if (Schema::hasTable('v2_referral_reward')) {
+            $setting = ReferralSetting::current();
+            if (!$setting->enabled) {
+                return response(['data' => ['codes' => $codes, 'stat' => $stat, 'program' => null]]);
+            }
+            $effectiveCount = ReferralReward::where('user_id', $user->id)
+                ->where('reward_type', 'effective_invite')->where('status', 'granted')->count();
+            $level = ReferralLevel::where('enabled', 1)->where('required_invites', '<=', $effectiveCount)
+                ->orderBy('required_invites', 'DESC')->first();
+            $nextMilestone = ReferralMilestone::where('enabled', 1)->where('required_invites', '>', $effectiveCount)
+                ->orderBy('required_invites')->first();
+            $program = [
+                'setting' => $setting,
+                'effective_invites' => $effectiveCount,
+                'level' => $level,
+                'next_milestone' => $nextMilestone,
+                'recent_rewards' => ReferralReward::where('user_id', $user->id)->where('reward_type', '!=', 'effective_invite')
+                    ->orderBy('id', 'DESC')->limit(10)->get(),
+            ];
+        }
         return response([
             'data' => [
                 'codes' => $codes,
-                'stat' => $stat
+                'stat' => $stat,
+                'program' => $program
             ]
         ]);
     }

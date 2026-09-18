@@ -7,6 +7,8 @@ use Illuminate\Console\Command;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Models\ReferralSetting;
+use Illuminate\Support\Facades\Schema;
 
 class CheckCommission extends Command
 {
@@ -48,10 +50,13 @@ class CheckCommission extends Command
     public function autoCheck()
     {
         if ((int)config('v2board.commission_auto_check_enable', 1)) {
+            $freezeDays = Schema::hasTable('v2_referral_setting')
+                ? (int)ReferralSetting::current()->freeze_days
+                : 3;
             Order::where('commission_status', 0)
                 ->where('invite_user_id', '!=', NULL)
                 ->whereIn('status', [3, 4])
-                ->where('updated_at', '<=', strtotime('-3 day', time()))
+                ->where('updated_at', '<=', strtotime('-' . max(0, $freezeDays) . ' day', time()))
                 ->update([
                     'commission_status' => 1
                 ]);

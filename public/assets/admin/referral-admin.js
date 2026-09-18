@@ -3,6 +3,8 @@
     var root;
     var tab = "overview";
     var responseCache = {};
+    var dashboardPreloaded = false;
+    var previousHeaderTitle = null;
 
     function api(path, options) {
         options = options || {};
@@ -35,7 +37,16 @@
     function cachedApi(path) {
         var cached = responseCache[path];
         if (cached && Date.now() - cached.time < 30000) return Promise.resolve(cached.payload);
-        return api(path).then(function (payload) { responseCache[path] = { time: Date.now(), payload: payload }; return payload; });
+        if (cached && cached.promise) return cached.promise;
+        var promise = api(path).then(function (payload) {
+            responseCache[path] = { time: Date.now(), payload: payload };
+            return payload;
+        }).catch(function (error) {
+            delete responseCache[path];
+            throw error;
+        });
+        responseCache[path] = { time: 0, promise: promise };
+        return promise;
     }
     function clearCache(path) { if (path) delete responseCache[path]; else responseCache = {}; }
 
@@ -46,10 +57,15 @@
     }
 
     function open() {
-        if (!root) {
+        if (!root || !root.isConnected) {
             root = document.createElement("div");
             root.className = "referral-admin";
             (document.getElementById("page-container") || document.body).appendChild(root);
+        }
+        var headerTitle = document.querySelector(".v2board-container-title");
+        if (headerTitle) {
+            if (previousHeaderTitle === null) previousHeaderTitle = headerTitle.textContent;
+            headerTitle.textContent = "邀请管理";
         }
         root.hidden = false;
         setMenuActive(true);
@@ -57,14 +73,18 @@
         loadTab();
     }
 
-    function close() { if (root) root.hidden = true; setMenuActive(false); }
+    function close() {
+        if (root) root.hidden = true;
+        var headerTitle = document.querySelector(".v2board-container-title");
+        if (headerTitle && previousHeaderTitle !== null) headerTitle.textContent = previousHeaderTitle;
+        previousHeaderTitle = null;
+        setMenuActive(false);
+    }
 
     function renderShell() {
-        root.innerHTML = '<div class="content-header"><div><h1>邀请管理</h1><small>双向奖励、推广等级与增长数据</small></div><button class="btn btn-sm btn-light" data-close><i class="fa fa-times mr-1"></i>关闭</button></div>' +
-            '<div class="content"><div class="block block-rounded mb-4"><div class="block-content p-0"><nav class="nav nav-tabs nav-tabs-block">' + [["overview","数据概览"],["setting","奖励规则"],["levels","推广等级"],["milestones","里程碑"],["relations","邀请关系"],["rewards","奖励流水"]].map(function (item) {
+        root.innerHTML = '<div class="p-0 p-lg-4"><div class="mb-0 block border-bottom"><nav class="nav nav-tabs nav-tabs-block">' + [["overview","数据概览"],["setting","奖励规则"],["levels","推广等级"],["milestones","里程碑"],["relations","邀请关系"],["rewards","奖励流水"]].map(function (item) {
                 return '<button data-tab="' + item[0] + '" class="nav-link ' + (tab === item[0] ? "active" : "") + '">' + item[1] + '</button>';
-            }).join("") + '</nav></div></div><main data-content><div class="block block-rounded"><div class="block-content referral-loading">加载中…</div></div></main></div>';
-        root.querySelector("[data-close]").onclick = close;
+            }).join("") + '</nav><main data-content><div class="block-content referral-loading">加载中…</div></main></div></div>';
         root.querySelectorAll("[data-tab]").forEach(function (button) { button.onclick = function () { switchTab(button.dataset.tab); }; });
     }
 
@@ -154,6 +174,10 @@
         if (!window.settings || !window.settings.secure_path) return;
         if (mountSidebarMenu()) {
             document.querySelectorAll(".referral-admin-entry").forEach(function (entry) { entry.remove(); });
+            if (!dashboardPreloaded) {
+                dashboardPreloaded = true;
+                cachedApi("/dashboard").catch(function () { dashboardPreloaded = false; });
+            }
             return;
         }
         mountHeaderFallback();

@@ -59,7 +59,6 @@ class UserRoute
             // Coupon
             $router->get ('/coupon/wallet', 'V1\\User\\CouponController@wallet');
             $router->get ('/coupon/available', 'V1\\User\\CouponController@available');
-            $router->post('/coupon/redeem', 'V1\\User\\CouponController@redeem');
             // Telegram
             $router->get ('/telegram/getBotInfo', 'V1\\User\\TelegramController@getBotInfo');
             // Comm

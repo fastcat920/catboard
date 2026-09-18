@@ -40,13 +40,6 @@ class CreateCouponCenter extends Migration
             $table->string('revoke_reason')->nullable(); $table->unsignedInteger('created_at'); $table->unsignedInteger('updated_at');
             $table->unique(['template_id', 'user_id', 'source', 'source_reference'], 'user_coupon_issue_unique');
         });
-        Schema::create('v2_coupon_redemption_code', function (Blueprint $table) {
-            $table->bigIncrements('id'); $table->unsignedInteger('template_id')->index(); $table->string('code', 64)->unique();
-            $table->enum('mode', ['public', 'single'])->default('single'); $table->unsignedInteger('usage_limit')->default(1);
-            $table->unsignedInteger('used_count')->default(0); $table->unsignedInteger('per_user_limit')->default(1);
-            $table->unsignedInteger('starts_at')->nullable(); $table->unsignedInteger('ends_at')->nullable(); $table->boolean('enabled')->default(true)->index();
-            $table->unsignedInteger('created_at'); $table->unsignedInteger('updated_at');
-        });
         Schema::create('v2_coupon_distribution_task', function (Blueprint $table) {
             $table->bigIncrements('id'); $table->unsignedInteger('template_id')->index(); $table->unsignedInteger('admin_id')->nullable();
             $table->string('name'); $table->text('filters'); $table->enum('status', ['pending', 'running', 'completed', 'partial', 'cancelled'])->default('pending')->index();
@@ -73,6 +66,6 @@ class CreateCouponCenter extends Migration
         Schema::table('v2_referral_setting', function (Blueprint $table) { $table->dropColumn('newcomer_coupon_template_id'); });
         Schema::table('v2_order', function (Blueprint $table) { $table->dropIndex(['user_coupon_id']); $table->dropColumn(['user_coupon_id','coupon_discount_amount','coupon_snapshot']); });
         Schema::dropIfExists('v2_coupon_operation_record'); Schema::dropIfExists('v2_coupon_distribution_task');
-        Schema::dropIfExists('v2_coupon_redemption_code'); Schema::dropIfExists('v2_user_coupon'); Schema::dropIfExists('v2_coupon_template');
+        Schema::dropIfExists('v2_user_coupon'); Schema::dropIfExists('v2_coupon_template');
     }
 }

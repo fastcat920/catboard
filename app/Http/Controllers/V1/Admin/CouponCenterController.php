@@ -5,7 +5,6 @@ namespace App\Http\Controllers\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessCouponDistributionTask;
 use App\Models\CouponDistributionTask;
-use App\Models\CouponRedemptionCode;
 use App\Models\CouponTemplate;
 use App\Models\Order;
 use App\Models\Plan;
@@ -13,12 +12,17 @@ use App\Models\User;
 use App\Models\UserCoupon;
 use App\Services\CouponWalletService;
 use App\Services\CouponAudienceService;
-use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CouponCenterController extends Controller
 {
+    public function legacyFetch()
+    {
+        $templates=CouponTemplate::orderBy('id','DESC')->get();
+        return response(['data'=>$templates,'total'=>$templates->count()]);
+    }
+
     public function dashboard()
     {
         return response(['data'=>[
@@ -45,10 +49,15 @@ class CouponCenterController extends Controller
     public function createTask(Request $request,CouponAudienceService $audience)
     {
         $data=$request->validate(['template_id'=>'required|integer|exists:v2_coupon_template,id','name'=>'required|string|max:100','filters'=>'required|array']);$count=$audience->query($data['filters'])->count();
-        $task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>$data['filters'],'estimated_count'=>$count]);
-        ProcessCouponDistributionTask::dispatch($task->id);return response(['data'=>$task]);
+        $task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>$data['filters'],'status'=>'running','estimated_count'=>$count]);
+        ProcessCouponDistributionTask::dispatchAfterResponse($task->id);return response(['data'=>$task]);
     }
-    public function tasks(){return response(['data'=>CouponDistributionTask::orderBy('id','DESC')->limit(200)->get()]);}
+    public function tasks()
+    {
+        $pending=CouponDistributionTask::where('status','pending')->limit(20)->pluck('id');
+        foreach($pending as $id){if(CouponDistributionTask::where('id',$id)->where('status','pending')->update(['status'=>'running','updated_at'=>time()]))ProcessCouponDistributionTask::dispatchAfterResponse($id);}
+        return response(['data'=>CouponDistributionTask::orderBy('id','DESC')->limit(200)->get()]);
+    }
     public function cancelTask(Request $request){$task=CouponDistributionTask::findOrFail($request->input('id'));if(!in_array($task->status,['pending','running']))abort(422,'当前任务不能取消');$task->status='cancelled';$task->save();return response(['data'=>true]);}
     public function userCoupons(Request $request)
     {
@@ -59,18 +68,11 @@ class CouponCenterController extends Controller
     public function issueUser(Request $request,CouponWalletService $service){$data=$request->validate(['template_id'=>'required|integer','user_id'=>'required|integer']);$coupon=$service->issue(CouponTemplate::findOrFail($data['template_id']),User::findOrFail($data['user_id']),'manual','admin:'.($request->user['id']??0).':'.time());return response(['data'=>$coupon]);}
     public function revoke(Request $request){$data=$request->validate(['id'=>'required|integer','reason'=>'required|string|max:200']);$c=UserCoupon::findOrFail($data['id']);if(!in_array($c->status,['pending','available']))abort(422,'只有未使用优惠券可以撤销');$c->status='revoked';$c->revoke_reason=$data['reason'];$c->save();DB::table('v2_coupon_operation_record')->insert(['user_coupon_id'=>$c->id,'user_id'=>$c->user_id,'admin_id'=>$request->user['id']??null,'action'=>'revoked','detail'=>json_encode(['reason'=>$data['reason']],JSON_UNESCAPED_UNICODE),'created_at'=>time()]);return response(['data'=>true]);}
     public function extend(Request $request){$data=$request->validate(['id'=>'required|integer','days'=>'required|integer|min:1|max:3650']);$c=UserCoupon::findOrFail($data['id']);if(in_array($c->status,['used','revoked']))abort(422,'当前状态不可延期');$c->expires_at=max(time(),$c->expires_at)+$data['days']*86400;if($c->status==='expired')$c->status='available';$c->save();DB::table('v2_coupon_operation_record')->insert(['user_coupon_id'=>$c->id,'user_id'=>$c->user_id,'admin_id'=>$request->user['id']??null,'action'=>'extended','detail'=>json_encode(['days'=>$data['days']]),'created_at'=>time()]);return response(['data'=>$c]);}
-    public function codes(){return response(['data'=>CouponRedemptionCode::orderBy('id','DESC')->limit(500)->get()]);}
-    public function generateCodes(Request $request)
-    {
-        $data=$request->validate(['template_id'=>'required|integer|exists:v2_coupon_template,id','mode'=>'required|in:public,single','count'=>'required|integer|min:1|max:500','usage_limit'=>'required|integer|min:1','per_user_limit'=>'required|integer|min:1','starts_at'=>'nullable|integer','ends_at'=>'nullable|integer']);$rows=[];
-        $count=$data['count'];unset($data['count']);for($i=0;$i<$count;$i++)$rows[]=CouponRedemptionCode::create(array_merge($data,['code'=>strtoupper(Helper::randomChar(12))]));return response(['data'=>$rows]);
-    }
-    public function toggleCode(Request $request){$c=CouponRedemptionCode::findOrFail($request->input('id'));$c->enabled=!$c->enabled;$c->save();return response(['data'=>$c]);}
     public function restore(Request $request,CouponWalletService $service){$data=$request->validate(['order_id'=>'required|integer|exists:v2_order,id','reason'=>'required|string|max:200']);$coupon=$service->restoreUsed(Order::findOrFail($data['order_id']),$data['reason']);if(!$coupon)abort(422,'该订单没有可恢复的已使用优惠券');return response(['data'=>$coupon]);}
     public function importTask(Request $request)
     {
         $data=$request->validate(['template_id'=>'required|integer|exists:v2_coupon_template,id','name'=>'required|string|max:100','csv'=>'required|string|max:2000000']);$ids=[];$emails=[];foreach(preg_split('/\r\n|\r|\n/',$data['csv']) as $line){$value=trim(str_getcsv($line)[0]??'');if(!$value)continue;if(filter_var($value,FILTER_VALIDATE_EMAIL))$emails[]=strtolower($value);elseif(ctype_digit($value))$ids[]=(int)$value;}
-        if(!$ids&&!$emails)abort(422,'CSV 中未找到有效用户 ID 或邮箱');$task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>['user_ids'=>array_values(array_unique($ids)),'emails'=>array_values(array_unique($emails))],'estimated_count'=>User::whereIn('id',$ids)->orWhereIn('email',$emails)->count()]);ProcessCouponDistributionTask::dispatch($task->id);return response(['data'=>$task]);
+        if(!$ids&&!$emails)abort(422,'CSV 中未找到有效用户 ID 或邮箱');$task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>['user_ids'=>array_values(array_unique($ids)),'emails'=>array_values(array_unique($emails))],'status'=>'running','estimated_count'=>User::whereIn('id',$ids)->orWhereIn('email',$emails)->count()]);ProcessCouponDistributionTask::dispatchAfterResponse($task->id);return response(['data'=>$task]);
     }
     public function exportUserCoupons(Request $request)
     {

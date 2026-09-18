@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\CouponRedemptionCode;
 use App\Models\CouponTemplate;
 use App\Models\Order;
 use App\Models\User;
@@ -91,19 +90,6 @@ class CouponWalletService
         return DB::transaction(function () use ($order, $reason) {
             $coupon=UserCoupon::where('id',$order->user_coupon_id)->lockForUpdate()->first();if(!$coupon||$coupon->status!=='used'||(int)$coupon->order_id!==(int)$order->id)return null;
             $coupon->status=$coupon->expires_at>time()?'available':'expired';$coupon->order_id=null;$coupon->used_at=null;$coupon->save();CouponTemplate::where('id',$coupon->template_id)->where('used_count','>',0)->decrement('used_count');$this->record($coupon,$coupon->user_id,'restored',['reason'=>$reason,'order_id'=>$order->id]);return $coupon;
-        });
-    }
-
-    public function redeem(User $user, string $rawCode): ?UserCoupon
-    {
-        return DB::transaction(function () use ($user, $rawCode) {
-            $code=CouponRedemptionCode::where('code',strtoupper(trim($rawCode)))->lockForUpdate()->first();
-            if (!$code || !$code->enabled || ($code->starts_at && $code->starts_at>time()) || ($code->ends_at && $code->ends_at<time()) || $code->used_count >= $code->usage_limit) abort(422,'兑换码无效或已用完');
-            $used=UserCoupon::where('user_id',$user->id)->where('source','redemption')->where('source_reference','like',$code->id.':%')->count();
-            if ($used >= $code->per_user_limit) abort(422,'该兑换码已达到个人领取上限');
-            $coupon=$this->issue(CouponTemplate::findOrFail($code->template_id),$user,'redemption',$code->id.':'.($used+1));
-            if (!$coupon) abort(422,'优惠券库存不足或已达到领取上限');
-            $code->increment('used_count'); return $coupon;
         });
     }
 

@@ -1,3 +1,278 @@
-(function(){"use strict";var root,current='available';function text(z,e){return localStorage.getItem('umi_locale')==='en-US'?e:z;}function esc(v){var d=document.createElement('div');d.textContent=v==null?'':v;return d.innerHTML;}function api(path,opt){opt=opt||{};var h={'Content-Type':'application/json','Accept':'application/json'},a=localStorage.getItem('authorization');if(a)h.authorization=a;return fetch('/api/v1/user/coupon'+path,Object.assign({credentials:'include',headers:h},opt)).then(function(r){return r.json().then(function(p){if(!r.ok)throw new Error(p.message||text('请求失败','Request failed'));return p;});});}function dt(v){return v?new Date(Number(v)*1000).toLocaleString(): '-';}function status(v){return({pending:text('待生效','Pending'),available:text('可使用','Available'),locked:text('已锁定','Locked'),used:text('已使用','Used'),expired:text('已过期','Expired'),revoked:text('已撤销','Revoked')})[v]||v;}function open(){if(!root||!root.isConnected){root=document.createElement('div');root.className='coupon-wallet-page';(document.getElementById('page-container')||document.body).appendChild(root);}root.hidden=false;load();}function close(){if(root)root.hidden=true;}function load(){root.innerHTML='<div class="coupon-wallet-loading">'+text('加载中…','Loading…')+'</div>';api('/wallet').then(function(p){var rows=p.data||[],shown=rows.filter(function(x){return current==='history'?['used','expired','revoked'].indexOf(x.status)>=0:x.status===current;}),preference=localStorage.getItem('coupon_preference')||'auto';root.innerHTML='<div class="coupon-wallet-shell"><div class="block"><div class="block-header block-header-default"><h3 class="block-title">'+text('我的优惠券','My coupons')+'</h3></div><div class="block-content"><div class="coupon-wallet-controls"><button class="btn '+(current==='available'?'btn-primary':'btn-light')+'" data-status="available">'+text('可使用','Available')+'</button><button class="btn '+(current==='locked'?'btn-primary':'btn-light')+'" data-status="locked">'+text('使用中','Locked')+'</button><button class="btn '+(current==='history'?'btn-primary':'btn-light')+'" data-status="history">'+text('历史记录','History')+'</button><div class="coupon-preference"><label>'+text('下单默认：','Checkout default:')+'</label><select class="form-control" data-preference><option value="auto">'+text('自动选择最优惠','Auto-select best')+'</option><option value="none">'+text('不使用优惠券','Do not use')+'</option></select></div></div><form data-redeem class="coupon-redeem"><input class="form-control" name="code" required placeholder="'+text('输入兑换码','Enter redemption code')+'"><button class="btn btn-primary">'+text('兑换','Redeem')+'</button></form><div class="coupon-list">'+(shown.length?shown.map(function(x){var t=x.template||{},discount=t.discount_type==='fixed'?text('减 ¥','¥')+(Number(t.discount_value||0)/100).toFixed(2):(100-Number(t.discount_value||0))+text(' 折','% off');return'<article class="coupon-card '+x.status+'"><div class="coupon-value">'+discount+'</div><div class="coupon-info"><strong>'+esc(localStorage.getItem('umi_locale')==='en-US'&&t.name_en?t.name_en:t.name)+'</strong><span>'+text('满 ¥','Min ¥')+(Number(t.minimum_amount||0)/100).toFixed(2)+' · '+text('有效期至 ','Expires ')+dt(x.expires_at)+'</span><small>'+status(x.status)+' · '+esc(x.source)+'</small></div>'+(x.status==='available'?'<button class="btn btn-sm btn-light" data-prefer="'+x.id+'">'+text('优先使用','Prefer')+'</button>':'')+'</article>';}).join(''):'<div class="coupon-empty">'+text('暂无优惠券','No coupons')+'</div>')+'</div></div></div></div>';root.querySelectorAll('[data-status]').forEach(function(b){b.onclick=function(){current=b.dataset.status;load();};});var select=root.querySelector('[data-preference]');if(/^coupon:/.test(preference)){var id=preference.split(':')[1],coupon=rows.find(function(x){return String(x.id)===id&&x.status==='available';});if(coupon){var o=document.createElement('option');o.value=preference;o.textContent=text('优先：','Prefer: ')+(coupon.template&&coupon.template.name);select.appendChild(o);}}select.value=preference;select.onchange=function(){localStorage.setItem('coupon_preference',select.value);};root.querySelectorAll('[data-prefer]').forEach(function(b){b.onclick=function(){localStorage.setItem('coupon_preference','coupon:'+b.dataset.prefer);load();};});root.querySelector('[data-redeem]').onsubmit=function(e){e.preventDefault();api('/redeem',{method:'POST',body:JSON.stringify({code:e.target.code.value})}).then(function(){current='available';load();}).catch(function(er){alert(er.message);});};}).catch(function(e){root.innerHTML='<div class="alert alert-danger">'+esc(e.message)+'</div>';});}
-function mount(){var nav=document.querySelector('#sidebar ul.nav-main');if(!nav)return;var item=nav.querySelector('.coupon-wallet-menu');if(!item){item=document.createElement('li');item.className='nav-main-item coupon-wallet-menu';item.innerHTML='<a class="nav-main-link" href="javascript:void(0)"><i class="nav-main-link-icon si si-wallet"></i><span class="nav-main-link-name">'+text('我的优惠券','My coupons')+'</span></a>';var invite=Array.prototype.find.call(nav.querySelectorAll('.nav-main-link-name'),function(n){return /邀请|Invite/i.test(n.textContent);});var target=invite&&invite.closest('.nav-main-item');target?nav.insertBefore(item,target):nav.appendChild(item);item.querySelector('a').onclick=function(e){e.preventDefault();open();};}}
-var originalOpen=XMLHttpRequest.prototype.open,originalSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(method,url){this.__couponOrderSave=typeof url==='string'&&url.indexOf('/user/order/save')>=0;return originalOpen.apply(this,arguments);};XMLHttpRequest.prototype.send=function(body){if(this.__couponOrderSave){var pref=localStorage.getItem('coupon_preference')||'auto';try{if(body instanceof FormData){if(pref==='none')body.append('disable_auto_coupon','1');else if(/^coupon:/.test(pref))body.append('user_coupon_id',pref.split(':')[1]);}else if(typeof body==='string'){var data;try{data=JSON.parse(body);if(pref==='none')data.disable_auto_coupon=true;else if(/^coupon:/.test(pref))data.user_coupon_id=Number(pref.split(':')[1]);body=JSON.stringify(data);}catch(e){var q=new URLSearchParams(body);if(pref==='none')q.set('disable_auto_coupon','1');else if(/^coupon:/.test(pref))q.set('user_coupon_id',pref.split(':')[1]);body=q.toString();}}}catch(e){}}return originalSend.call(this,body);};function start(){mount();document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('.nav-main-link');if(a&&!a.closest('.coupon-wallet-menu'))close();});new MutationObserver(function(){requestAnimationFrame(mount);}).observe(document.getElementById('root')||document.body,{childList:true,subtree:true});}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();})();
+(function () {
+    "use strict";
+    var root,
+        current = "available";
+    function text(z, e) {
+        return localStorage.getItem("umi_locale") === "en-US" ? e : z;
+    }
+    function esc(v) {
+        var d = document.createElement("div");
+        d.textContent = v == null ? "" : v;
+        return d.innerHTML;
+    }
+    function api(path, opt) {
+        opt = opt || {};
+        var h = {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            a = localStorage.getItem("authorization");
+        if (a) h.authorization = a;
+        return fetch(
+            "/api/v1/user/coupon" + path,
+            Object.assign({ credentials: "include", headers: h }, opt),
+        ).then(function (r) {
+            return r.json().then(function (p) {
+                if (!r.ok)
+                    throw new Error(
+                        p.message || text("请求失败", "Request failed"),
+                    );
+                return p;
+            });
+        });
+    }
+    function dt(v) {
+        return v ? new Date(Number(v) * 1000).toLocaleString() : "-";
+    }
+    function status(v) {
+        return (
+            {
+                pending: text("待生效", "Pending"),
+                available: text("可使用", "Available"),
+                locked: text("已锁定", "Locked"),
+                used: text("已使用", "Used"),
+                expired: text("已过期", "Expired"),
+                revoked: text("已撤销", "Revoked"),
+            }[v] || v
+        );
+    }
+    function open() {
+        if (!root || !root.isConnected) {
+            root = document.createElement("div");
+            root.className = "coupon-wallet-page";
+            (
+                document.getElementById("page-container") || document.body
+            ).appendChild(root);
+        }
+        root.hidden = false;
+        load();
+    }
+    function close() {
+        if (root) root.hidden = true;
+    }
+    function load() {
+        root.innerHTML =
+            '<div class="coupon-wallet-loading">' +
+            text("加载中…", "Loading…") +
+            "</div>";
+        api("/wallet")
+            .then(function (p) {
+                var rows = p.data || [],
+                    shown = rows.filter(function (x) {
+                        return current === "history"
+                            ? ["used", "expired", "revoked"].indexOf(
+                                  x.status,
+                              ) >= 0
+                            : x.status === current;
+                    }),
+                    preference =
+                        localStorage.getItem("coupon_preference") || "auto";
+                root.innerHTML =
+                    '<div class="coupon-wallet-shell"><div class="block"><div class="block-header block-header-default"><h3 class="block-title">' +
+                    text("我的优惠券", "My coupons") +
+                    '</h3></div><div class="block-content"><div class="coupon-wallet-controls"><button class="btn ' +
+                    (current === "available" ? "btn-primary" : "btn-light") +
+                    '" data-status="available">' +
+                    text("可使用", "Available") +
+                    '</button><button class="btn ' +
+                    (current === "locked" ? "btn-primary" : "btn-light") +
+                    '" data-status="locked">' +
+                    text("使用中", "Locked") +
+                    '</button><button class="btn ' +
+                    (current === "history" ? "btn-primary" : "btn-light") +
+                    '" data-status="history">' +
+                    text("历史记录", "History") +
+                    '</button><div class="coupon-preference"><label>' +
+                    text("下单默认：", "Checkout default:") +
+                    '</label><select class="form-control" data-preference><option value="auto">' +
+                    text("自动选择最优惠", "Auto-select best") +
+                    '</option><option value="none">' +
+                    text("不使用优惠券", "Do not use") +
+                    '</option></select></div></div><div class="coupon-list">' +
+                    (shown.length
+                        ? shown
+                              .map(function (x) {
+                                  var t = x.template || {},
+                                      discount =
+                                          t.discount_type === "fixed"
+                                              ? text("减 ¥", "¥") +
+                                                (
+                                                    Number(
+                                                        t.discount_value || 0,
+                                                    ) / 100
+                                                ).toFixed(2)
+                                              : 100 -
+                                                Number(t.discount_value || 0) +
+                                                text(" 折", "% off");
+                                  return (
+                                      '<article class="coupon-card ' +
+                                      x.status +
+                                      '"><div class="coupon-value">' +
+                                      discount +
+                                      '</div><div class="coupon-info"><strong>' +
+                                      esc(
+                                          localStorage.getItem("umi_locale") ===
+                                              "en-US" && t.name_en
+                                              ? t.name_en
+                                              : t.name,
+                                      ) +
+                                      "</strong><span>" +
+                                      text("满 ¥", "Min ¥") +
+                                      (
+                                          Number(t.minimum_amount || 0) / 100
+                                      ).toFixed(2) +
+                                      " · " +
+                                      text("有效期至 ", "Expires ") +
+                                      dt(x.expires_at) +
+                                      "</span><small>" +
+                                      status(x.status) +
+                                      " · " +
+                                      esc(x.source) +
+                                      "</small></div>" +
+                                      (x.status === "available"
+                                          ? '<button class="btn btn-sm btn-light" data-prefer="' +
+                                            x.id +
+                                            '">' +
+                                            text("优先使用", "Prefer") +
+                                            "</button>"
+                                          : "") +
+                                      "</article>"
+                                  );
+                              })
+                              .join("")
+                        : '<div class="coupon-empty">' +
+                          text("暂无优惠券", "No coupons") +
+                          "</div>") +
+                    "</div></div></div></div>";
+                root.querySelectorAll("[data-status]").forEach(function (b) {
+                    b.onclick = function () {
+                        current = b.dataset.status;
+                        load();
+                    };
+                });
+                var select = root.querySelector("[data-preference]");
+                if (/^coupon:/.test(preference)) {
+                    var id = preference.split(":")[1],
+                        coupon = rows.find(function (x) {
+                            return (
+                                String(x.id) === id && x.status === "available"
+                            );
+                        });
+                    if (coupon) {
+                        var o = document.createElement("option");
+                        o.value = preference;
+                        o.textContent =
+                            text("优先：", "Prefer: ") +
+                            (coupon.template && coupon.template.name);
+                        select.appendChild(o);
+                    }
+                }
+                select.value = preference;
+                select.onchange = function () {
+                    localStorage.setItem("coupon_preference", select.value);
+                };
+                root.querySelectorAll("[data-prefer]").forEach(function (b) {
+                    b.onclick = function () {
+                        localStorage.setItem(
+                            "coupon_preference",
+                            "coupon:" + b.dataset.prefer,
+                        );
+                        load();
+                    };
+                });
+            })
+            .catch(function (e) {
+                root.innerHTML =
+                    '<div class="alert alert-danger">' +
+                    esc(e.message) +
+                    "</div>";
+            });
+    }
+    function mount() {
+        var nav = document.querySelector("#sidebar ul.nav-main");
+        if (!nav) return;
+        var item = nav.querySelector(".coupon-wallet-menu");
+        if (!item) {
+            item = document.createElement("li");
+            item.className = "nav-main-item coupon-wallet-menu";
+            item.innerHTML =
+                '<a class="nav-main-link" href="javascript:void(0)"><i class="nav-main-link-icon si si-wallet"></i><span class="nav-main-link-name">' +
+                text("我的优惠券", "My coupons") +
+                "</span></a>";
+            var invite = Array.prototype.find.call(
+                nav.querySelectorAll(".nav-main-link-name"),
+                function (n) {
+                    return /邀请|Invite/i.test(n.textContent);
+                },
+            );
+            var target = invite && invite.closest(".nav-main-item");
+            target ? nav.insertBefore(item, target) : nav.appendChild(item);
+            item.querySelector("a").onclick = function (e) {
+                e.preventDefault();
+                open();
+            };
+        }
+    }
+    var originalOpen = XMLHttpRequest.prototype.open,
+        originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+        this.__couponOrderSave =
+            typeof url === "string" && url.indexOf("/user/order/save") >= 0;
+        return originalOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+        if (this.__couponOrderSave) {
+            var pref = localStorage.getItem("coupon_preference") || "auto";
+            try {
+                if (body instanceof FormData) {
+                    if (pref === "none")
+                        body.append("disable_auto_coupon", "1");
+                    else if (/^coupon:/.test(pref))
+                        body.append("user_coupon_id", pref.split(":")[1]);
+                } else if (typeof body === "string") {
+                    var data;
+                    try {
+                        data = JSON.parse(body);
+                        if (pref === "none") data.disable_auto_coupon = true;
+                        else if (/^coupon:/.test(pref))
+                            data.user_coupon_id = Number(pref.split(":")[1]);
+                        body = JSON.stringify(data);
+                    } catch (e) {
+                        var q = new URLSearchParams(body);
+                        if (pref === "none") q.set("disable_auto_coupon", "1");
+                        else if (/^coupon:/.test(pref))
+                            q.set("user_coupon_id", pref.split(":")[1]);
+                        body = q.toString();
+                    }
+                }
+            } catch (e) {}
+        }
+        return originalSend.call(this, body);
+    };
+    function start() {
+        mount();
+        document.addEventListener("click", function (e) {
+            var a = e.target.closest && e.target.closest(".nav-main-link");
+            if (a && !a.closest(".coupon-wallet-menu")) close();
+        });
+        new MutationObserver(function () {
+            requestAnimationFrame(mount);
+        }).observe(document.getElementById("root") || document.body, {
+            childList: true,
+            subtree: true,
+        });
+    }
+    if (document.readyState === "loading")
+        document.addEventListener("DOMContentLoaded", start);
+    else start();
+})();

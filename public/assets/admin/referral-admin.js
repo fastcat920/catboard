@@ -3,7 +3,7 @@
     var root;
     var tab = "overview";
     var responseCache = {};
-    var listState = { relations: { current: 1, pageSize: 20, keyword: "", status: "" }, rewards: { current: 1, pageSize: 20, keyword: "", status: "", type: "", from: "", to: "" }, audits: { current: 1, pageSize: 20, action: "" } };
+    var listState = { relations: { current: 1, pageSize: 20, keyword: "", status: "" }, rewards: { current: 1, pageSize: 20, keyword: "", status: "", type: "", from: "", to: "" } };
     var dashboardPreloaded = false;
     var previousHeaderTitle = null;
 
@@ -36,9 +36,6 @@
     }
     function rewardStatus(value) {
         return ({ pending: "待发放", granted: "已发放", reversed: "已撤销", rejected: "已拒绝" })[value] || value || "-";
-    }
-    function auditAction(value) {
-        return ({ "setting.save": "保存奖励规则", "level.save": "保存推广等级", "level.delete": "删除推广等级", "milestone.save": "保存里程碑", "milestone.delete": "删除里程碑", "reward.reverse": "撤销订单奖励" })[value] || value || "-";
     }
     function field(name, label, value, type) { return '<div class="form-group"><label>' + label + '</label><input class="form-control" name="' + name + '" type="' + (type || "number") + '" value="' + esc(value == null ? "" : value) + '"></div>'; }
     function cachedApi(path) {
@@ -90,7 +87,7 @@
     }
 
     function renderShell() {
-        root.innerHTML = '<div class="p-0 p-lg-4"><div class="mb-0 block border-bottom"><nav class="nav nav-tabs nav-tabs-block">' + [["overview","数据概览"],["setting","奖励规则"],["levels","推广等级"],["milestones","里程碑"],["relations","邀请关系"],["rewards","奖励流水"],["audits","操作日志"]].map(function (item) {
+        root.innerHTML = '<div class="p-0 p-lg-4"><div class="mb-0 block border-bottom"><nav class="nav nav-tabs nav-tabs-block">' + [["overview","数据概览"],["setting","奖励规则"],["levels","推广等级"],["milestones","里程碑"],["relations","邀请关系"],["rewards","奖励流水"]].map(function (item) {
                 return '<button data-tab="' + item[0] + '" class="nav-link ' + (tab === item[0] ? "active" : "") + '">' + item[1] + '</button>';
             }).join("") + '</nav><main data-content><div class="block-content referral-loading">加载中…</div></main></div></div>';
         root.querySelectorAll("[data-tab]").forEach(function (button) { button.onclick = function () { switchTab(button.dataset.tab); }; });
@@ -106,7 +103,7 @@
         loadTab();
     }
     function loadTab() {
-        ({ overview: loadOverview, setting: loadSetting, levels: loadLevels, milestones: loadMilestones, relations: loadRelations, rewards: loadRewards, audits: loadAudits }[tab] || loadOverview)();
+        ({ overview: loadOverview, setting: loadSetting, levels: loadLevels, milestones: loadMilestones, relations: loadRelations, rewards: loadRewards }[tab] || loadOverview)();
     }
 
     function loadOverview() {
@@ -156,9 +153,6 @@
     function pagination(kind,total){var state=listState[kind],pages=Math.max(Math.ceil(total/state.pageSize),1);return '<div class="referral-pagination"><span>共 '+total+' 条</span><select class="form-control" data-page-size><option value="10">10 条/页</option><option value="20">20 条/页</option><option value="50">50 条/页</option><option value="100">100 条/页</option></select><button class="btn btn-light" data-page="'+(state.current-1)+'" '+(state.current<=1?'disabled':'')+'>上一页</button><span>'+state.current+' / '+pages+'</span><button class="btn btn-light" data-page="'+(state.current+1)+'" '+(state.current>=pages?'disabled':'')+'>下一页</button></div>';}
     function bindListControls(kind){var state=listState[kind],search=function(){root.querySelectorAll('.referral-filters [name]').forEach(function(el){state[el.name]=el.value.trim();});state.current=1;loadTab();};root.querySelector('[data-search]').onclick=search;root.querySelectorAll('.referral-filters input').forEach(function(input){input.onkeydown=function(event){if(event.key==='Enter')search();};});root.querySelector('[data-reset]').onclick=function(){Object.keys(state).forEach(function(key){if(key!=='current'&&key!=='pageSize')state[key]='';});state.current=1;loadTab();};root.querySelectorAll('[data-page]').forEach(function(button){button.onclick=function(){state.current=Number(button.dataset.page);loadTab();};});var size=root.querySelector('[data-page-size]');size.value=String(state.pageSize);size.onchange=function(){state.pageSize=Number(size.value);state.current=1;loadTab();};}
     function reverseReward(row){var modal=document.createElement('div');modal.className='referral-modal';modal.innerHTML='<div class="referral-modal-dialog"><div class="referral-modal-head"><h3>撤销订单相关奖励</h3><button type="button" data-cancel>×</button></div><form><div class="referral-modal-body"><div class="alert alert-warning">本操作会撤销该订单产生的全部邀请奖励，并扣回已发放余额。余额不足时系统会拒绝操作。</div><div class="form-group"><label>撤销原因</label><textarea class="form-control" name="reason" maxlength="200" rows="3" required placeholder="例如：订单退款"></textarea></div></div><div class="referral-modal-foot"><button class="btn btn-light" type="button" data-cancel>取消</button><button class="btn btn-danger" type="submit">确认撤销</button></div></form></div>';root.appendChild(modal);modal.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){modal.remove();};});modal.querySelector('form').onsubmit=function(event){event.preventDefault();var submit=event.target.querySelector('[type="submit"]');submit.disabled=true;api('/reward/reverse',{method:'POST',body:JSON.stringify({id:row.id,reason:event.target.reason.value.trim()})}).then(function(){modal.remove();loadRewards();}).catch(function(e){submit.disabled=false;alert(e.message);});};}
-    function loadAudits(){var state=listState.audits;api('/audits?'+queryString(state)).then(function(p){if(tab!=='audits')return;content('<div class="referral-filters"><select class="form-control" name="action"><option value="">全部操作</option><option value="setting.save">保存奖励规则</option><option value="level.save">保存推广等级</option><option value="level.delete">删除推广等级</option><option value="milestone.save">保存里程碑</option><option value="milestone.delete">删除里程碑</option><option value="reward.reverse">撤销订单奖励</option></select><button class="btn btn-primary" data-search>查询</button><button class="btn btn-light" data-reset>重置</button></div>'+table(['管理员','操作','目标','IP','时间','详情'],p.data.map(function(x){return [x.admin_email||('管理员 #'+x.admin_id),auditAction(x.action),x.target_type+' #'+(x.target_id||'-'),x.request_ip||'-',dateTime(x.created_at),''];}))+pagination('audits',p.total));var action=root.querySelector('[name="action"]');action.value=state.action;root.querySelectorAll('tbody tr').forEach(function(tr,index){var row=p.data[index];if(!row)return;var cell=tr.lastElementChild;cell.innerHTML='<button class="btn btn-sm btn-light" data-detail>查看</button>';cell.querySelector('[data-detail]').onclick=function(){showAudit(row);};});bindListControls('audits');}).catch(fail);}
-    function showAudit(row){var modal=document.createElement('div');modal.className='referral-modal';modal.innerHTML='<div class="referral-modal-dialog referral-modal-wide"><div class="referral-modal-head"><h3>操作详情</h3><button type="button" data-cancel>×</button></div><div class="referral-modal-body"><dl class="referral-audit-detail"><dt>管理员</dt><dd>'+esc(row.admin_email||row.admin_id)+'</dd><dt>操作</dt><dd>'+esc(auditAction(row.action))+'</dd><dt>操作前</dt><dd><pre>'+esc(formatJson(row.before_data))+'</pre></dd><dt>操作后</dt><dd><pre>'+esc(formatJson(row.after_data))+'</pre></dd></dl></div><div class="referral-modal-foot"><button class="btn btn-primary" data-cancel>关闭</button></div></div>';root.appendChild(modal);modal.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){modal.remove();};});}
-    function formatJson(value){if(!value)return '-';try{return JSON.stringify(typeof value==='string'?JSON.parse(value):value,null,2);}catch(e){return String(value);}}
     function table(heads,rows){return '<div class="block block-rounded"><div class="block-content p-0"><div class="table-responsive"><table class="table table-hover table-vcenter mb-0"><thead><tr>'+heads.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+(rows.length?rows.map(function(r){return '<tr>'+r.map(function(x){return '<td>'+esc(x)+'</td>';}).join('')+'</tr>';}).join(''):'<tr><td class="referral-empty" colspan="'+heads.length+'">暂无数据</td></tr>')+'</tbody></table></div></div></div>';}
 
     function mountSidebarMenu() {

@@ -12,8 +12,6 @@ use App\Models\User;
 use App\Services\ReferralProgramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ReferralController extends Controller
 {
@@ -48,10 +46,8 @@ class ReferralController extends Controller
             'monthly_reward_limit' => 'nullable|integer|min:0',
         ]);
         $setting = ReferralSetting::first();
-        $before = $setting ? $setting->toArray() : null;
         if ($setting) $setting->update($data);
         else $setting = ReferralSetting::create($data);
-        $this->audit($request, 'setting.save', 'setting', $setting->id, $before, $setting->fresh()->toArray());
         Cache::forget('admin_referral_dashboard');
         return response(['data' => $setting]);
     }
@@ -70,18 +66,14 @@ class ReferralController extends Controller
             'enabled' => 'required|boolean',
         ]);
         $level = $request->input('id') ? ReferralLevel::findOrFail($request->input('id')) : new ReferralLevel();
-        $before = $level->exists ? $level->toArray() : null;
         $level->fill($data)->save();
-        $this->audit($request, 'level.save', 'level', $level->id, $before, $level->fresh()->toArray());
         return response(['data' => $level]);
     }
 
     public function dropLevel(Request $request)
     {
         $level = ReferralLevel::findOrFail($request->input('id'));
-        $before = $level->toArray();
         $result = (bool)$level->delete();
-        if ($result) $this->audit($request, 'level.delete', 'level', $before['id'], $before, null);
         return response(['data' => $result]);
     }
 
@@ -100,18 +92,14 @@ class ReferralController extends Controller
             'enabled' => 'required|boolean',
         ]);
         $milestone = $request->input('id') ? ReferralMilestone::findOrFail($request->input('id')) : new ReferralMilestone();
-        $before = $milestone->exists ? $milestone->toArray() : null;
         $milestone->fill($data)->save();
-        $this->audit($request, 'milestone.save', 'milestone', $milestone->id, $before, $milestone->fresh()->toArray());
         return response(['data' => $milestone]);
     }
 
     public function dropMilestone(Request $request)
     {
         $milestone = ReferralMilestone::findOrFail($request->input('id'));
-        $before = $milestone->toArray();
         $result = (bool)$milestone->delete();
-        if ($result) $this->audit($request, 'milestone.delete', 'milestone', $before['id'], $before, null);
         return response(['data' => $result]);
     }
 
@@ -153,20 +141,7 @@ class ReferralController extends Controller
         } catch (\RuntimeException $e) {
             abort(422, $e->getMessage());
         }
-        $this->audit($request, 'reward.reverse', 'order', $reward->order_id, ['reward_id' => $reward->id], ['reversed' => $count, 'reason' => trim($data['reason'] ?? '')]);
         return response(['data' => ['reversed' => $count]]);
-    }
-
-    public function audits(Request $request)
-    {
-        if (!Schema::hasTable('v2_referral_admin_log')) return response(['data' => [], 'total' => 0]);
-        $pageSize = min(max((int)$request->input('pageSize', 20), 1), 100);
-        $builder = DB::table('v2_referral_admin_log as l')->leftJoin('v2_user as u', 'u.id', '=', 'l.admin_id')
-            ->select('l.*', 'u.email as admin_email')->orderBy('l.id', 'DESC');
-        if ($request->input('action')) $builder->where('l.action', $request->input('action'));
-        $total = $builder->count();
-        $rows = $builder->forPage(max((int)$request->input('current', 1), 1), $pageSize)->get();
-        return response(['data' => $rows, 'total' => $total]);
     }
 
     public function relations(Request $request)
@@ -194,20 +169,5 @@ class ReferralController extends Controller
             $row->effective = $effectiveIds->has($row->id);
         });
         return response(['data' => $rows, 'total' => $total]);
-    }
-
-    private function audit(Request $request, string $action, string $targetType, $targetId, $before, $after): void
-    {
-        if (!Schema::hasTable('v2_referral_admin_log')) return;
-        DB::table('v2_referral_admin_log')->insert([
-            'admin_id' => (int)($request->user['id'] ?? 0),
-            'action' => $action,
-            'target_type' => $targetType,
-            'target_id' => (string)$targetId,
-            'before_data' => $before === null ? null : json_encode($before, JSON_UNESCAPED_UNICODE),
-            'after_data' => $after === null ? null : json_encode($after, JSON_UNESCAPED_UNICODE),
-            'request_ip' => $request->ip(),
-            'created_at' => time(),
-        ]);
     }
 }

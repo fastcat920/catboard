@@ -79,20 +79,6 @@ CREATE TABLE `v2_referral_reward` (
   PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `status` (`status`), KEY `referral_type_status_created_idx` (`reward_type`,`status`,`created_at`), KEY `referral_order_status_idx` (`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `v2_referral_admin_log`;
-CREATE TABLE `v2_referral_admin_log` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `admin_id` int unsigned NOT NULL,
-  `action` varchar(64) NOT NULL,
-  `target_type` varchar(32) NOT NULL,
-  `target_id` varchar(64) DEFAULT NULL,
-  `before_data` text,
-  `after_data` text,
-  `request_ip` varchar(64) DEFAULT NULL,
-  `created_at` int unsigned NOT NULL,
-  PRIMARY KEY (`id`), KEY `admin_id` (`admin_id`), KEY `action` (`action`), KEY `created_at` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 
 DROP TABLE IF EXISTS `v2_coupon`;
 CREATE TABLE `v2_coupon` (

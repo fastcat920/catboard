@@ -16,6 +16,8 @@ class ReferralSetting extends Model
             'enabled' => 1,
             'first_order_min' => 0,
             'invitee_reward' => 0,
+            'newcomer_coupon_id' => null,
+            'newcomer_reward_valid_days' => 30,
             'base_commission_rate' => (int)config('v2board.invite_commission', 10),
             'freeze_days' => 3,
         ]);

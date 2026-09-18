@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/assets/admin/custom.css?v={{$version}}">
     <link rel="stylesheet" href="/assets/admin/security-entry.css?v={{$version}}-{{filemtime(public_path('assets/admin/security-entry.css'))}}">
     <link rel="stylesheet" href="/assets/admin/referral-admin.css?v={{$version}}-{{filemtime(public_path('assets/admin/referral-admin.css'))}}">
+    <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     <title>{{$title}}</title>

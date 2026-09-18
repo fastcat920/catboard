@@ -126,9 +126,20 @@ class AdminRoute
             $router->get ('/referral/milestones', 'V1\\Admin\\ReferralController@milestones');
             $router->post('/referral/milestone/save', 'V1\\Admin\\ReferralController@saveMilestone');
             $router->post('/referral/milestone/drop', 'V1\\Admin\\ReferralController@dropMilestone');
+            $router->get ('/referral/campaigns', 'V1\\Admin\\ReferralController@campaigns');
+            $router->post('/referral/campaign/save', 'V1\\Admin\\ReferralController@saveCampaign');
+            $router->post('/referral/campaign/drop', 'V1\\Admin\\ReferralController@dropCampaign');
+            $router->get ('/referral/materials', 'V1\\Admin\\ReferralController@materials');
+            $router->post('/referral/material/save', 'V1\\Admin\\ReferralController@saveMaterial');
+            $router->post('/referral/material/drop', 'V1\\Admin\\ReferralController@dropMaterial');
+            $router->get ('/referral/leaderboard', 'V1\\Admin\\ReferralController@leaderboard');
+            $router->post('/referral/leaderboard/setting', 'V1\\Admin\\ReferralController@saveLeaderboardSetting');
+            $router->get ('/referral/funnel', 'V1\\Admin\\ReferralController@funnel');
             $router->get ('/referral/rewards', 'V1\\Admin\\ReferralController@rewards');
             $router->post('/referral/reward/reverse', 'V1\\Admin\\ReferralController@reverseReward');
             $router->get ('/referral/relations', 'V1\\Admin\\ReferralController@relations');
+            $router->get ('/referral/relation/detail', 'V1\\Admin\\ReferralController@relationDetail');
+            $router->post('/referral/relation/change', 'V1\\Admin\\ReferralController@changeRelation');
             // Stat
             $router->get ('/stat/getStat', 'V1\\Admin\\StatController@getStat');
             $router->get ('/stat/getOverride', 'V1\\Admin\\StatController@getOverride');

@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/components.chunk.css?v={{$version}}">
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/umi.css?v={{$version}}">
     <link rel="stylesheet" href="/assets/referral-user.css?v={{$version}}-{{filemtime(public_path('assets/referral-user.css'))}}">
+    <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
     @if (file_exists(public_path("/theme/{$theme}/assets/custom.css")))
         <link rel="stylesheet" href="/theme/{{$theme}}/assets/custom.css?v={{$version}}">
     @endif

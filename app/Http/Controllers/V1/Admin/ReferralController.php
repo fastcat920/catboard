@@ -4,6 +4,12 @@ namespace App\Http\Controllers\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Coupon;
+use App\Models\Plan;
+use App\Models\ReferralCampaign;
+use App\Models\ReferralMaterial;
+use App\Models\ReferralVisit;
+use App\Models\ReferralLeaderboardSetting;
 use App\Models\ReferralLevel;
 use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
@@ -12,6 +18,7 @@ use App\Models\User;
 use App\Services\ReferralProgramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ReferralController extends Controller
 {
@@ -30,6 +37,7 @@ class ReferralController extends Controller
                 'referral_revenue' => (int)Order::whereNotNull('invite_user_id')->where('status', 3)->sum('total_amount'),
                 'reward_total' => (int)ReferralReward::whereIn('reward_type', ['balance', 'commission_balance'])->where('status', 'granted')->sum('reward_value'),
                 'active_promoters' => (clone $effectiveQuery)->distinct()->count('user_id'),
+                'coupon_templates' => Coupon::where('show', 1)->orderBy('id', 'DESC')->get(['id', 'name', 'code', 'ended_at']),
             ];
         });
         return response(['data' => $data]);
@@ -41,6 +49,8 @@ class ReferralController extends Controller
             'enabled' => 'required|boolean',
             'first_order_min' => 'required|integer|min:0',
             'invitee_reward' => 'required|integer|min:0',
+            'newcomer_coupon_id' => 'nullable|integer|exists:v2_coupon,id',
+            'newcomer_reward_valid_days' => 'required|integer|min:1|max:3650',
             'base_commission_rate' => 'required|integer|min:0|max:100',
             'freeze_days' => 'required|integer|min:0|max:365',
             'monthly_reward_limit' => 'nullable|integer|min:0',
@@ -61,8 +71,13 @@ class ReferralController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:100',
+            'name_en' => 'nullable|string|max:100',
+            'description' => 'nullable|string|max:255',
+            'description_en' => 'nullable|string|max:255',
             'required_invites' => 'required|integer|min:0',
             'commission_rate' => 'required|integer|min:0|max:100',
+            'valid_days' => 'required|integer|min:0|max:3650',
+            'retain_invites' => 'required|integer|min:0',
             'enabled' => 'required|boolean',
         ]);
         $level = $request->input('id') ? ReferralLevel::findOrFail($request->input('id')) : new ReferralLevel();
@@ -82,12 +97,130 @@ class ReferralController extends Controller
         return response(['data' => ReferralMilestone::orderBy('required_invites')->get()]);
     }
 
+    public function campaigns()
+    {
+        $campaigns = ReferralCampaign::orderBy('id', 'DESC')->get();
+        $campaigns->each(function ($campaign) {
+            $rewards = ReferralReward::where('campaign_id', $campaign->id)->whereIn('reward_type', ['balance', 'commission_balance', 'traffic', 'duration'])->where('status', 'granted');
+            $campaign->reward_count = (clone $rewards)->count();
+            $campaign->reward_users = (clone $rewards)->distinct()->count('user_id');
+            $campaign->order_count = ReferralReward::where('campaign_id', $campaign->id)->whereNotNull('order_id')->distinct()->count('order_id');
+        });
+        return response(['data' => $campaigns, 'plans' => Plan::orderBy('id')->get(['id', 'name'])]);
+    }
+
+    public function saveCampaign(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:100', 'name_en' => 'nullable|string|max:100',
+            'description' => 'nullable|string|max:1000', 'description_en' => 'nullable|string|max:1000',
+            'starts_at' => 'required|integer', 'ends_at' => 'required|integer|gt:starts_at',
+            'audience' => 'required|in:all,new,existing', 'plan_ids' => 'nullable|array', 'plan_ids.*' => 'integer|exists:v2_plan,id',
+            'first_order_min' => 'required|integer|min:0', 'commission_multiplier' => 'required|numeric|min:0|max:10',
+            'inviter_reward_type' => 'required|in:none,balance,commission_balance,traffic,duration',
+            'inviter_reward_value' => 'required|integer|min:0', 'bonus_required_invites' => 'required|integer|min:0',
+            'invitee_reward_type' => 'required|in:none,balance,traffic,duration', 'invitee_reward_value' => 'required|integer|min:0',
+            'budget_total' => 'nullable|integer|min:0', 'per_user_limit' => 'nullable|integer|min:1', 'grant_limit' => 'nullable|integer|min:1',
+            'enabled' => 'required|boolean',
+        ]);
+        $campaign = $request->input('id') ? ReferralCampaign::findOrFail($request->input('id')) : new ReferralCampaign();
+        $campaign->fill($data)->save();
+        return response(['data' => $campaign]);
+    }
+
+    public function dropCampaign(Request $request)
+    {
+        $campaign = ReferralCampaign::findOrFail($request->input('id'));
+        if (ReferralReward::where('campaign_id', $campaign->id)->exists()) abort(422, '活动已有奖励流水，请停用活动而不是删除');
+        return response(['data' => (bool)$campaign->delete()]);
+    }
+
+    public function materials()
+    {
+        return response(['data' => ReferralMaterial::orderBy('sort')->orderBy('id', 'DESC')->get()]);
+    }
+
+    public function saveMaterial(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:100', 'name_en' => 'nullable|string|max:100',
+            'copy_zh' => 'nullable|string|max:2000', 'copy_en' => 'nullable|string|max:2000',
+            'image_data' => 'nullable|string|max:3000000', 'sort' => 'required|integer|min:0', 'enabled' => 'required|boolean',
+        ]);
+        if (!empty($data['image_data']) && !preg_match('#^data:image/(png|jpeg|webp);base64,#', $data['image_data'])) abort(422, '海报模板仅支持 PNG、JPG 或 WebP 图片');
+        $material = $request->input('id') ? ReferralMaterial::findOrFail($request->input('id')) : new ReferralMaterial();
+        $material->fill($data)->save();
+        return response(['data' => $material]);
+    }
+
+    public function dropMaterial(Request $request)
+    {
+        return response(['data' => (bool)ReferralMaterial::findOrFail($request->input('id'))->delete()]);
+    }
+
+    public function leaderboard(Request $request)
+    {
+        $period = $request->input('period', 'month');
+        $metric = $request->input('metric', 'invites');
+        $from = $period === 'week' ? strtotime('monday this week') : ($period === 'total' ? 0 : strtotime(date('Y-m-01')));
+        $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))->where('reward_type', 'effective_invite')->where('status', 'granted');
+        if ($from) $effective->where('created_at', '>=', $from);
+        $effective->groupBy('user_id');
+        $rows = User::query()->joinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
+            ->leftJoin('v2_order as o', function ($join) use ($from) { $join->on('o.invite_user_id', '=', 'v2_user.id')->where('o.status', 3); if ($from) $join->where('o.created_at', '>=', $from); })
+            ->select('v2_user.id', 'v2_user.email', DB::raw('MAX(r.invite_count) as invite_count'), DB::raw('COALESCE(SUM(o.total_amount),0) as revenue'), DB::raw('COALESCE(SUM(o.commission_balance),0) as income'))
+            ->groupBy('v2_user.id', 'v2_user.email')->orderBy($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), 'DESC')->limit(100)->get();
+        return response(['data' => $rows, 'setting' => ReferralLeaderboardSetting::current()]);
+    }
+
+    public function saveLeaderboardSetting(Request $request)
+    {
+        $data = $request->validate(['enabled' => 'required|boolean', 'mask_email' => 'required|boolean', 'reward_rules' => 'nullable|array']);
+        $setting = ReferralLeaderboardSetting::current();
+        $setting->fill($data)->save();
+        return response(['data' => $setting]);
+    }
+
+    public function funnel(Request $request)
+    {
+        $days = min(max((int)$request->input('days', 30), 7), 365);
+        $from = strtotime('-' . ($days - 1) . ' days midnight');
+        $visits = ReferralVisit::where('created_at', '>=', $from);
+        $registrations = User::whereNotNull('invite_user_id')->where('created_at', '>=', $from);
+        $firstOrders = Order::whereNotNull('invite_user_id')->where('type', 1)->where('status', 3)->where('created_at', '>=', $from);
+        $renewals = Order::whereNotNull('invite_user_id')->where('type', 2)->where('status', 3)->where('created_at', '>=', $from);
+        $rewards = ReferralReward::where('created_at', '>=', $from);
+        $trend = [];
+        for ($i = 0; $i < $days; $i++) {
+            $start = $from + $i * 86400; $end = $start + 86400;
+            $trend[] = ['date' => date('Y-m-d', $start), 'visits' => (clone $visits)->whereBetween('created_at', [$start, $end - 1])->count(), 'registrations' => (clone $registrations)->whereBetween('created_at', [$start, $end - 1])->count(), 'first_orders' => (clone $firstOrders)->whereBetween('created_at', [$start, $end - 1])->count(), 'renewals' => (clone $renewals)->whereBetween('created_at', [$start, $end - 1])->count()];
+        }
+        $aggregate = function (array $rows, string $format) {
+            return collect($rows)->groupBy(function ($row) use ($format) { return date($format, strtotime($row['date'])); })->map(function ($items, $key) {
+                return ['date'=>$key,'visits'=>$items->sum('visits'),'registrations'=>$items->sum('registrations'),'first_orders'=>$items->sum('first_orders'),'renewals'=>$items->sum('renewals')];
+            })->values();
+        };
+        $revenue = (int)(clone $firstOrders)->sum('total_amount');
+        $rewardCost = (int)(clone $rewards)->whereIn('reward_type', ['balance', 'commission_balance'])->where('status', 'granted')->sum('reward_value');
+        $firstBuyers = (clone $firstOrders)->distinct()->count('user_id');
+        $renewalUsers = (clone $renewals)->distinct()->count('user_id');
+        return response(['data' => [
+            'summary' => ['visits' => (clone $visits)->count(), 'registrations' => (clone $registrations)->count(), 'verified' => config('v2board.email_verify') ? (clone $registrations)->count() : null, 'first_orders' => (clone $firstOrders)->count(), 'renewal_users' => $renewalUsers, 'renewal_rate' => $firstBuyers ? round($renewalUsers * 100 / $firstBuyers, 2) : 0, 'pending_rewards' => (clone $rewards)->where('status', 'pending')->count(), 'reversed_rewards' => (clone $rewards)->where('status', 'reversed')->count(), 'revenue' => $revenue, 'reward_cost' => $rewardCost, 'roi' => $rewardCost ? round(($revenue - $rewardCost) / $rewardCost, 2) : null],
+            'trend' => $trend,
+            'weekly_trend' => $aggregate($trend, 'o-W'),
+            'monthly_trend' => $aggregate($trend, 'Y-m'),
+            'channels' => ReferralVisit::where('created_at', '>=', $from)->select('channel', DB::raw('COUNT(*) visits'), DB::raw('COUNT(user_id) registrations'))->groupBy('channel')->orderBy('visits', 'DESC')->get(),
+            'plans' => Order::whereNotNull('invite_user_id')->where('type', 1)->where('status', 3)->where('created_at', '>=', $from)->select('plan_id', DB::raw('COUNT(*) orders'), DB::raw('SUM(total_amount) revenue'))->groupBy('plan_id')->orderBy('orders', 'DESC')->get(),
+            'campaigns' => ReferralCampaign::select('id', 'name', 'name_en', 'granted_count', 'spent_amount')->orderBy('id', 'DESC')->limit(20)->get(),
+        ]]);
+    }
+
     public function saveMilestone(Request $request)
     {
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'required_invites' => 'required|integer|min:1',
-            'reward_type' => 'required|in:balance,commission_balance',
+            'reward_type' => 'required|in:balance,commission_balance,traffic,duration',
             'reward_value' => 'required|integer|min:1',
             'enabled' => 'required|boolean',
         ]);
@@ -169,5 +302,40 @@ class ReferralController extends Controller
             $row->effective = $effectiveIds->has($row->id);
         });
         return response(['data' => $rows, 'total' => $total]);
+    }
+
+    public function relationDetail(Request $request)
+    {
+        $user = User::findOrFail($request->input('user_id'));
+        $inviter = $user->invite_user_id ? User::find($user->invite_user_id) : null;
+        return response(['data' => [
+            'user' => $user->only(['id', 'email', 'invite_user_id', 'created_at']),
+            'inviter' => $inviter ? $inviter->only(['id', 'email']) : null,
+            'orders' => Order::where('user_id', $user->id)->orderBy('id', 'DESC')->limit(20)->get(['id', 'trade_no', 'plan_id', 'total_amount', 'status', 'created_at']),
+            'rewards' => ReferralReward::where('invited_user_id', $user->id)->orderBy('id', 'DESC')->get(),
+        ]]);
+    }
+
+    public function changeRelation(Request $request)
+    {
+        $data = $request->validate(['user_id' => 'required|integer|exists:v2_user,id', 'inviter_id' => 'nullable|integer|exists:v2_user,id']);
+        if ($data['inviter_id'] && (int)$data['inviter_id'] === (int)$data['user_id']) abort(422, '不能邀请自己');
+        DB::transaction(function () use ($data) {
+            $user = User::where('id', $data['user_id'])->lockForUpdate()->firstOrFail();
+            if (ReferralReward::where('invited_user_id', $user->id)->where('status', 'granted')->exists()) {
+                abort(422, '该关系已产生有效奖励，请先撤销关联订单奖励');
+            }
+            if ($data['inviter_id']) {
+                $cursor = User::find($data['inviter_id']);
+                for ($depth = 0; $cursor && $depth < 100; $depth++) {
+                    if ((int)$cursor->id === (int)$user->id) abort(422, '调整后会形成循环邀请关系');
+                    $cursor = $cursor->invite_user_id ? User::find($cursor->invite_user_id) : null;
+                }
+            }
+            $user->invite_user_id = $data['inviter_id'] ?: null;
+            $user->save();
+        });
+        Cache::forget('admin_referral_dashboard');
+        return response(['data' => true]);
     }
 }

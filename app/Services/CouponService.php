@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Coupon;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
+use App\Models\ReferralCouponGrant;
+use Illuminate\Support\Facades\Schema;
 
 class CouponService
 {
@@ -43,6 +45,12 @@ class CouponService
             if (!$this->coupon->save()) {
                 return false;
             }
+        }
+        if (Schema::hasTable('v2_referral_coupon_grant')) {
+            ReferralCouponGrant::where('coupon_id', $this->coupon->id)
+                ->where('user_id', $order->user_id)
+                ->where('status', 'issued')
+                ->update(['status' => 'used', 'used_at' => time(), 'updated_at' => time()]);
         }
         return true;
     }
@@ -95,6 +103,15 @@ class CouponService
         }
         if (time() > $this->coupon->ended_at) {
             abort(500, __('This coupon has expired'));
+        }
+        if (Schema::hasTable('v2_referral_coupon_grant')) {
+            $grant = ReferralCouponGrant::where('coupon_id', $this->coupon->id)->first();
+            if ($grant && ((int)$grant->user_id !== (int)$this->userId || $grant->status !== 'issued')) {
+                abort(500, __('Invalid coupon'));
+            }
+            if ($grant && Order::where('user_id', $this->userId)->whereNotIn('status', [0, 2])->exists()) {
+                abort(500, __('This coupon is only available for the first order'));
+            }
         }
         if ($this->coupon->limit_plan_ids && $this->planId) {
             if (!in_array($this->planId, $this->coupon->limit_plan_ids)) {

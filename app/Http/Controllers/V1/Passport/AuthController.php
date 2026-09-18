@@ -12,12 +12,15 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\AuthService;
 use App\Services\TrialClaimService;
+use App\Services\ReferralProgramService;
+use App\Models\ReferralVisit;
 use App\Utils\CacheKey;
 use App\Utils\Dict;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use ReCaptcha\ReCaptcha;
 
 class AuthController extends Controller
@@ -133,6 +136,16 @@ class AuthController extends Controller
 
         $user->last_login_at = time();
         $user->save();
+        try {
+            app(ReferralProgramService::class)->issueNewcomerCoupon($user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+        if ($request->input('invite_code') && Schema::hasTable('v2_referral_visit')) {
+            ReferralVisit::where('invite_code', $request->input('invite_code'))->whereNull('user_id')
+                ->where('ip_hash', hash('sha256', (string)$request->ip()))->orderBy('id', 'DESC')->limit(1)
+                ->update(['user_id' => $user->id]);
+        }
 
         if ((int)config('v2board.register_limit_by_ip_enable', 0)) {
             Cache::put(

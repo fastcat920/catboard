@@ -34,6 +34,8 @@ class Kernel extends ConsoleKernel
         // check
         $schedule->command('check:order')->everyMinute()->withoutOverlapping();
         $schedule->command('check:commission')->everyFifteenMinutes();
+        $schedule->command('check:referral-levels')->hourly()->withoutOverlapping();
+        $schedule->command('referral:settle-leaderboard')->dailyAt('00:20')->withoutOverlapping();
         $schedule->command('check:ticket')->everyMinute();
         $schedule->command('check:renewal')->dailyAt('22:30');
         // reset

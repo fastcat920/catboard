@@ -57,7 +57,7 @@
 <script src="/theme/{{$theme}}/assets/vendors.async.js?v={{$version}}"></script>
 <script src="/theme/{{$theme}}/assets/components.async.js?v={{$version}}"></script>
 <script src="/assets/locale-request.js?v={{$version}}-{{filemtime(public_path('assets/locale-request.js'))}}"></script>
-<script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}"></script>
+<script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}-{{filemtime(public_path("theme/{$theme}/assets/umi.js"))}}"></script>
 <script src="/theme/{{$theme}}/assets/account-deletion.js?v={{$version}}"></script>
 <script src="/assets/referral-user.js?v={{$version}}-{{filemtime(public_path('assets/referral-user.js'))}}"></script>
 <script src="/assets/coupon-wallet.js?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.js'))}}"></script>

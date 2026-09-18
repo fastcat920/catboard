@@ -243,6 +243,49 @@
         }
         renderSummary(cashier);
     }
+    function hideLegacyCoupon(cashier) {
+        var input = cashier.querySelector(
+            '.v2board-input-coupon,input[placeholder*="优惠券"],input[placeholder*="coupon" i]',
+        );
+        var legacy = input && input.closest(".block");
+        if (legacy) legacy.style.display = "none";
+    }
+    function loadPlanMetadata(cashier, planId) {
+        if (cashier.dataset.couponMetadataLoading === "1") return;
+        cashier.dataset.couponMetadataLoading = "1";
+        fetch("/api/v1/user/plan/fetch?id=" + encodeURIComponent(planId), {
+            credentials: "include",
+            headers: headers(),
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (body) {
+                var plan = body.data || {};
+                var periods = [
+                    "month_price",
+                    "quarter_price",
+                    "half_year_price",
+                    "year_price",
+                    "two_year_price",
+                    "three_year_price",
+                    "onetime_price",
+                ].filter(function (period) {
+                    return plan[period] !== null && plan[period] !== undefined;
+                });
+                cashier.dataset.couponPlan = planId;
+                cashier
+                    .querySelectorAll(".v2board-select")
+                    .forEach(function (node, index) {
+                        if (periods[index])
+                            node.dataset.couponPeriod = periods[index];
+                    });
+                mount();
+            })
+            .catch(function () {
+                cashier.dataset.couponMetadataLoading = "0";
+            });
+    }
     function openModal() {
         if (!state.preview) return;
         var coupons = state.preview.available_coupons || [],
@@ -342,10 +385,20 @@
         if (!/#\/plan\//.test(location.hash)) return;
         var cashier = document.getElementById("cashier");
         if (!cashier) return;
+        hideLegacyCoupon(cashier);
+        var routeMatch = location.hash.match(/#\/plan\/(\d+)/);
         var active = cashier.querySelector("[data-coupon-period].active"),
-            planId = Number(cashier.dataset.couponPlan || 0),
+            planId = Number(
+                cashier.dataset.couponPlan ||
+                    (routeMatch && routeMatch[1]) ||
+                    0,
+            ),
             period = active && active.dataset.couponPeriod;
-        if (!planId || !period) return;
+        if (!planId) return;
+        if (!period) {
+            loadPlanMetadata(cashier, planId);
+            return;
+        }
         var key = planId + ":" + period;
         if (state.key !== key) {
             state.key = key;

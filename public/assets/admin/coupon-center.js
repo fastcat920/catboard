@@ -98,6 +98,13 @@
         }
         if (root) root.hidden = true;
     }
+    function isCouponRoute() {
+        return !!(
+            window.g_history &&
+            window.g_history.location &&
+            window.g_history.location.pathname === "/coupon"
+        );
+    }
     function render() {
         root.innerHTML =
             '<div class="p-0 p-lg-4"><div class="block"><nav class="nav nav-tabs nav-tabs-block">' +
@@ -617,10 +624,8 @@
                 function (e) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
-                    var href = link.getAttribute("href") || "/coupon";
-                    if (location.pathname !== href) {
-                        history.pushState({}, "", href);
-                    }
+                    if (!isCouponRoute() && window.g_history)
+                        window.g_history.push("/coupon");
                     setTimeout(open, 0);
                 },
                 true,
@@ -629,11 +634,12 @@
     }
     function start() {
         mount();
-        if (location.pathname === "/coupon") setTimeout(open, 0);
-        window.addEventListener("popstate", function () {
-            if (location.pathname === "/coupon") setTimeout(open, 0);
-            else close();
-        });
+        if (isCouponRoute()) setTimeout(open, 0);
+        if (window.g_history)
+            window.g_history.listen(function (location) {
+                if (location.pathname === "/coupon") setTimeout(open, 0);
+                else close();
+            });
         document.addEventListener("click", function (e) {
             var a = e.target.closest && e.target.closest(".nav-main-link");
             if (a && !a.dataset.couponCenter) close();

@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\Coupon;
-use App\Models\ReferralCouponGrant;
+use App\Models\CouponTemplate;
+use App\Models\UserCoupon;
 use App\Models\ReferralCampaign;
 use App\Models\ReferralLevel;
 use App\Models\ReferralMilestone;
@@ -14,42 +14,17 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
-use App\Utils\Helper;
 
 class ReferralProgramService
 {
-    public function issueNewcomerCoupon(User $user): ?ReferralCouponGrant
+    public function issueNewcomerCoupon(User $user): ?UserCoupon
     {
-        if (!$user->invite_user_id || !Schema::hasTable('v2_referral_coupon_grant')) return null;
+        if (!$user->invite_user_id || !Schema::hasTable('v2_user_coupon')) return null;
         $setting = $this->setting();
-        if (!$setting || !$setting->enabled || !$setting->newcomer_coupon_id) return null;
-        $template = Coupon::find($setting->newcomer_coupon_id);
-        if (!$template || ($template->ended_at && $template->ended_at <= time())) return null;
-
-        return DB::transaction(function () use ($user, $setting, $template) {
-            $existing = ReferralCouponGrant::where('user_id', $user->id)
-                ->where('template_coupon_id', $template->id)->lockForUpdate()->first();
-            if ($existing) return $existing;
-            $expiresAt = time() + max(1, (int)$setting->newcomer_reward_valid_days) * 86400;
-            if ($template->ended_at) $expiresAt = min($expiresAt, (int)$template->ended_at);
-            $coupon = $template->replicate();
-            $coupon->name = $template->name . '-新人专属';
-            $coupon->code = Helper::randomChar(12);
-            $coupon->show = 1;
-            $coupon->limit_use = 1;
-            $coupon->limit_use_with_user = 1;
-            $coupon->started_at = time();
-            $coupon->ended_at = $expiresAt;
-            $coupon->save();
-            return ReferralCouponGrant::create([
-                'user_id' => $user->id,
-                'inviter_id' => $user->invite_user_id,
-                'template_coupon_id' => $template->id,
-                'coupon_id' => $coupon->id,
-                'status' => 'issued',
-                'expires_at' => $expiresAt,
-            ]);
-        });
+        if (!$setting || !$setting->enabled || !$setting->newcomer_coupon_template_id) return null;
+        $template = CouponTemplate::find($setting->newcomer_coupon_template_id);
+        if (!$template) return null;
+        return app(CouponWalletService::class)->issue($template, $user, 'referral_newcomer', 'inviter:' . $user->invite_user_id);
     }
 
     public function reverseOrderRewards(int $orderId, string $reason = ''): int

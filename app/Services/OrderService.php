@@ -97,6 +97,7 @@ class OrderService
             DB::rollBack();
             abort(500, '开通失败');
         }
+        app(CouponWalletService::class)->consume($order);
 
         DB::commit();
         try {
@@ -135,9 +136,10 @@ class OrderService
     {
         $order = $this->order;
         if ($user->discount) {
-            $order->discount_amount = $order->discount_amount + ($order->total_amount * ($user->discount / 100));
+            $vipDiscount = $order->total_amount * ($user->discount / 100);
+            $order->discount_amount = $order->discount_amount + $vipDiscount;
+            $order->total_amount = $order->total_amount - $vipDiscount;
         }
-        $order->total_amount = $order->total_amount - $order->discount_amount;
     }
 
     public function setInvite(User $user):void
@@ -290,6 +292,7 @@ class OrderService
                 return false;
             }
         }
+        app(CouponWalletService::class)->release($order);
         DB::commit();
         return true;
     }

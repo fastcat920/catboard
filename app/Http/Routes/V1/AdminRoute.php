@@ -162,10 +162,25 @@ class AdminRoute
             $router->post('/ticket/reply', 'V1\\Admin\\TicketController@reply');
             $router->post('/ticket/close', 'V1\\Admin\\TicketController@close');
             // Coupon
-            $router->get ('/coupon/fetch', 'V1\\Admin\\CouponController@fetch');
-            $router->post('/coupon/generate', 'V1\\Admin\\CouponController@generate');
-            $router->post('/coupon/drop', 'V1\\Admin\\CouponController@drop');
-            $router->post('/coupon/show', 'V1\\Admin\\CouponController@show');
+            $router->get ('/coupon-center/dashboard', 'V1\\Admin\\CouponCenterController@dashboard');
+            $router->get ('/coupon-center/templates', 'V1\\Admin\\CouponCenterController@templates');
+            $router->post('/coupon-center/template/save', 'V1\\Admin\\CouponCenterController@saveTemplate');
+            $router->post('/coupon-center/template/copy', 'V1\\Admin\\CouponCenterController@copyTemplate');
+            $router->post('/coupon-center/template/drop', 'V1\\Admin\\CouponCenterController@dropTemplate');
+            $router->post('/coupon-center/distribution/estimate', 'V1\\Admin\\CouponCenterController@estimate');
+            $router->post('/coupon-center/distribution/create', 'V1\\Admin\\CouponCenterController@createTask');
+            $router->get ('/coupon-center/distribution/tasks', 'V1\\Admin\\CouponCenterController@tasks');
+            $router->post('/coupon-center/distribution/cancel', 'V1\\Admin\\CouponCenterController@cancelTask');
+            $router->get ('/coupon-center/user-coupons', 'V1\\Admin\\CouponCenterController@userCoupons');
+            $router->post('/coupon-center/user-coupon/issue', 'V1\\Admin\\CouponCenterController@issueUser');
+            $router->post('/coupon-center/user-coupon/revoke', 'V1\\Admin\\CouponCenterController@revoke');
+            $router->post('/coupon-center/user-coupon/extend', 'V1\\Admin\\CouponCenterController@extend');
+            $router->get ('/coupon-center/codes', 'V1\\Admin\\CouponCenterController@codes');
+            $router->post('/coupon-center/code/generate', 'V1\\Admin\\CouponCenterController@generateCodes');
+            $router->post('/coupon-center/code/toggle', 'V1\\Admin\\CouponCenterController@toggleCode');
+            $router->post('/coupon-center/user-coupon/restore', 'V1\\Admin\\CouponCenterController@restore');
+            $router->post('/coupon-center/distribution/import', 'V1\\Admin\\CouponCenterController@importTask');
+            $router->get ('/coupon-center/user-coupons/export', 'V1\\Admin\\CouponCenterController@exportUserCoupons');
             // Giftcard
             $router->get ('/giftcard/fetch', 'V1\\Admin\\GiftcardController@fetch');
             $router->get ('/giftcard/redemptions', 'V1\\Admin\\GiftcardController@redemptions');

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\Coupon;
+use App\Models\CouponTemplate;
 use App\Models\Plan;
 use App\Models\ReferralCampaign;
 use App\Models\ReferralMaterial;
@@ -37,7 +37,7 @@ class ReferralController extends Controller
                 'referral_revenue' => (int)Order::whereNotNull('invite_user_id')->where('status', 3)->sum('total_amount'),
                 'reward_total' => (int)ReferralReward::whereIn('reward_type', ['balance', 'commission_balance'])->where('status', 'granted')->sum('reward_value'),
                 'active_promoters' => (clone $effectiveQuery)->distinct()->count('user_id'),
-                'coupon_templates' => Coupon::where('show', 1)->orderBy('id', 'DESC')->get(['id', 'name', 'code', 'ended_at']),
+                'coupon_templates' => CouponTemplate::where('enabled', 1)->orderBy('id', 'DESC')->get(['id', 'name', 'name_en', 'ends_at']),
             ];
         });
         return response(['data' => $data]);
@@ -49,8 +49,7 @@ class ReferralController extends Controller
             'enabled' => 'required|boolean',
             'first_order_min' => 'required|integer|min:0',
             'invitee_reward' => 'required|integer|min:0',
-            'newcomer_coupon_id' => 'nullable|integer|exists:v2_coupon,id',
-            'newcomer_reward_valid_days' => 'required|integer|min:1|max:3650',
+            'newcomer_coupon_template_id' => 'nullable|integer|exists:v2_coupon_template,id',
             'base_commission_rate' => 'required|integer|min:0|max:100',
             'freeze_days' => 'required|integer|min:0|max:365',
             'monthly_reward_limit' => 'nullable|integer|min:0',

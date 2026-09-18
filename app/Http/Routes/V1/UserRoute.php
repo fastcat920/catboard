@@ -33,6 +33,7 @@ class UserRoute
             $router->post('/removeActiveSession', 'V1\\User\\UserController@removeActiveSession');
             // Order
             $router->post('/order/save', 'V1\\User\\OrderController@save');
+            $router->post('/order/preview', 'V1\\User\\OrderController@preview');
             $router->post('/order/checkout', 'V1\\User\\OrderController@checkout');
             $router->get ('/order/check', 'V1\\User\\OrderController@check');
             $router->get ('/order/detail', 'V1\\User\\OrderController@detail');
@@ -56,7 +57,9 @@ class UserRoute
             // Server
             $router->get ('/server/fetch', 'V1\\User\\ServerController@fetch');
             // Coupon
-            $router->post('/coupon/check', 'V1\\User\\CouponController@check');
+            $router->get ('/coupon/wallet', 'V1\\User\\CouponController@wallet');
+            $router->get ('/coupon/available', 'V1\\User\\CouponController@available');
+            $router->post('/coupon/redeem', 'V1\\User\\CouponController@redeem');
             // Telegram
             $router->get ('/telegram/getBotInfo', 'V1\\User\\TelegramController@getBotInfo');
             // Comm

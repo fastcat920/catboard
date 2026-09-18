@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/assets/admin/security-entry.css?v={{$version}}-{{filemtime(public_path('assets/admin/security-entry.css'))}}">
     <link rel="stylesheet" href="/assets/admin/referral-admin.css?v={{$version}}-{{filemtime(public_path('assets/admin/referral-admin.css'))}}">
     <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
+    <link rel="stylesheet" href="/assets/admin/coupon-center.css?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     <title>{{$title}}</title>
@@ -36,6 +37,7 @@
 <script src="/assets/admin/umi.js?v={{$version}}-{{filemtime(public_path('assets/admin/umi.js'))}}"></script>
 <script src="/assets/admin/security-entry.js?v={{$version}}-{{filemtime(public_path('assets/admin/security-entry.js'))}}"></script>
 <script src="/assets/admin/referral-admin.js?v={{$version}}-{{filemtime(public_path('assets/admin/referral-admin.js'))}}"></script>
+<script src="/assets/admin/coupon-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.js'))}}"></script>
 </body>
 
 </html>

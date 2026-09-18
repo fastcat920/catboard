@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/umi.css?v={{$version}}">
     <link rel="stylesheet" href="/assets/referral-user.css?v={{$version}}-{{filemtime(public_path('assets/referral-user.css'))}}">
     <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
+    <link rel="stylesheet" href="/assets/coupon-wallet.css?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.css'))}}">
     @if (file_exists(public_path("/theme/{$theme}/assets/custom.css")))
         <link rel="stylesheet" href="/theme/{{$theme}}/assets/custom.css?v={{$version}}">
     @endif
@@ -58,6 +59,8 @@
 <script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}"></script>
 <script src="/theme/{{$theme}}/assets/account-deletion.js?v={{$version}}"></script>
 <script src="/assets/referral-user.js?v={{$version}}-{{filemtime(public_path('assets/referral-user.js'))}}"></script>
+<script src="/assets/coupon-wallet.js?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.js'))}}"></script>
+<script src="/assets/coupon-checkout.js?v={{$version}}-{{filemtime(public_path('assets/coupon-checkout.js'))}}"></script>
 @if (file_exists(public_path("/theme/{$theme}/assets/custom.js")))
     <script src="/theme/{{$theme}}/assets/custom.js?v={{$version}}"></script>
 @endif

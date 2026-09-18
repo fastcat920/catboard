@@ -38,8 +38,7 @@ CREATE TABLE `v2_referral_setting` (
   `enabled` tinyint(1) NOT NULL DEFAULT '1',
   `first_order_min` int unsigned NOT NULL DEFAULT '0',
   `invitee_reward` int unsigned NOT NULL DEFAULT '0',
-  `newcomer_coupon_id` int unsigned DEFAULT NULL,
-  `newcomer_reward_valid_days` smallint unsigned NOT NULL DEFAULT '30',
+  `newcomer_coupon_template_id` int unsigned DEFAULT NULL,
   `base_commission_rate` tinyint unsigned NOT NULL DEFAULT '10',
   `freeze_days` smallint unsigned NOT NULL DEFAULT '3',
   `monthly_reward_limit` int unsigned DEFAULT NULL,
@@ -97,16 +96,6 @@ CREATE TABLE `v2_referral_campaign` (
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `starts_at` (`starts_at`), KEY `ends_at` (`ends_at`), KEY `enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `v2_referral_coupon_grant`;
-CREATE TABLE `v2_referral_coupon_grant` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT, `user_id` int unsigned NOT NULL, `inviter_id` int unsigned DEFAULT NULL,
-  `template_coupon_id` int unsigned NOT NULL, `coupon_id` int unsigned NOT NULL,
-  `status` enum('issued','used','expired','revoked') NOT NULL DEFAULT 'issued', `expires_at` int unsigned NOT NULL,
-  `used_at` int unsigned DEFAULT NULL, `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `coupon_id` (`coupon_id`), UNIQUE KEY `referral_coupon_user_template_unique` (`user_id`,`template_coupon_id`),
-  KEY `user_id` (`user_id`), KEY `inviter_id` (`inviter_id`), KEY `status` (`status`), KEY `expires_at` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 DROP TABLE IF EXISTS `v2_referral_visit`;
 CREATE TABLE `v2_referral_visit` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT, `invite_code` varchar(32) NOT NULL, `channel` varchar(50) NOT NULL DEFAULT 'direct',
@@ -136,24 +125,28 @@ CREATE TABLE `v2_referral_leaderboard_award` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `v2_coupon`;
-CREATE TABLE `v2_coupon` (
-                             `id` int(11) NOT NULL AUTO_INCREMENT,
-                             `code` varchar(255) NOT NULL,
-                             `name` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-                             `type` tinyint(1) NOT NULL,
-                             `value` int(11) NOT NULL,
-                             `show` tinyint(1) NOT NULL DEFAULT '0',
-                             `limit_use` int(11) DEFAULT NULL,
-                             `limit_use_with_user` int(11) DEFAULT NULL,
-                             `limit_plan_ids` varchar(255) DEFAULT NULL,
-                             `limit_period` varchar(255) DEFAULT NULL,
-                             `started_at` int(11) NOT NULL,
-                             `ended_at` int(11) NOT NULL,
-                             `created_at` int(11) NOT NULL,
-                             `updated_at` int(11) NOT NULL,
-                             PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+DROP TABLE IF EXISTS `v2_coupon_template`;
+CREATE TABLE `v2_coupon_template` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL, `description` text, `description_en` text,
+  `discount_type` enum('fixed','percent') NOT NULL, `discount_value` int unsigned NOT NULL, `minimum_amount` int unsigned NOT NULL DEFAULT '0', `maximum_discount` int unsigned DEFAULT NULL,
+  `plan_ids` text, `periods` text, `first_order_only` tinyint(1) NOT NULL DEFAULT '0', `new_user_only` tinyint(1) NOT NULL DEFAULT '0', `allow_renewal` tinyint(1) NOT NULL DEFAULT '1', `stackable` tinyint(1) NOT NULL DEFAULT '0',
+  `per_user_limit` int unsigned NOT NULL DEFAULT '1', `total_limit` int unsigned DEFAULT NULL, `daily_limit` int unsigned DEFAULT NULL, `valid_days` smallint unsigned DEFAULT NULL,
+  `starts_at` int unsigned DEFAULT NULL, `ends_at` int unsigned DEFAULT NULL, `issued_count` int unsigned NOT NULL DEFAULT '0', `used_count` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+DROP TABLE IF EXISTS `v2_user_coupon`;
+CREATE TABLE `v2_user_coupon` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT, `template_id` int unsigned NOT NULL, `user_id` int unsigned NOT NULL, `source` varchar(50) NOT NULL, `source_reference` varchar(100) DEFAULT NULL,
+  `status` enum('pending','available','locked','used','expired','revoked') NOT NULL DEFAULT 'available', `starts_at` int unsigned NOT NULL, `expires_at` int unsigned NOT NULL,
+  `locked_trade_no` varchar(36) DEFAULT NULL, `locked_at` int unsigned DEFAULT NULL, `order_id` int unsigned DEFAULT NULL, `used_at` int unsigned DEFAULT NULL, `revoke_reason` varchar(255) DEFAULT NULL,
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), UNIQUE KEY `user_coupon_issue_unique` (`template_id`,`user_id`,`source`,`source_reference`), KEY `template_id` (`template_id`), KEY `user_id` (`user_id`), KEY `status` (`status`), KEY `expires_at` (`expires_at`), KEY `locked_trade_no` (`locked_trade_no`), KEY `order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+DROP TABLE IF EXISTS `v2_coupon_redemption_code`;
+CREATE TABLE `v2_coupon_redemption_code` (`id` bigint unsigned NOT NULL AUTO_INCREMENT,`template_id` int unsigned NOT NULL,`code` varchar(64) NOT NULL,`mode` enum('public','single') NOT NULL DEFAULT 'single',`usage_limit` int unsigned NOT NULL DEFAULT '1',`used_count` int unsigned NOT NULL DEFAULT '0',`per_user_limit` int unsigned NOT NULL DEFAULT '1',`starts_at` int unsigned DEFAULT NULL,`ends_at` int unsigned DEFAULT NULL,`enabled` tinyint(1) NOT NULL DEFAULT '1',`created_at` int unsigned NOT NULL,`updated_at` int unsigned NOT NULL,PRIMARY KEY (`id`),UNIQUE KEY `code` (`code`),KEY `template_id` (`template_id`),KEY `enabled` (`enabled`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+DROP TABLE IF EXISTS `v2_coupon_distribution_task`;
+CREATE TABLE `v2_coupon_distribution_task` (`id` bigint unsigned NOT NULL AUTO_INCREMENT,`template_id` int unsigned NOT NULL,`admin_id` int unsigned DEFAULT NULL,`name` varchar(255) NOT NULL,`filters` text NOT NULL,`status` enum('pending','running','completed','partial','cancelled') NOT NULL DEFAULT 'pending',`estimated_count` int unsigned NOT NULL DEFAULT '0',`success_count` int unsigned NOT NULL DEFAULT '0',`skipped_count` int unsigned NOT NULL DEFAULT '0',`failed_count` int unsigned NOT NULL DEFAULT '0',`completed_at` int unsigned DEFAULT NULL,`created_at` int unsigned NOT NULL,`updated_at` int unsigned NOT NULL,PRIMARY KEY (`id`),KEY `template_id` (`template_id`),KEY `status` (`status`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+DROP TABLE IF EXISTS `v2_coupon_operation_record`;
+CREATE TABLE `v2_coupon_operation_record` (`id` bigint unsigned NOT NULL AUTO_INCREMENT,`user_coupon_id` bigint unsigned DEFAULT NULL,`user_id` int unsigned DEFAULT NULL,`admin_id` int unsigned DEFAULT NULL,`action` varchar(50) NOT NULL,`detail` text,`created_at` int unsigned NOT NULL,PRIMARY KEY (`id`),KEY `user_coupon_id` (`user_coupon_id`),KEY `user_id` (`user_id`),KEY `action` (`action`),KEY `created_at` (`created_at`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 DROP TABLE IF EXISTS `v2_giftcard`;
@@ -277,6 +270,7 @@ CREATE TABLE `v2_order` (
                             `user_id` int(11) NOT NULL,
                             `plan_id` int(11) NOT NULL,
                             `coupon_id` int(11) DEFAULT NULL,
+                            `user_coupon_id` bigint unsigned DEFAULT NULL,
                             `payment_id` int(11) DEFAULT NULL,
                             `type` int(11) NOT NULL COMMENT '1新购2续费3升级',
                             `period` varchar(255) NOT NULL,
@@ -285,6 +279,8 @@ CREATE TABLE `v2_order` (
                             `total_amount` int(11) NOT NULL,
                             `handling_amount` int(11) DEFAULT NULL,
                             `discount_amount` int(11) DEFAULT NULL,
+                            `coupon_discount_amount` int unsigned NOT NULL DEFAULT '0',
+                            `coupon_snapshot` text,
                             `surplus_amount` int(11) DEFAULT NULL COMMENT '剩余价值',
                             `refund_amount` int(11) DEFAULT NULL COMMENT '退款金额',
                             `balance_amount` int(11) DEFAULT NULL COMMENT '使用余额',
@@ -299,6 +295,7 @@ CREATE TABLE `v2_order` (
                             PRIMARY KEY (`id`),
                             UNIQUE KEY `trade_no` (`trade_no`),
                             INDEX idx_user (`user_id`),
+                            KEY `user_coupon_id` (`user_coupon_id`),
                             KEY `referral_order_status_inviter_idx` (`status`,`invite_user_id`),
                             INDEX idx_user_status (`user_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

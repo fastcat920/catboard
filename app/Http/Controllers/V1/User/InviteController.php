@@ -11,11 +11,10 @@ use App\Models\ReferralLevel;
 use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
-use App\Models\ReferralCouponGrant;
+use App\Models\UserCoupon;
 use App\Models\ReferralCampaign;
 use App\Models\ReferralMaterial;
 use App\Models\ReferralLeaderboardSetting;
-use App\Models\Coupon;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -138,19 +137,9 @@ class InviteController extends Controller
                     });
                 }
             }
-            if (Schema::hasTable('v2_referral_coupon_grant')) {
-                ReferralCouponGrant::where('user_id', $user->id)->where('status', 'issued')
-                    ->where('expires_at', '<', time())->update(['status' => 'expired', 'updated_at' => time()]);
-                $grant = ReferralCouponGrant::where('user_id', $user->id)->orderBy('id', 'DESC')->first();
-                if ($grant) {
-                    $coupon = Coupon::find($grant->coupon_id);
-                    $program['newcomer_reward'] = [
-                        'status' => $grant->status,
-                        'expires_at' => $grant->expires_at,
-                        'coupon_code' => $coupon ? $coupon->code : null,
-                        'coupon_name' => $coupon ? $coupon->name : null,
-                    ];
-                }
+            if (Schema::hasTable('v2_user_coupon')) {
+                $grant = UserCoupon::with('template')->where('user_id', $user->id)->where('source', 'referral_newcomer')->orderBy('id', 'DESC')->first();
+                if ($grant) $program['newcomer_reward'] = ['status'=>$grant->status,'expires_at'=>$grant->expires_at,'coupon_name'=>$grant->template?$grant->template->name:null];
             }
         }
         return response([

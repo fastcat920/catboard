@@ -60,7 +60,13 @@ class CouponCenterController extends Controller
         $legacy=CouponDistributionTask::where('status','pending')->whereNull('queued_at')->limit(20)->get();
         foreach($legacy as $task){$task->queued_at=time();$task->total_batches=max(1,(int)ceil($task->estimated_count/ProcessCouponDistributionTask::BATCH_SIZE));$task->save();ProcessCouponDistributionTask::dispatch($task->id)->onQueue('default');}
         $rows=CouponDistributionTask::orderBy('id','DESC')->limit(200)->get();$now=time();
-        $rows->each(function($task)use($now){$terminal=in_array($task->status,['completed','partial']);$task->progress=$terminal?100:($task->estimated_count?min(100,round($task->processed_count/$task->estimated_count*100,1)):100);$last=(int)($task->heartbeat_at?:$task->queued_at?:$task->updated_at);$task->worker_warning=in_array($task->status,['pending','running'])&&$last>0&&$last<$now-300;});
+        $rows->each(function($task)use($now){
+            $terminal=in_array($task->status,['completed','partial']);
+            $task->progress=$terminal?100:($task->estimated_count?min(100,round($task->processed_count/$task->estimated_count*100,1)):100);
+            $lastValue=$task->heartbeat_at?:$task->queued_at?:$task->updated_at;
+            $last=$lastValue instanceof \DateTimeInterface?$lastValue->getTimestamp():(int)$lastValue;
+            $task->worker_warning=in_array($task->status,['pending','running'])&&$last>0&&$last<$now-300;
+        });
         return response(['data'=>$rows]);
     }
     public function cancelTask(Request $request){$task=CouponDistributionTask::findOrFail($request->input('id'));if(!in_array($task->status,['pending','running']))abort(422,'当前任务不能取消');$task->status='cancelled';$task->save();return response(['data'=>true]);}

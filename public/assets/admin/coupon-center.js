@@ -17,8 +17,15 @@
             Object.assign({ credentials: "include", headers: h }, opt),
         ).then(function (r) {
             return r.json().then(function (p) {
-                if (!r.ok) throw new Error(p.message || "请求失败");
+                if (!r.ok)
+                    throw new Error(
+                        path + "：" + (p.message || "请求失败（HTTP " + r.status + "）"),
+                    );
                 return p;
+            }).catch(function (error) {
+                if (error.message && error.message.indexOf(path + "：") === 0)
+                    throw error;
+                throw new Error(path + "：服务器返回了无法解析的响应（HTTP " + r.status + "）");
             });
         });
     }

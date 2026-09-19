@@ -15,9 +15,11 @@ class KnowledgeSave extends FormRequest
     {
         return [
             'category' => 'required',
-            'language' => 'required',
+            'category_en' => 'nullable|string|max:255',
             'title' => 'required',
-            'body' => 'required'
+            'title_en' => 'nullable|string|max:255',
+            'body' => 'required',
+            'body_en' => 'nullable|string'
         ];
     }
 
@@ -26,8 +28,7 @@ class KnowledgeSave extends FormRequest
         return [
             'title.required' => '标题不能为空',
             'category.required' => '分类不能为空',
-            'body.required' => '内容不能为空',
-            'language.required' => '语言不能为空'
+            'body.required' => '内容不能为空'
         ];
     }
 }

@@ -4,9 +4,14 @@
 <head>
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/components.chunk.css?v={{$version}}">
     <link rel="stylesheet" href="/theme/{{$theme}}/assets/umi.css?v={{$version}}">
+    <link rel="stylesheet" href="/assets/referral-user.css?v={{$version}}-{{filemtime(public_path('assets/referral-user.css'))}}">
+    <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
+    <link rel="stylesheet" href="/assets/coupon-wallet.css?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.css'))}}">
     @if (file_exists(public_path("/theme/{$theme}/assets/custom.css")))
         <link rel="stylesheet" href="/theme/{{$theme}}/assets/custom.css?v={{$version}}">
     @endif
+    <link rel="stylesheet" href="/assets/coupon-checkout.css?v={{$version}}-{{filemtime(public_path('assets/coupon-checkout.css'))}}">
+    <link rel="stylesheet" href="/assets/plan-flash-sale.css?v={{$version}}-{{filemtime(public_path('assets/plan-flash-sale.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     @php ($colors = [
@@ -22,7 +27,9 @@
     <script>window.routerBase = "/";</script>
     <script>
         window.settings = {
-            title: '{{$title}}',
+            title: @json($title),
+            title_zh: @json($title_zh),
+            title_en: @json($title_en),
             assets_path: '/theme/{{$theme}}/assets',
             theme: {
                 sidebar: '{{$theme_config['theme_sidebar']}}',
@@ -31,26 +38,18 @@
             },
             version: '{{$version}}',
             background_url: '{{$theme_config['background_url']}}',
-            description: '{{$description}}',
+            description: @json($description),
+            description_zh: @json($description_zh),
+            description_en: @json($description_en),
             i18n: [
                 'zh-CN',
-                'en-US',
-                'ja-JP',
-                'vi-VN',
-                'ko-KR',
-                'zh-TW',
-                'fa-IR'
+                'en-US'
             ],
             logo: '{{$logo}}'
         }
     </script>
     <script src="/theme/{{$theme}}/assets/i18n/zh-CN.js?v={{$version}}"></script>
-    <script src="/theme/{{$theme}}/assets/i18n/zh-TW.js?v={{$version}}"></script>
     <script src="/theme/{{$theme}}/assets/i18n/en-US.js?v={{$version}}"></script>
-    <script src="/theme/{{$theme}}/assets/i18n/ja-JP.js?v={{$version}}"></script>
-    <script src="/theme/{{$theme}}/assets/i18n/vi-VN.js?v={{$version}}"></script>
-    <script src="/theme/{{$theme}}/assets/i18n/ko-KR.js?v={{$version}}"></script>
-    <script src="/theme/{{$theme}}/assets/i18n/fa-IR.js?v={{$version}}"></script>
 </head>
 
 <body>
@@ -58,7 +57,13 @@
 {!! $theme_config['custom_html'] !!}
 <script src="/theme/{{$theme}}/assets/vendors.async.js?v={{$version}}"></script>
 <script src="/theme/{{$theme}}/assets/components.async.js?v={{$version}}"></script>
-<script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}"></script>
+<script src="/assets/locale-request.js?v={{$version}}-{{filemtime(public_path('assets/locale-request.js'))}}"></script>
+<script src="/theme/{{$theme}}/assets/umi.js?v={{$version}}-{{filemtime(public_path("theme/{$theme}/assets/umi.js"))}}"></script>
+<script src="/theme/{{$theme}}/assets/account-deletion.js?v={{$version}}"></script>
+<script src="/assets/referral-user.js?v={{$version}}-{{filemtime(public_path('assets/referral-user.js'))}}"></script>
+<script src="/assets/coupon-wallet.js?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.js'))}}"></script>
+<script src="/assets/coupon-checkout.js?v={{$version}}-{{filemtime(public_path('assets/coupon-checkout.js'))}}"></script>
+<script src="/assets/plan-flash-sale.js?v={{$version}}-{{filemtime(public_path('assets/plan-flash-sale.js'))}}"></script>
 @if (file_exists(public_path("/theme/{$theme}/assets/custom.js")))
     <script src="/theme/{{$theme}}/assets/custom.js?v={{$version}}"></script>
 @endif

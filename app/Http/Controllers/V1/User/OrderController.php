@@ -8,17 +8,33 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\User;
-use App\Services\CouponService;
+use App\Services\CouponWalletService;
+use App\Services\FlashSaleService;
+use App\Services\DepositOrderPresenter;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    public function preview(Request $request, CouponWalletService $couponService, FlashSaleService $flashSaleService)
+    {
+        $data=$request->validate(['plan_id'=>'required|integer','period'=>'required|string','user_coupon_id'=>'nullable|integer','disable_auto_coupon'=>'nullable|boolean']);
+        $plan=Plan::findOrFail($data['plan_id']);if(!array_key_exists($data['period'],$plan->getAttributes())||$plan[$data['period']]===null)abort(422,'当前付款周期不可购买');
+        $user=User::findOrFail($request->user['id']);$order=new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$data['period'],'total_amount'=>$plan[$data['period']]]);(new OrderService($order))->setOrderType($user);$original=(int)$order->total_amount;
+        $flashSale=$flashSaleService->apply($order,$user);$activityDiscount=(int)$order->flash_sale_discount_amount;$couponBase=(int)$order->total_amount;
+        $available=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->available($user,$plan->id,$data['period'],$couponBase,(int)$order->type);$selected=$request->boolean('disable_auto_coupon')?null:($request->input('user_coupon_id')?$available->firstWhere('id',(int)$request->input('user_coupon_id')):$available->first());
+        if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$couponBase-$couponDiscount;$memberDiscountRate=app(\App\Services\ReferralProgramService::class)->memberDiscountRate($user);$vipDiscount=(!$selected||$selected->template->stackable)&&$memberDiscountRate?(int)round($afterCoupon*$memberDiscountRate/100):0;
+        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) abort(422, '当前限时特价不可叠加优惠券');
+        $unavailable=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->unavailable($user,$plan->id,$data['period'],$couponBase,(int)$order->type);
+        return response(['data'=>['original_amount'=>$original,'activity_discount'=>$activityDiscount,'flash_sale'=>$flashSale,'coupon_discount'=>$couponDiscount,'member_discount_rate'=>$memberDiscountRate,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available,'unavailable_coupons'=>$unavailable]]);
+    }
+
     public function fetch(Request $request)
     {
         $model = Order::where('user_id', $request->user['id'])
@@ -28,6 +44,9 @@ class OrderController extends Controller
         }
         $order = $model->get();
         $plan = Plan::get();
+        $plan->each(function ($item) use ($request) {
+            ContentLocale::localize($item, ['name', 'content'], $request);
+        });
         for ($i = 0; $i < count($order); $i++) {
             for ($x = 0; $x < count($plan); $x++) {
                 if ($order[$i]['plan_id'] === $plan[$x]['id']) {
@@ -40,7 +59,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function detail(Request $request)
+    public function detail(Request $request, DepositOrderPresenter $depositPresenter)
     {
         $order = Order::where('user_id', $request->user['id'])
             ->where('trade_no', $request->input('trade_no'))
@@ -49,15 +68,8 @@ class OrderController extends Controller
             abort(500, __('Order does not exist or has been paid'));
         }
         if ($order->plan_id == 0) {
-            $order['plan'] = [
-                'id' => 0,
-                'name' => 'deposit'
-            ];
-            $order->bounus = $this->getbounus($order->total_amount);
-            $order->get_amount = $order->total_amount + $order->bounus;
-
             return response([
-                'data' => $order
+                'data' => $depositPresenter->decorate($order)
             ]);
         }
         $order['plan'] = Plan::find($order->plan_id);
@@ -65,6 +77,7 @@ class OrderController extends Controller
         if (!$order['plan']) {
             abort(500, __('Subscription plan does not exist'));
         }
+        ContentLocale::localize($order['plan'], ['name', 'content'], $request);
         if ($order->surplus_order_ids) {
             $order['surplus_orders'] = Order::whereIn('id', $order->surplus_order_ids)->get();
         }
@@ -158,17 +171,11 @@ class OrderController extends Controller
         $order->trade_no = Helper::generateOrderNo();
         $order->total_amount = $plan[$request->input('period')];
 
-        if ($request->input('coupon_code')) {
-            $couponService = new CouponService($request->input('coupon_code'));
-            if (!$couponService->use($order)) {
-                DB::rollBack();
-                abort(500, __('Coupon failed'));
-            }
-            $order->coupon_id = $couponService->getId();
-        }
-
-        $orderService->setVipDiscount($user);
         $orderService->setOrderType($user);
+        $flashSale = app(FlashSaleService::class)->apply($order, $user);
+        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) { DB::rollBack(); abort(422, '当前限时特价不可叠加优惠券'); }
+        $userCoupon = $flashSale && !$flashSale->allow_coupon ? null : app(CouponWalletService::class)->lockForOrder($order, $user, $request->input('user_coupon_id') ? (int)$request->input('user_coupon_id') : null, $request->boolean('disable_auto_coupon'));
+        if (!$userCoupon || $userCoupon->template->stackable) $orderService->setVipDiscount($user);
 
         if ($user->balance > 0 && $order->total_amount > 0) {
             $remainingBalance = $user->balance - $order->total_amount;
@@ -238,11 +245,52 @@ class OrderController extends Controller
             'total_amount' => isset($order->handling_amount) ? ($order->total_amount + $order->handling_amount) : $order->total_amount,
             'user_id' => $order->user_id,
             'stripe_token' => $request->input('token')
-        ]);
+        ], $this->getPaymentReturnUrl($request, $tradeNo));
         return response([
             'type' => $result['type'],
             'data' => $result['data']
         ]);
+    }
+
+    private function getPaymentReturnUrl(Request $request, $tradeNo)
+    {
+        foreach ([$request->header('origin'), $request->header('referer')] as $source) {
+            $origin = $this->normalizePaymentReturnOrigin($source);
+            if ($origin) {
+                return $origin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
+            }
+        }
+
+        $defaultOrigin = $this->normalizePaymentReturnOrigin(config('v2board.app_url'));
+        if ($defaultOrigin) {
+            return $defaultOrigin . '/#/payment?trade_no=' . rawurlencode($tradeNo);
+        }
+
+        return url('/#/payment?trade_no=' . rawurlencode($tradeNo));
+    }
+
+    private function normalizePaymentReturnOrigin($url)
+    {
+        if (!is_string($url) || $url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if (!$parts || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $origin = $scheme . '://' . strtolower($parts['host']);
+        if (isset($parts['port'])) {
+            $origin .= ':' . $parts['port'];
+        }
+
+        return $origin;
     }
 
     public function check(Request $request)
@@ -259,11 +307,12 @@ class OrderController extends Controller
         ]);
     }
 
-    public function getPaymentMethod()
+    public function getPaymentMethod(Request $request)
     {
         $methods = Payment::select([
             'id',
             'name',
+            'name_en',
             'payment',
             'icon',
             'handling_fee_fixed',
@@ -272,6 +321,10 @@ class OrderController extends Controller
             ->where('enable', 1)
             ->orderBy('sort', 'ASC')
             ->get();
+
+        $methods->each(function ($method) use ($request) {
+            ContentLocale::localize($method, ['name'], $request);
+        });
 
         return response([
             'data' => $methods
@@ -301,22 +354,4 @@ class OrderController extends Controller
         ]);
     }
 
-    private function getbounus($total_amount) {
-        $deposit_bounus = config('v2board.deposit_bounus', []);
-        if (empty($deposit_bounus) || $deposit_bounus[0] === null) {
-            return 0;
-        }
-        $add = 0;
-        foreach ($deposit_bounus as $tier) {
-            list($amount, $bounus) = explode(':', $tier);
-            $amount = (float)$amount * 100;
-            $bounus = (float)$bounus * 100;
-            $amount = (int)$amount;
-            $bounus = (int)$bounus;
-            if ($total_amount >= $amount) {
-                $add = max($add, $bounus);
-            }
-        }
-        return $add;
-    }
 }

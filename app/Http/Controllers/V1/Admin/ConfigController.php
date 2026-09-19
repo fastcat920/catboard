@@ -95,7 +95,9 @@ class ConfigController extends Controller
                 'force_https' => (int)config('v2board.force_https', 0),
                 'stop_register' => (int)config('v2board.stop_register', 0),
                 'app_name' => config('v2board.app_name', 'V2Board'),
+                'app_name_en' => config('v2board.app_name_en'),
                 'app_description' => config('v2board.app_description', 'V2Board is best!'),
+                'app_description_en' => config('v2board.app_description_en'),
                 'app_url' => config('v2board.app_url'),
                 'subscribe_url' => config('v2board.subscribe_url'),
                 'subscribe_path' => config('v2board.subscribe_path'),
@@ -140,7 +142,8 @@ class ConfigController extends Controller
                 'email_username' => config('v2board.email_username'),
                 'email_password' => config('v2board.email_password'),
                 'email_encryption' => config('v2board.email_encryption'),
-                'email_from_address' => config('v2board.email_from_address')
+                'email_from_address' => config('v2board.email_from_address'),
+                'coupon_email_notification_enable' => (int)config('v2board.coupon_email_notification_enable', 1)
             ],
             'telegram' => [
                 'telegram_bot_enable' => config('v2board.telegram_bot_enable', 0),

@@ -17,7 +17,12 @@ class UserRoute
             $router->get ('/info', 'V1\\User\\UserController@info');
             $router->post('/newPeriod', 'V1\\User\\UserController@newPeriod');
             $router->post('/redeemgiftcard', 'V1\\User\\UserController@redeemgiftcard');
+            $router->get ('/giftcard/redemptions', 'V1\\User\\UserController@giftcardRedemptions');
             $router->post('/changePassword', 'V1\\User\\UserController@changePassword');
+            $router->post('/sendChangeEmailVerify', 'V1\\User\\UserController@sendChangeEmailVerify');
+            $router->post('/changeEmail', 'V1\\User\\UserController@changeEmail');
+            $router->post('/account/sendDeleteVerify', 'V1\\User\\UserController@sendDeleteAccountVerify');
+            $router->post('/account/delete', 'V1\\User\\UserController@deleteAccount');
             $router->post('/update', 'V1\\User\\UserController@update');
             $router->get ('/getSubscribe', 'V1\\User\\UserController@getSubscribe');
             $router->get ('/getStat', 'V1\\User\\UserController@getStat');
@@ -28,6 +33,7 @@ class UserRoute
             $router->post('/removeActiveSession', 'V1\\User\\UserController@removeActiveSession');
             // Order
             $router->post('/order/save', 'V1\\User\\OrderController@save');
+            $router->post('/order/preview', 'V1\\User\\OrderController@preview');
             $router->post('/order/checkout', 'V1\\User\\OrderController@checkout');
             $router->get ('/order/check', 'V1\\User\\OrderController@check');
             $router->get ('/order/detail', 'V1\\User\\OrderController@detail');
@@ -51,7 +57,8 @@ class UserRoute
             // Server
             $router->get ('/server/fetch', 'V1\\User\\ServerController@fetch');
             // Coupon
-            $router->post('/coupon/check', 'V1\\User\\CouponController@check');
+            $router->get ('/coupon/wallet', 'V1\\User\\CouponController@wallet');
+            $router->get ('/coupon/available', 'V1\\User\\CouponController@available');
             // Telegram
             $router->get ('/telegram/getBotInfo', 'V1\\User\\TelegramController@getBotInfo');
             // Comm

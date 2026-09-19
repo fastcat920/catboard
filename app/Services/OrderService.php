@@ -97,8 +97,15 @@ class OrderService
             DB::rollBack();
             abort(500, '开通失败');
         }
+        app(CouponWalletService::class)->consume($order);
+        app(FlashSaleService::class)->complete($order);
 
         DB::commit();
+        try {
+            app(ReferralProgramService::class)->processCompletedOrder($order->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
 
@@ -129,10 +136,12 @@ class OrderService
     public function setVipDiscount(User $user)
     {
         $order = $this->order;
-        if ($user->discount) {
-            $order->discount_amount = $order->discount_amount + ($order->total_amount * ($user->discount / 100));
+        $discountRate = app(ReferralProgramService::class)->memberDiscountRate($user);
+        if ($discountRate) {
+            $vipDiscount = $order->total_amount * ($discountRate / 100);
+            $order->discount_amount = $order->discount_amount + $vipDiscount;
+            $order->total_amount = $order->total_amount - $vipDiscount;
         }
-        $order->total_amount = $order->total_amount - $order->discount_amount;
     }
 
     public function setInvite(User $user):void
@@ -157,11 +166,10 @@ class OrderService
         }
 
         if (!$isCommission) return;
-        if ($inviter && $inviter->commission_rate) {
-            $order->commission_balance = $order->total_amount * ($inviter->commission_rate / 100);
-        } else {
-            $order->commission_balance = $order->total_amount * (config('v2board.invite_commission', 10) / 100);
-        }
+        $referralService = app(ReferralProgramService::class);
+        $commissionRate = $referralService->commissionRate($inviter) * $referralService->campaignCommissionMultiplier($order, $user);
+        $commissionRate = min($commissionRate, 100);
+        $order->commission_balance = $order->total_amount * ($commissionRate / 100);
     }
 
     private function haveValidOrder(User $user)
@@ -286,6 +294,7 @@ class OrderService
                 return false;
             }
         }
+        app(CouponWalletService::class)->release($order);
         DB::commit();
         return true;
     }

@@ -1,0 +1,14 @@
+(function () {
+    "use strict";
+    var plans = [], timer = null, loading = false;
+    function text(zh,en){return localStorage.getItem("umi_locale")==="en-US"?en:zh;}
+    function headers(){var h={Accept:"application/json","X-Locale":localStorage.getItem("umi_locale")||"zh-CN"},a=localStorage.getItem("authorization");if(a)h.authorization=a;return h;}
+    function money(v){return (Number(v||0)/100).toFixed(2);}
+    function remaining(ts){var s=Math.max(0,Number(ts||0)-Date.now()/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),sec=Math.floor(s%60);if(!s)return text("活动即将结束","Ending soon");if(d)return text("剩余 ","")+d+text("天 ","d ")+h+text("小时","h left");return text("剩余 ","")+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");}
+    function bestSale(plan){var values=Object.keys(plan.active_flash_sales||{}).map(function(k){return plan.active_flash_sales[k];});if(!values.length)return null;return values.sort(function(a,b){return a.final_amount-b.final_amount;})[0];}
+    function render(){var cards=document.querySelectorAll("#main-container .block-header.plan");cards.forEach(function(head){var title=head.querySelector(".block-title"),card=head.closest(".block");if(!title||!card)return;var plan=plans.find(function(x){return String(x.name).trim()===title.textContent.trim();}),old=card.querySelector(".plan-flash-sale");if(!plan){if(old)old.remove();return;}var sale=bestSale(plan);if(!sale){if(old)old.remove();return;}if(!old){old=document.createElement("div");old.className="plan-flash-sale";head.parentNode.insertBefore(old,head.nextSibling);}var signature=[sale.id,sale.name,sale.final_amount,sale.ends_at].join(":");old.dataset.endsAt=sale.ends_at;if(old.dataset.saleRender===signature)return;old.dataset.saleRender=signature;old.innerHTML='<div><b>'+text("限时优惠","FLASH SALE")+'</b><span>'+sale.name+'</span></div><div><strong>'+text("最低活动价 ¥","From ¥")+money(sale.final_amount)+'</strong><small data-countdown>'+remaining(sale.ends_at)+'</small></div>';});}
+    function tick(){document.querySelectorAll(".plan-flash-sale[data-ends-at] [data-countdown]").forEach(function(x){x.textContent=remaining(x.closest(".plan-flash-sale").dataset.endsAt);});}
+    function load(){if(loading||location.hash.indexOf("/plan")<0)return;loading=true;fetch("/api/v1/user/plan/fetch",{credentials:"include",headers:headers()}).then(function(r){return r.json();}).then(function(p){plans=p.data||[];render();}).catch(function(){}).finally(function(){loading=false;});}
+    function start(){load();new MutationObserver(function(){if(location.hash.indexOf("/plan")>=0){render();if(!plans.length)load();}}).observe(document.getElementById("root")||document.body,{childList:true,subtree:true});timer=setInterval(tick,1000);window.addEventListener("hashchange",load);}
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
+})();

@@ -1,0 +1,83 @@
+<?php
+
+namespace App\Services\NodeSecurity;
+
+use Illuminate\Support\Facades\DB;
+
+class SettingsService
+{
+    private const DEFAULTS = [
+        'enabled' => true,
+        'retention_days' => 30,
+        'risk_window_seconds' => 300,
+        'health_enabled' => false,
+        'health_timeout_seconds' => 3,
+        'health_failures_to_alert' => 3,
+        'auto_create_event' => true,
+        'auto_suspend_score' => 0,
+        'multi_account_ip_threshold' => 5,
+        'alert_webhook_url' => '',
+        'probe_interval_seconds' => 300,
+        'probe_failures_to_event' => 3,
+        'probe_domestic_min_success' => 1,
+        'probe_overseas_min_success' => 1,
+        'probe_domestic_success_ratio' => 50,
+        'probe_overseas_success_ratio' => 50,
+        'probe_recovery_success_rounds' => 1,
+        'probe_result_window_seconds' => 600,
+        'probe_page_refresh_seconds' => 30,
+        'security_analysis_interval_minutes' => 1,
+    ];
+
+    public function all(): array
+    {
+        $values = self::DEFAULTS;
+        try {
+            foreach (DB::table('v2_security_setting')->get() as $row) {
+                if (array_key_exists($row->key, self::DEFAULTS)) {
+                    $values[$row->key] = json_decode($row->value, true);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Migration may not have run yet; security instrumentation must fail open.
+        }
+        return $values;
+    }
+
+    public function get(string $key, $default = null)
+    {
+        $values = $this->all();
+        return array_key_exists($key, $values) ? $values[$key] : $default;
+    }
+
+    public function save(array $values): array
+    {
+        $allowed = array_intersect_key($values, self::DEFAULTS);
+        if (array_key_exists('probe_page_refresh_seconds', $allowed)) {
+            $refresh = (int)$allowed['probe_page_refresh_seconds'];
+            $allowed['probe_page_refresh_seconds'] = $refresh <= 0 ? 0 : max(5, min(3600, $refresh));
+        }
+        if (array_key_exists('security_analysis_interval_minutes', $allowed)) {
+            $allowed['security_analysis_interval_minutes'] = max(1, min(60, (int)$allowed['security_analysis_interval_minutes']));
+        }
+        foreach (['probe_domestic_min_success', 'probe_overseas_min_success'] as $key) {
+            if (array_key_exists($key, $allowed)) $allowed[$key] = max(1, min(100, (int)$allowed[$key]));
+        }
+        foreach (['probe_domestic_success_ratio', 'probe_overseas_success_ratio'] as $key) {
+            if (array_key_exists($key, $allowed)) $allowed[$key] = max(1, min(100, (int)$allowed[$key]));
+        }
+        if (array_key_exists('probe_recovery_success_rounds', $allowed)) {
+            $allowed['probe_recovery_success_rounds'] = max(1, min(20, (int)$allowed['probe_recovery_success_rounds']));
+        }
+        if (array_key_exists('probe_failures_to_event', $allowed)) {
+            $allowed['probe_failures_to_event'] = max(1, min(100, (int)$allowed['probe_failures_to_event']));
+        }
+        foreach ($allowed as $key => $value) {
+            DB::table('v2_security_setting')->updateOrInsert(
+                ['key' => $key],
+                ['value' => json_encode($value), 'updated_at' => time()]
+            );
+        }
+        return $this->all();
+    }
+}

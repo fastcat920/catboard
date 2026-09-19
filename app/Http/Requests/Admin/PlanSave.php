@@ -15,7 +15,9 @@ class PlanSave extends FormRequest
     {
         return [
             'name' => 'required',
+            'name_en' => 'nullable|string|max:255',
             'content' => '',
+            'content_en' => 'nullable|string',
             'group_id' => 'required',
             'transfer_enable' => 'required',
             'device_limit' => 'nullable|integer',

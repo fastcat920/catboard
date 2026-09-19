@@ -24,7 +24,7 @@ class SendCouponReceivedEmail implements ShouldQueue
     public function __construct(int $couponId)
     {
         $this->couponId = $couponId;
-        $this->onQueue('default');
+        $this->onQueue('send_email');
     }
 
     public function handle()

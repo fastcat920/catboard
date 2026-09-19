@@ -36,7 +36,7 @@ class CouponWalletService
             return ['coupon'=>$coupon,'created'=>true];
         });
         if ($result['created'] && $result['coupon'] && config('v2board.coupon_email_notification_enable', 1) && $template->email_notify_enabled) {
-            SendCouponReceivedEmail::dispatch($result['coupon']->id)->onQueue('default');
+            SendCouponReceivedEmail::dispatch($result['coupon']->id)->onQueue('send_email');
         } elseif ($result['created'] && $result['coupon']) {
             $result['coupon']->update(['notification_status'=>'disabled']);
         }

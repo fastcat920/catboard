@@ -64,6 +64,10 @@
         });
     }
 
+    function isReferralRoute() {
+        return location.hash === "#/referral" || location.pathname === "/referral";
+    }
+
     function open() {
         if (!root || !root.isConnected) {
             root = document.createElement("div");
@@ -187,7 +191,11 @@
             item.innerHTML = '<a class="nav-main-link referral-admin-menu-link" href="javascript:void(0);" title="邀请管理">' +
                 '<i class="nav-main-link-icon si si-present"></i>' +
                 '<span class="nav-main-link-name">邀请管理</span></a>';
-            item.querySelector("a").onclick = function (event) { event.preventDefault(); open(); };
+            item.querySelector("a").onclick = function (event) {
+                event.preventDefault();
+                if (!isReferralRoute() && window.g_history) window.g_history.push("/referral");
+                setTimeout(open, 0);
+            };
         }
         if (item.nextElementSibling !== subscriptionItem) nav.insertBefore(item, subscriptionItem);
         return true;
@@ -213,6 +221,11 @@
     }
     function start(){
         mount();
+        if (isReferralRoute()) setTimeout(open, 0);
+        if (window.g_history) window.g_history.listen(function (location) {
+            if (location.pathname === "/referral") setTimeout(open, 0);
+            else close();
+        });
         document.addEventListener("click", function (event) {
             var link = event.target.closest && event.target.closest(".nav-main-link");
             if (link && !link.classList.contains("referral-admin-menu-link")) close();

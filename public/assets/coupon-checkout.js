@@ -22,6 +22,12 @@
     function money(value) {
         return (Number(value || 0) / 100).toFixed(2);
     }
+    function remaining(value) {
+        var seconds = Math.max(0, Number(value || 0) - Date.now() / 1000);
+        if (!seconds) return text("即将结束", "Ending soon");
+        var days = Math.floor(seconds / 86400), hours = Math.floor(seconds % 86400 / 3600), minutes = Math.floor(seconds % 3600 / 60);
+        return days ? text("剩余 ", "") + days + text(" 天 ", "d ") + hours + text(" 小时", "h left") : text("剩余 ", "") + hours + text(" 小时 ", "h ") + minutes + text(" 分钟", "m left");
+    }
     function localizedName(template) {
         if (!template) return "";
         return localStorage.getItem("umi_locale") === "en-US" &&
@@ -176,6 +182,7 @@
         }
         var signature = [
             state.key,
+            state.preview.activity_discount,
             state.preview.coupon_discount,
             state.preview.vip_discount,
             state.preview.final_amount,
@@ -183,6 +190,7 @@
         if (rows.dataset.couponRender === signature) return;
         rows.dataset.couponRender = signature;
         rows.innerHTML =
+            (state.preview.flash_sale ? "<div><span>" + text("限时特价", "Flash sale") + " · " + esc(localizedName(state.preview.flash_sale)) + "<small>" + esc(remaining(state.preview.flash_sale.ends_at)) + "</small></span><strong>-¥" + money(state.preview.activity_discount) + "</strong></div>" : "") +
             "<div><span>" +
             text("优惠券", "Coupon") +
             "</span><strong>-¥" +

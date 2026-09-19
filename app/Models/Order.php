@@ -15,6 +15,7 @@ class Order extends Model
         'created_at' => 'timestamp',
         'updated_at' => 'timestamp',
         'surplus_order_ids' => 'array',
-        'coupon_snapshot' => 'array'
+        'coupon_snapshot' => 'array',
+        'flash_sale_snapshot' => 'array'
     ];
 }

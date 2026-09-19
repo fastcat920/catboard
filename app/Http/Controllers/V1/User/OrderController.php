@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\CouponWalletService;
+use App\Services\FlashSaleService;
 use App\Services\DepositOrderPresenter;
 use App\Services\OrderService;
 use App\Services\PaymentService;
@@ -21,15 +22,17 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function preview(Request $request, CouponWalletService $couponService)
+    public function preview(Request $request, CouponWalletService $couponService, FlashSaleService $flashSaleService)
     {
         $data=$request->validate(['plan_id'=>'required|integer','period'=>'required|string','user_coupon_id'=>'nullable|integer','disable_auto_coupon'=>'nullable|boolean']);
         $plan=Plan::findOrFail($data['plan_id']);if(!array_key_exists($data['period'],$plan->getAttributes())||$plan[$data['period']]===null)abort(422,'当前付款周期不可购买');
         $user=User::findOrFail($request->user['id']);$order=new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$data['period'],'total_amount'=>$plan[$data['period']]]);(new OrderService($order))->setOrderType($user);$original=(int)$order->total_amount;
-        $available=$couponService->available($user,$plan->id,$data['period'],$original,(int)$order->type);$selected=$request->boolean('disable_auto_coupon')?null:($request->input('user_coupon_id')?$available->firstWhere('id',(int)$request->input('user_coupon_id')):$available->first());
-        if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$original-$couponDiscount;$vipDiscount=(!$selected||$selected->template->stackable)&&$user->discount?(int)round($afterCoupon*$user->discount/100):0;
-        $unavailable=$couponService->unavailable($user,$plan->id,$data['period'],$original,(int)$order->type);
-        return response(['data'=>['original_amount'=>$original,'coupon_discount'=>$couponDiscount,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available,'unavailable_coupons'=>$unavailable]]);
+        $flashSale=$flashSaleService->apply($order,$user);$activityDiscount=(int)$order->flash_sale_discount_amount;$couponBase=(int)$order->total_amount;
+        $available=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->available($user,$plan->id,$data['period'],$couponBase,(int)$order->type);$selected=$request->boolean('disable_auto_coupon')?null:($request->input('user_coupon_id')?$available->firstWhere('id',(int)$request->input('user_coupon_id')):$available->first());
+        if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$couponBase-$couponDiscount;$vipDiscount=(!$selected||$selected->template->stackable)&&$user->discount?(int)round($afterCoupon*$user->discount/100):0;
+        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) abort(422, '当前限时特价不可叠加优惠券');
+        $unavailable=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->unavailable($user,$plan->id,$data['period'],$couponBase,(int)$order->type);
+        return response(['data'=>['original_amount'=>$original,'activity_discount'=>$activityDiscount,'flash_sale'=>$flashSale,'coupon_discount'=>$couponDiscount,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available,'unavailable_coupons'=>$unavailable]]);
     }
 
     public function fetch(Request $request)
@@ -169,7 +172,9 @@ class OrderController extends Controller
         $order->total_amount = $plan[$request->input('period')];
 
         $orderService->setOrderType($user);
-        $userCoupon = app(CouponWalletService::class)->lockForOrder($order, $user, $request->input('user_coupon_id') ? (int)$request->input('user_coupon_id') : null, $request->boolean('disable_auto_coupon'));
+        $flashSale = app(FlashSaleService::class)->apply($order, $user);
+        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) { DB::rollBack(); abort(422, '当前限时特价不可叠加优惠券'); }
+        $userCoupon = $flashSale && !$flashSale->allow_coupon ? null : app(CouponWalletService::class)->lockForOrder($order, $user, $request->input('user_coupon_id') ? (int)$request->input('user_coupon_id') : null, $request->boolean('disable_auto_coupon'));
         if (!$userCoupon || $userCoupon->template->stackable) $orderService->setVipDiscount($user);
 
         if ($user->balance > 0 && $order->total_amount > 0) {

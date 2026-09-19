@@ -98,6 +98,7 @@ class OrderService
             abort(500, '开通失败');
         }
         app(CouponWalletService::class)->consume($order);
+        app(FlashSaleService::class)->complete($order);
 
         DB::commit();
         try {

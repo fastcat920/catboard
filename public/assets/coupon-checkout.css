@@ -44,6 +44,7 @@
 .coupon-checkout-summary strong {
     color: #5cdb95;
 }
+.coupon-checkout-summary small { display:block; color:#8a94a6; margin-top:2px; }
 .coupon-select-modal {
     position: fixed;
     z-index: 1090;

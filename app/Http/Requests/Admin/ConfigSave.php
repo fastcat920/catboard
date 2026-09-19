@@ -77,6 +77,7 @@ class ConfigSave extends FormRequest
         'email_password' => '',
         'email_encryption' => '',
         'email_from_address' => '',
+        'coupon_email_notification_enable' => 'in:0,1',
         // telegram
         'telegram_bot_enable' => 'in:0,1',
         'telegram_bot_token' => '',

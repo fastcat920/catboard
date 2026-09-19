@@ -6400,6 +6400,12 @@
                     }, e)
                 }
                 ))), f.a.createElement(m, {
+                    title: "优惠券到账通知",
+                    description: "用户账号有新优惠券到账时自动发送邮件；关闭后所有优惠券模板均不发送。"
+                }, f.a.createElement(l["a"], {
+                    checked: parseInt(v.coupon_email_notification_enable),
+                    onChange: e=>this.set("email", "coupon_email_notification_enable", e ? 1 : 0)
+                })), f.a.createElement(m, {
                     title: "\u53d1\u9001\u6d4b\u8bd5\u90ae\u4ef6",
                     description: "\u90ae\u4ef6\u5c06\u4f1a\u53d1\u9001\u5230\u5f53\u524d\u767b\u9646\u7528\u6237\u90ae\u7bb1"
                 }, f.a.createElement(o["a"], {

@@ -31,7 +31,7 @@ class SendCouponReceivedEmail implements ShouldQueue
     {
         $coupon = UserCoupon::with(['template', 'user'])->find($this->couponId);
         if (!$coupon || !$coupon->template || !$coupon->user || $coupon->notification_status === 'sent') return;
-        if (!$coupon->template->email_notify_enabled) {
+        if (!config('v2board.coupon_email_notification_enable', 1) || !$coupon->template->email_notify_enabled) {
             $coupon->notification_status = 'disabled';
             $coupon->notification_error = null;
             $coupon->save();

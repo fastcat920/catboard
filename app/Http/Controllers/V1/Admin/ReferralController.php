@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\CouponTemplate;
 use App\Models\Plan;
 use App\Models\ReferralCampaign;
-use App\Models\ReferralMaterial;
 use App\Models\ReferralVisit;
 use App\Models\ReferralLeaderboardSetting;
 use App\Models\ReferralLevel;
@@ -132,29 +131,6 @@ class ReferralController extends Controller
         $campaign = ReferralCampaign::findOrFail($request->input('id'));
         if (ReferralReward::where('campaign_id', $campaign->id)->exists()) abort(422, '活动已有奖励流水，请停用活动而不是删除');
         return response(['data' => (bool)$campaign->delete()]);
-    }
-
-    public function materials()
-    {
-        return response(['data' => ReferralMaterial::orderBy('sort')->orderBy('id', 'DESC')->get()]);
-    }
-
-    public function saveMaterial(Request $request)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:100', 'name_en' => 'nullable|string|max:100',
-            'copy_zh' => 'nullable|string|max:2000', 'copy_en' => 'nullable|string|max:2000',
-            'image_data' => 'nullable|string|max:3000000', 'sort' => 'required|integer|min:0', 'enabled' => 'required|boolean',
-        ]);
-        if (!empty($data['image_data']) && !preg_match('#^data:image/(png|jpeg|webp);base64,#', $data['image_data'])) abort(422, '海报模板仅支持 PNG、JPG 或 WebP 图片');
-        $material = $request->input('id') ? ReferralMaterial::findOrFail($request->input('id')) : new ReferralMaterial();
-        $material->fill($data)->save();
-        return response(['data' => $material]);
-    }
-
-    public function dropMaterial(Request $request)
-    {
-        return response(['data' => (bool)ReferralMaterial::findOrFail($request->input('id'))->delete()]);
     }
 
     public function leaderboard(Request $request)

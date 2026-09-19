@@ -129,9 +129,6 @@ class AdminRoute
             $router->get ('/referral/campaigns', 'V1\\Admin\\ReferralController@campaigns');
             $router->post('/referral/campaign/save', 'V1\\Admin\\ReferralController@saveCampaign');
             $router->post('/referral/campaign/drop', 'V1\\Admin\\ReferralController@dropCampaign');
-            $router->get ('/referral/materials', 'V1\\Admin\\ReferralController@materials');
-            $router->post('/referral/material/save', 'V1\\Admin\\ReferralController@saveMaterial');
-            $router->post('/referral/material/drop', 'V1\\Admin\\ReferralController@dropMaterial');
             $router->get ('/referral/leaderboard', 'V1\\Admin\\ReferralController@leaderboard');
             $router->post('/referral/leaderboard/setting', 'V1\\Admin\\ReferralController@saveLeaderboardSetting');
             $router->get ('/referral/funnel', 'V1\\Admin\\ReferralController@funnel');

@@ -13,7 +13,6 @@ use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\UserCoupon;
 use App\Models\ReferralCampaign;
-use App\Models\ReferralMaterial;
 use App\Models\ReferralLeaderboardSetting;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
@@ -117,9 +116,6 @@ class InviteController extends Controller
                             ->orWhere(function ($q) use ($registeredAt) { $q->where('audience', 'new')->where('starts_at', '<=', $registeredAt); })
                             ->orWhere(function ($q) use ($registeredAt) { $q->where('audience', 'existing')->where('starts_at', '>', $registeredAt); });
                     })->orderBy('id', 'DESC')->first();
-            }
-            if (Schema::hasTable('v2_referral_material')) {
-                $program['materials'] = ReferralMaterial::where('enabled', 1)->orderBy('sort')->get();
             }
             if (Schema::hasTable('v2_referral_leaderboard_setting')) {
                 $leaderboardSetting = ReferralLeaderboardSetting::current();

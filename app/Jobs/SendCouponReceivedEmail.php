@@ -80,6 +80,15 @@ class SendCouponReceivedEmail implements ShouldQueue
         }
     }
 
+    public function failed(\Throwable $exception): void
+    {
+        $coupon = UserCoupon::find($this->couponId);
+        if (!$coupon || $coupon->notification_status === 'sent') return;
+        $coupon->notification_status = 'failed';
+        $coupon->notification_error = mb_substr($exception->getMessage(), 0, 2000);
+        $coupon->save();
+    }
+
     private function configureMail(): void
     {
         if (!config('v2board.email_host')) return;

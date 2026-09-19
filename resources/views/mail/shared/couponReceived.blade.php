@@ -11,10 +11,10 @@
             <div style="border:1px solid #e7ebf0;border-radius:10px;padding:22px;background:#fafbfc">
                 <div style="font-size:20px;font-weight:600">{{ $couponName }}</div>
                 <div style="font-size:14px;color:#718096;margin-top:4px">{{ $couponNameEn }}</div>
-                @if($description)<div style="margin-top:14px">{{ $description }}</div>@endif
-                @if($descriptionEn)<div style="margin-top:4px;color:#718096">{{ $descriptionEn }}</div>@endif
+                <div style="margin-top:14px">{{ $description ?: '' }}</div>
+                <div style="margin-top:4px;color:#718096">{{ $descriptionEn ?: '' }}</div>
                 <div style="font-size:30px;font-weight:700;color:#4566ae;margin:20px 0 8px">
-                    @if($discountType === 'fixed')¥{{ number_format($discountValue / 100, 2) }}@else{{ $discountValue }}% OFF@endif
+                    {{ $discountType === 'fixed' ? '¥'.number_format($discountValue / 100, 2) : $discountValue.'% OFF' }}
                 </div>
                 <div style="font-size:14px;line-height:1.8;color:#59636e">
                     最低消费 / Minimum spend：¥{{ number_format($minimumAmount / 100, 2) }}<br>

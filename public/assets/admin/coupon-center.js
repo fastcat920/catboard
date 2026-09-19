@@ -57,6 +57,17 @@
             }[source] || source
         );
     }
+    function notificationLabel(status) {
+        return (
+            {
+                pending: "等待投递",
+                sending: "发送中",
+                sent: "已发送",
+                failed: "发送失败",
+                disabled: "未启用",
+            }[status] || status || "-"
+        );
+    }
     function field(n, l, v, t) {
         return (
             '<div class="form-group"><label>' +
@@ -216,6 +227,7 @@
                                 "门槛",
                                 "有效期",
                                 "已发放/已使用",
+                                "到账邮件",
                                 "状态",
                                 "操作",
                             ],
@@ -230,6 +242,7 @@
                                         ? x.valid_days + " 天"
                                         : dt(x.ends_at),
                                     x.issued_count + " / " + x.used_count,
+                                    x.email_notify_enabled ? "发送" : "不发送",
                                     x.enabled ? "启用" : "停用",
                                     "",
                                 ];
@@ -282,7 +295,11 @@
             field("name", "中文名称", x.name || "", "text") +
             '</div><div class="col-md-6">' +
             field("name_en", "英文名称", x.name_en || "", "text") +
-            '</div></div><div class="row"><div class="col-md-6"><div class="form-group"><label>优惠类型</label><select class="form-control" name="discount_type"><option value="fixed">固定金额</option><option value="percent">百分比</option></select></div></div><div class="col-md-6">' +
+            '</div></div><div class="row"><div class="col-md-6"><div class="form-group"><label>中文描述</label><textarea class="form-control" name="description" rows="2">' +
+            esc(x.description || "") +
+            '</textarea></div></div><div class="col-md-6"><div class="form-group"><label>英文描述</label><textarea class="form-control" name="description_en" rows="2">' +
+            esc(x.description_en || "") +
+            '</textarea></div></div></div><div class="row"><div class="col-md-6"><div class="form-group"><label>优惠类型</label><select class="form-control" name="discount_type"><option value="fixed">固定金额</option><option value="percent">百分比</option></select></div></div><div class="col-md-6">' +
             field(
                 "discount_value",
                 "优惠值（金额填分，比例填整数）",
@@ -358,6 +375,7 @@
                 ["new_user_only", "仅限新用户"],
                 ["allow_renewal", "允许续费"],
                 ["stackable", "允许叠加会员折扣"],
+                ["email_notify_enabled", "优惠券到账后发送邮件"],
                 ["enabled", "启用"],
             ]
                 .map(function (v) {
@@ -367,7 +385,7 @@
                         '" ' +
                         (x[v[0]] ||
                         (!x.id &&
-                            ["allow_renewal", "enabled"].indexOf(v[0]) >= 0)
+                            ["allow_renewal", "email_notify_enabled", "enabled"].indexOf(v[0]) >= 0)
                             ? "checked"
                             : "") +
                         "> " +
@@ -394,8 +412,8 @@
                 data = {
                     name: f.name.value,
                     name_en: f.name_en.value,
-                    description: null,
-                    description_en: null,
+                    description: f.description.value || null,
+                    description_en: f.description_en.value || null,
                     discount_type: f.discount_type.value,
                     discount_value: Number(f.discount_value.value),
                     minimum_amount: Number(f.minimum_amount.value || 0),
@@ -414,6 +432,7 @@
                     new_user_only: f.new_user_only.checked ? 1 : 0,
                     allow_renewal: f.allow_renewal.checked ? 1 : 0,
                     stackable: f.stackable.checked ? 1 : 0,
+                    email_notify_enabled: f.email_notify_enabled.checked ? 1 : 0,
                     per_user_limit: Number(f.per_user_limit.value || 1),
                     total_limit: n("total_limit"),
                     daily_limit: n("daily_limit"),
@@ -659,6 +678,7 @@
                                 "状态",
                                 "生效",
                                 "过期",
+                                "邮件通知",
                                 "订单",
                                 "操作",
                             ],
@@ -670,6 +690,7 @@
                                     x.status,
                                     dt(x.starts_at),
                                     dt(x.expires_at),
+                                    notificationLabel(x.notification_status),
                                     x.order_id || "-",
                                     "",
                                 ];
@@ -680,7 +701,10 @@
                     var x = p.data[i];
                     if (!x) return;
                     tr.lastElementChild.innerHTML =
-                        '<button class="btn btn-sm btn-light" data-extend>延期</button><button class="btn btn-sm btn-light text-danger" data-revoke>撤销</button>';
+                        '<button class="btn btn-sm btn-light" data-extend>延期</button><button class="btn btn-sm btn-light text-danger" data-revoke>撤销</button>' +
+                        (x.notification_status === "failed"
+                            ? '<button class="btn btn-sm btn-light" data-retry-mail>重发邮件</button>'
+                            : "");
                     tr.querySelector("[data-extend]").onclick = function () {
                         var days = prompt("延长多少天？", "30");
                         if (days)
@@ -711,6 +735,18 @@
                                     alert(e.message);
                                 });
                     };
+                    var retryMail = tr.querySelector("[data-retry-mail]");
+                    if (retryMail)
+                        retryMail.onclick = function () {
+                            api("/user-coupon/retry-notification", {
+                                method: "POST",
+                                body: JSON.stringify({ id: x.id }),
+                            })
+                                .then(wallet)
+                                .catch(function (e) {
+                                    alert(e.message);
+                                });
+                        };
                 });
             })
             .catch(fail);

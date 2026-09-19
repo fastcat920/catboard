@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendCouponReceivedEmail;
 use App\Models\CouponTemplate;
 use App\Models\Order;
 use App\Models\User;
@@ -18,7 +19,7 @@ class CouponWalletService
 
     public function issueWithStatus(CouponTemplate $template, User $user, string $source, string $reference): array
     {
-        return DB::transaction(function () use ($template, $user, $source, $reference) {
+        $result = DB::transaction(function () use ($template, $user, $source, $reference) {
             $template = CouponTemplate::where('id', $template->id)->lockForUpdate()->first();
             if (!$template || !$template->enabled) return ['coupon'=>null,'created'=>false];
             $existing = UserCoupon::where(compact('source'))->where('source_reference', $reference)->where('template_id', $template->id)->where('user_id', $user->id)->first();
@@ -34,6 +35,12 @@ class CouponWalletService
             $template->increment('issued_count'); $this->record($coupon, $user->id, 'issued', ['source'=>$source]);
             return ['coupon'=>$coupon,'created'=>true];
         });
+        if ($result['created'] && $result['coupon'] && $template->email_notify_enabled) {
+            SendCouponReceivedEmail::dispatch($result['coupon']->id)->onQueue('default');
+        } elseif ($result['created'] && $result['coupon']) {
+            $result['coupon']->update(['notification_status'=>'disabled']);
+        }
+        return $result;
     }
 
     public function wallet(int $userId)

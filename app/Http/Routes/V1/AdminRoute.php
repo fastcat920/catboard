@@ -175,6 +175,7 @@ class AdminRoute
             $router->post('/coupon/distribution/retry', 'V1\\Admin\\CouponCenterController@retryTask');
             $router->get ('/coupon/user-coupons', 'V1\\Admin\\CouponCenterController@userCoupons');
             $router->post('/coupon/user-coupon/issue', 'V1\\Admin\\CouponCenterController@issueUser');
+            $router->post('/coupon/user-coupon/retry-notification', 'V1\\Admin\\CouponCenterController@retryNotification');
             $router->post('/coupon/user-coupon/revoke', 'V1\\Admin\\CouponCenterController@revoke');
             $router->post('/coupon/user-coupon/extend', 'V1\\Admin\\CouponCenterController@extend');
             $router->post('/coupon/user-coupon/restore', 'V1\\Admin\\CouponCenterController@restore');

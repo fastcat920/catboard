@@ -17,6 +17,15 @@ use Illuminate\Support\Facades\Schema;
 
 class ReferralProgramService
 {
+    public function memberDiscountRate(User $user): int
+    {
+        $manual = max(0, min(100, (int)$user->discount));
+        if (!$user->referral_level_id) return $manual;
+        if ($user->referral_level_expires_at && $user->referral_level_expires_at <= time()) return $manual;
+        $level = ReferralLevel::where('id', $user->referral_level_id)->where('enabled', 1)->first();
+        return max($manual, $level ? max(0, min(100, (int)$level->member_discount)) : 0);
+    }
+
     public function issueNewcomerCoupon(User $user): ?UserCoupon
     {
         if (!$user->invite_user_id || !Schema::hasTable('v2_user_coupon')) return null;

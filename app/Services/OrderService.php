@@ -136,8 +136,9 @@ class OrderService
     public function setVipDiscount(User $user)
     {
         $order = $this->order;
-        if ($user->discount) {
-            $vipDiscount = $order->total_amount * ($user->discount / 100);
+        $discountRate = app(ReferralProgramService::class)->memberDiscountRate($user);
+        if ($discountRate) {
+            $vipDiscount = $order->total_amount * ($discountRate / 100);
             $order->discount_amount = $order->discount_amount + $vipDiscount;
             $order->total_amount = $order->total_amount - $vipDiscount;
         }

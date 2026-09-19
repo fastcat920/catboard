@@ -74,6 +74,7 @@ class ReferralController extends Controller
             'description_en' => 'nullable|string|max:255',
             'required_invites' => 'required|integer|min:0',
             'commission_rate' => 'required|integer|min:0|max:100',
+            'member_discount' => 'required|integer|min:0|max:100',
             'valid_days' => 'required|integer|min:0|max:3650',
             'retain_invites' => 'required|integer|min:0',
             'enabled' => 'required|boolean',

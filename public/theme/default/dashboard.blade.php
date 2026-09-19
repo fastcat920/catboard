@@ -11,6 +11,7 @@
         <link rel="stylesheet" href="/theme/{{$theme}}/assets/custom.css?v={{$version}}">
     @endif
     <link rel="stylesheet" href="/assets/coupon-checkout.css?v={{$version}}-{{filemtime(public_path('assets/coupon-checkout.css'))}}">
+    <link rel="stylesheet" href="/assets/plan-flash-sale.css?v={{$version}}-{{filemtime(public_path('assets/plan-flash-sale.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     @php ($colors = [
@@ -62,6 +63,7 @@
 <script src="/assets/referral-user.js?v={{$version}}-{{filemtime(public_path('assets/referral-user.js'))}}"></script>
 <script src="/assets/coupon-wallet.js?v={{$version}}-{{filemtime(public_path('assets/coupon-wallet.js'))}}"></script>
 <script src="/assets/coupon-checkout.js?v={{$version}}-{{filemtime(public_path('assets/coupon-checkout.js'))}}"></script>
+<script src="/assets/plan-flash-sale.js?v={{$version}}-{{filemtime(public_path('assets/plan-flash-sale.js'))}}"></script>
 @if (file_exists(public_path("/theme/{$theme}/assets/custom.js")))
     <script src="/theme/{{$theme}}/assets/custom.js?v={{$version}}"></script>
 @endif

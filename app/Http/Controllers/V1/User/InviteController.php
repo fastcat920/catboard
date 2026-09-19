@@ -95,8 +95,11 @@ class InviteController extends Controller
             }
             $effectiveCount = ReferralReward::where('user_id', $user->id)
                 ->where('reward_type', 'effective_invite')->where('status', 'granted')->count();
-            $level = $user->referral_level_id ? ReferralLevel::find($user->referral_level_id) : ReferralLevel::where('enabled', 1)
+            $assignedLevelValid = $user->referral_level_id && (!$user->referral_level_expires_at || $user->referral_level_expires_at > time());
+            $level = $assignedLevelValid ? ReferralLevel::where('id', $user->referral_level_id)->where('enabled', 1)->first() : ReferralLevel::where('enabled', 1)
                 ->where('required_invites', '<=', $effectiveCount)->orderBy('required_invites', 'DESC')->first();
+            $nextLevel = ReferralLevel::where('enabled', 1)->where('required_invites', '>', $effectiveCount)
+                ->orderBy('required_invites')->first();
             $nextMilestone = ReferralMilestone::where('enabled', 1)->where('required_invites', '>', $effectiveCount)
                 ->orderBy('required_invites')->first();
             $program = [
@@ -104,6 +107,7 @@ class InviteController extends Controller
                 'effective_invites' => $effectiveCount,
                 'level' => $level,
                 'level_expires_at' => $user->referral_level_expires_at,
+                'next_level' => $nextLevel,
                 'next_milestone' => $nextMilestone,
                 'recent_rewards' => ReferralReward::where('user_id', $user->id)->where('reward_type', '!=', 'effective_invite')
                     ->orderBy('id', 'DESC')->limit(10)->get(),

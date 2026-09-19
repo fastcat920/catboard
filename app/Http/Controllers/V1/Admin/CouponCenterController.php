@@ -19,8 +19,11 @@ class CouponCenterController extends Controller
 {
     public function legacyFetch()
     {
-        $templates=CouponTemplate::orderBy('id','DESC')->get();
-        return response(['data'=>$templates,'total'=>$templates->count()]);
+        // The bundled admin page still requests this legacy endpoint before the
+        // coupon center overlay is mounted. New coupon templates are not
+        // compatible with the old coupon-code table schema, so keep the legacy
+        // page empty and let the coupon center endpoints render the real data.
+        return response(['data'=>[],'total'=>0]);
     }
 
     public function dashboard()

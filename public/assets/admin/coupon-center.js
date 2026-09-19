@@ -96,9 +96,10 @@
         if (!root || !root.isConnected) {
             root = document.createElement("div");
             root.className = "coupon-center-admin";
-            (
-                document.getElementById("page-container") || document.body
-            ).appendChild(root);
+            // page-container is owned by React and may be reconciled when the
+            // legacy coupon page finishes loading. Mount beside it so React
+            // cannot remove the coupon center after it has opened.
+            document.body.appendChild(root);
         }
         root.hidden = false;
         render();

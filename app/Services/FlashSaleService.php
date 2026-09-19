@@ -5,26 +5,38 @@ namespace App\Services;
 use App\Models\FlashSaleCampaign;
 use App\Models\Order;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
 
 class FlashSaleService
 {
+    public function activeCampaigns()
+    {
+        if (!Schema::hasTable('v2_flash_sale_campaign')) return collect();
+        $now = time();
+        return FlashSaleCampaign::where('enabled', 1)->where('starts_at', '<=', $now)->where('ends_at', '>=', $now)
+            ->orderBy('priority', 'DESC')->orderBy('id', 'DESC')->get();
+    }
+
     public function match(User $user, int $planId, string $period, int $amount, int $orderType): ?FlashSaleCampaign
     {
-        $now = time();
-        return FlashSaleCampaign::where('enabled', 1)
-            ->where('starts_at', '<=', $now)
-            ->where('ends_at', '>=', $now)
-            ->orderBy('priority', 'DESC')->orderBy('id', 'DESC')->get()
-            ->first(function (FlashSaleCampaign $campaign) use ($user, $planId, $period, $amount, $orderType) {
-                if ($campaign->total_limit && $campaign->order_count >= $campaign->total_limit) return false;
-                if ($campaign->minimum_amount > $amount) return false;
-                if ($campaign->audience === 'new' && $orderType !== 1) return false;
-                if ($campaign->audience === 'existing' && $orderType === 1) return false;
-                if ($campaign->plan_ids && !in_array($planId, array_map('intval', $campaign->plan_ids), true)) return false;
-                if ($campaign->periods && !in_array($period, $campaign->periods, true)) return false;
-                if ($campaign->per_user_limit && Order::where('user_id', $user->id)->where('flash_sale_campaign_id', $campaign->id)->where('status', 3)->count() >= $campaign->per_user_limit) return false;
-                return true;
-            });
+        if (!Schema::hasTable('v2_flash_sale_campaign') || !Schema::hasColumn('v2_order', 'flash_sale_campaign_id')) return null;
+        $usage = Order::where('user_id', $user->id)->where('status', 3)->whereNotNull('flash_sale_campaign_id')
+            ->selectRaw('flash_sale_campaign_id, COUNT(*) as aggregate')->groupBy('flash_sale_campaign_id')->pluck('aggregate', 'flash_sale_campaign_id');
+        return $this->matchFrom($this->activeCampaigns(), $usage, $planId, $period, $amount, $orderType);
+    }
+
+    public function matchFrom($campaigns, $usage, int $planId, string $period, int $amount, int $orderType): ?FlashSaleCampaign
+    {
+        return $campaigns->first(function (FlashSaleCampaign $campaign) use ($usage, $planId, $period, $amount, $orderType) {
+            if ($campaign->total_limit && $campaign->order_count >= $campaign->total_limit) return false;
+            if ($campaign->minimum_amount > $amount) return false;
+            if ($campaign->audience === 'new' && $orderType !== 1) return false;
+            if ($campaign->audience === 'existing' && $orderType === 1) return false;
+            if ($campaign->plan_ids && !in_array($planId, array_map('intval', $campaign->plan_ids), true)) return false;
+            if ($campaign->periods && !in_array($period, $campaign->periods, true)) return false;
+            if ($campaign->per_user_limit && (int)$usage->get($campaign->id, 0) >= $campaign->per_user_limit) return false;
+            return true;
+        });
     }
 
     public function quote(FlashSaleCampaign $campaign, int $amount): array

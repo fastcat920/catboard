@@ -12,12 +12,20 @@ use App\Models\Order;
 use App\Support\ContentLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PlanController extends Controller
 {
     public function fetch(Request $request)
     {
         $user = User::find($request->user['id']);
+        $flashSaleService = app(FlashSaleService::class);
+        $campaigns = $flashSaleService->activeCampaigns();
+        $usage = collect();
+        if ($campaigns->isNotEmpty() && Schema::hasColumn('v2_order', 'flash_sale_campaign_id')) {
+            $usage = Order::where('user_id', $user->id)->where('status', 3)->whereNotNull('flash_sale_campaign_id')
+                ->selectRaw('flash_sale_campaign_id, COUNT(*) as aggregate')->groupBy('flash_sale_campaign_id')->pluck('aggregate', 'flash_sale_campaign_id');
+        }
         if ($request->input('id')) {
             $plan = Plan::where('id', $request->input('id'))->first();
             if (!$plan) {
@@ -27,7 +35,7 @@ class PlanController extends Controller
                 abort(500, __('Subscription plan does not exist'));
             }
             ContentLocale::localize($plan, ['name', 'content'], $request);
-            $this->attachFlashSales($plan, $user, $request);
+            $this->attachFlashSales($plan, $user, $request, $campaigns, $usage);
             return response([
                 'data' => $plan
             ]);
@@ -39,7 +47,7 @@ class PlanController extends Controller
             ->get();
         foreach ($plans as $k => $v) {
             ContentLocale::localize($plans[$k], ['name', 'content'], $request);
-            $this->attachFlashSales($plans[$k], $user, $request);
+            $this->attachFlashSales($plans[$k], $user, $request, $campaigns, $usage);
             if ($plans[$k]->capacity_limit === NULL) continue;
             if (!isset($counts[$plans[$k]->id])) continue;
             $plans[$k]->capacity_limit = $plans[$k]->capacity_limit - $counts[$plans[$k]->id]->count;
@@ -49,7 +57,7 @@ class PlanController extends Controller
         ]);
     }
 
-    private function attachFlashSales(Plan $plan, User $user, Request $request): void
+    private function attachFlashSales(Plan $plan, User $user, Request $request, $campaigns, $usage): void
     {
         $periods = ['month_price','quarter_price','half_year_price','year_price','two_year_price','three_year_price','onetime_price'];
         $service = app(FlashSaleService::class); $sales = [];
@@ -57,7 +65,7 @@ class PlanController extends Controller
             if ($plan->{$period} === null) continue;
             $order = new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$period,'total_amount'=>$plan->{$period}]);
             (new OrderService($order))->setOrderType($user);
-            $campaign = $service->match($user, (int)$plan->id, $period, (int)$plan->{$period}, (int)$order->type);
+            $campaign = $service->matchFrom($campaigns, $usage, (int)$plan->id, $period, (int)$plan->{$period}, (int)$order->type);
             if (!$campaign) continue;
             $quote = $service->quote($campaign, (int)$plan->{$period});
             $name = ContentLocale::isEnglish($request) && $campaign->name_en ? $campaign->name_en : $campaign->name;

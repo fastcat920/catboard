@@ -13,21 +13,26 @@ class CouponWalletService
     private $paidOrderCache = [];
     public function issue(CouponTemplate $template, User $user, string $source, string $reference): ?UserCoupon
     {
+        return $this->issueWithStatus($template,$user,$source,$reference)['coupon'];
+    }
+
+    public function issueWithStatus(CouponTemplate $template, User $user, string $source, string $reference): array
+    {
         return DB::transaction(function () use ($template, $user, $source, $reference) {
             $template = CouponTemplate::where('id', $template->id)->lockForUpdate()->first();
-            if (!$template || !$template->enabled) return null;
+            if (!$template || !$template->enabled) return ['coupon'=>null,'created'=>false];
             $existing = UserCoupon::where(compact('source'))->where('source_reference', $reference)->where('template_id', $template->id)->where('user_id', $user->id)->first();
-            if ($existing) return $existing;
-            if ($template->total_limit && $template->issued_count >= $template->total_limit) return null;
-            if ($template->daily_limit && UserCoupon::where('template_id', $template->id)->where('created_at', '>=', strtotime('today'))->count() >= $template->daily_limit) return null;
-            if (UserCoupon::where('template_id', $template->id)->where('user_id', $user->id)->whereNotIn('status', ['revoked'])->count() >= $template->per_user_limit) return null;
+            if ($existing) return ['coupon'=>$existing,'created'=>false];
+            if ($template->total_limit && $template->issued_count >= $template->total_limit) return ['coupon'=>null,'created'=>false];
+            if ($template->daily_limit && UserCoupon::where('template_id', $template->id)->where('created_at', '>=', strtotime('today'))->count() >= $template->daily_limit) return ['coupon'=>null,'created'=>false];
+            if (UserCoupon::where('template_id', $template->id)->where('user_id', $user->id)->whereNotIn('status', ['revoked'])->count() >= $template->per_user_limit) return ['coupon'=>null,'created'=>false];
             $startsAt = max(time(), (int)$template->starts_at);
             $expiresAt = $template->valid_days ? $startsAt + $template->valid_days * 86400 : (int)$template->ends_at;
             if ($template->ends_at) $expiresAt = $expiresAt ? min($expiresAt, (int)$template->ends_at) : (int)$template->ends_at;
-            if (!$expiresAt || $expiresAt <= $startsAt) return null;
+            if (!$expiresAt || $expiresAt <= $startsAt) return ['coupon'=>null,'created'=>false];
             $coupon = UserCoupon::create(['template_id'=>$template->id,'user_id'=>$user->id,'source'=>$source,'source_reference'=>$reference,'status'=>$startsAt>time()?'pending':'available','starts_at'=>$startsAt,'expires_at'=>$expiresAt]);
             $template->increment('issued_count'); $this->record($coupon, $user->id, 'issued', ['source'=>$source]);
-            return $coupon;
+            return ['coupon'=>$coupon,'created'=>true];
         });
     }
 

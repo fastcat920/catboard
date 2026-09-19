@@ -49,16 +49,25 @@ class CouponCenterController extends Controller
     public function createTask(Request $request,CouponAudienceService $audience)
     {
         $data=$request->validate(['template_id'=>'required|integer|exists:v2_coupon_template,id','name'=>'required|string|max:100','filters'=>'required|array']);$count=$audience->query($data['filters'])->count();
-        $task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>$data['filters'],'status'=>'running','estimated_count'=>$count]);
-        ProcessCouponDistributionTask::dispatchAfterResponse($task->id);return response(['data'=>$task]);
+        $task=$this->makeTask($data['template_id'],$request->user['id']??null,$data['name'],$data['filters'],$count);
+        $this->launchTask($task,$count);return response(['data'=>$task->fresh()]);
     }
     public function tasks()
     {
-        $pending=CouponDistributionTask::where('status','pending')->limit(20)->pluck('id');
-        foreach($pending as $id){if(CouponDistributionTask::where('id',$id)->where('status','pending')->update(['status'=>'running','updated_at'=>time()]))ProcessCouponDistributionTask::dispatchAfterResponse($id);}
-        return response(['data'=>CouponDistributionTask::orderBy('id','DESC')->limit(200)->get()]);
+        $legacy=CouponDistributionTask::where('status','pending')->whereNull('queued_at')->limit(20)->get();
+        foreach($legacy as $task){$task->queued_at=time();$task->total_batches=max(1,(int)ceil($task->estimated_count/ProcessCouponDistributionTask::BATCH_SIZE));$task->save();ProcessCouponDistributionTask::dispatch($task->id)->onQueue('default');}
+        $rows=CouponDistributionTask::orderBy('id','DESC')->limit(200)->get();$now=time();
+        $rows->each(function($task)use($now){$terminal=in_array($task->status,['completed','partial']);$task->progress=$terminal?100:($task->estimated_count?min(100,round($task->processed_count/$task->estimated_count*100,1)):100);$last=(int)($task->heartbeat_at?:$task->queued_at?:$task->updated_at);$task->worker_warning=in_array($task->status,['pending','running'])&&$last>0&&$last<$now-300;});
+        return response(['data'=>$rows]);
     }
     public function cancelTask(Request $request){$task=CouponDistributionTask::findOrFail($request->input('id'));if(!in_array($task->status,['pending','running']))abort(422,'当前任务不能取消');$task->status='cancelled';$task->save();return response(['data'=>true]);}
+    public function retryTask(Request $request)
+    {
+        $source=CouponDistributionTask::findOrFail($request->input('id'));$ids=array_values(array_unique(array_map('intval',(array)$source->failed_user_ids)));
+        if(!$ids&&$source->status==='failed'){$source->status='pending';$source->last_error=null;$source->queued_at=time();$source->save();ProcessCouponDistributionTask::dispatch($source->id)->onQueue('default');return response(['data'=>$source]);}
+        if(!$ids)abort(422,'该任务没有可重试的失败用户');
+        $task=$this->makeTask($source->template_id,$request->user['id']??null,$source->name.' - 重试失败用户',['user_ids'=>$ids],count($ids));$this->launchTask($task,count($ids));return response(['data'=>$task->fresh()]);
+    }
     public function userCoupons(Request $request)
     {
         $q=UserCoupon::with('template')->orderBy('id','DESC');if($request->input('status'))$q->where('status',$request->input('status'));if($request->input('template_id'))$q->where('template_id',$request->input('template_id'));
@@ -72,7 +81,18 @@ class CouponCenterController extends Controller
     public function importTask(Request $request)
     {
         $data=$request->validate(['template_id'=>'required|integer|exists:v2_coupon_template,id','name'=>'required|string|max:100','csv'=>'required|string|max:2000000']);$ids=[];$emails=[];foreach(preg_split('/\r\n|\r|\n/',$data['csv']) as $line){$value=trim(str_getcsv($line)[0]??'');if(!$value)continue;if(filter_var($value,FILTER_VALIDATE_EMAIL))$emails[]=strtolower($value);elseif(ctype_digit($value))$ids[]=(int)$value;}
-        if(!$ids&&!$emails)abort(422,'CSV 中未找到有效用户 ID 或邮箱');$task=CouponDistributionTask::create(['template_id'=>$data['template_id'],'admin_id'=>$request->user['id']??null,'name'=>$data['name'],'filters'=>['user_ids'=>array_values(array_unique($ids)),'emails'=>array_values(array_unique($emails))],'status'=>'running','estimated_count'=>User::whereIn('id',$ids)->orWhereIn('email',$emails)->count()]);ProcessCouponDistributionTask::dispatchAfterResponse($task->id);return response(['data'=>$task]);
+        if(!$ids&&!$emails)abort(422,'CSV 中未找到有效用户 ID 或邮箱');$filters=['user_ids'=>array_values(array_unique($ids)),'emails'=>array_values(array_unique($emails))];$count=User::whereIn('id',$ids)->orWhereIn('email',$emails)->count();$task=$this->makeTask($data['template_id'],$request->user['id']??null,$data['name'],$filters,$count);$this->launchTask($task,$count);return response(['data'=>$task->fresh()]);
+    }
+
+    private function makeTask(int $templateId,?int $adminId,string $name,array $filters,int $count):CouponDistributionTask
+    {
+        return CouponDistributionTask::create(['template_id'=>$templateId,'admin_id'=>$adminId,'name'=>$name,'filters'=>$filters,'status'=>'pending','estimated_count'=>$count,'total_batches'=>max(1,(int)ceil($count/ProcessCouponDistributionTask::BATCH_SIZE))]);
+    }
+
+    private function launchTask(CouponDistributionTask $task,int $count):void
+    {
+        if($count<=100){$task->status='running';$task->save();ProcessCouponDistributionTask::dispatchSync($task->id);return;}
+        $task->queued_at=time();$task->save();ProcessCouponDistributionTask::dispatch($task->id)->onQueue('default');
     }
     public function exportUserCoupons(Request $request)
     {

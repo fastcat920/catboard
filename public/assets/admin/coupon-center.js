@@ -428,6 +428,128 @@
                 });
         };
     }
+    function taskTableHtml(rows) {
+        var statusLabels = {
+            pending: "等待队列",
+            running: "执行中",
+            completed: "已完成",
+            partial: "部分失败",
+            failed: "执行失败",
+            cancelled: "已取消",
+        };
+        return (
+            '<div data-task-list>' +
+            table(
+                [
+                    "任务",
+                    "状态",
+                    "进度",
+                    "成功/跳过/失败",
+                    "批次",
+                    "最后更新",
+                    "操作",
+                ],
+                rows.map(function (x) {
+                    return [
+                        x.name,
+                        (statusLabels[x.status] || x.status) +
+                            (x.worker_warning ? "（队列可能未运行）" : ""),
+                        (x.processed_count || 0) +
+                            " / " +
+                            x.estimated_count +
+                            "（" +
+                            Number(x.progress || 0).toFixed(1) +
+                            "%）",
+                        x.success_count +
+                            " / " +
+                            x.skipped_count +
+                            " / " +
+                            x.failed_count,
+                        (x.completed_batches || 0) +
+                            " / " +
+                            (x.total_batches || 0),
+                        dt(x.heartbeat_at || x.updated_at),
+                        "",
+                    ];
+                }),
+            ) +
+            "</div>"
+        );
+    }
+    function bindTaskActions(rows) {
+        root.querySelectorAll("[data-task-list] tbody tr").forEach(function (tr, i) {
+            var task = rows[i];
+            if (!task) return;
+            var actions = [];
+            if (task.status === "pending" || task.status === "running")
+                actions.push(
+                    '<button class="btn btn-sm btn-light text-danger" data-cancel>取消</button>',
+                );
+            if (
+                task.status === "failed" ||
+                (task.failed_count > 0 && task.failed_user_ids)
+            )
+                actions.push(
+                    '<button class="btn btn-sm btn-light" data-retry>' +
+                        (task.status === "failed" ? "继续任务" : "重试失败用户") +
+                        "</button>",
+                );
+            if (task.last_error)
+                actions.push(
+                    '<button class="btn btn-sm btn-light" data-error>错误详情</button>',
+                );
+            tr.lastElementChild.innerHTML = actions.join(" ") || "-";
+            var cancel = tr.querySelector("[data-cancel]");
+            if (cancel)
+                cancel.onclick = function () {
+                    if (!confirm("确认取消该发放任务？")) return;
+                    api("/distribution/cancel", {
+                        method: "POST",
+                        body: JSON.stringify({ id: task.id }),
+                    }).then(refreshTasks);
+                };
+            var retry = tr.querySelector("[data-retry]");
+            if (retry)
+                retry.onclick = function () {
+                    if (!confirm(task.status === "failed" ? "从中断位置继续该任务？" : "仅重新发放本任务中的失败用户？")) return;
+                    api("/distribution/retry", {
+                        method: "POST",
+                        body: JSON.stringify({ id: task.id }),
+                    })
+                        .then(refreshTasks)
+                        .catch(function (e) {
+                            alert(e.message);
+                        });
+                };
+            var error = tr.querySelector("[data-error]");
+            if (error)
+                error.onclick = function () {
+                    alert(task.last_error);
+                };
+        });
+    }
+    function refreshTasks() {
+        if (tab !== "distribution") return;
+        if (taskTimer) clearTimeout(taskTimer);
+        api("/distribution/tasks")
+            .then(function (result) {
+                var host = root.querySelector("[data-task-list]");
+                if (!host) return;
+                var replacement = document.createElement("div");
+                replacement.innerHTML = taskTableHtml(result.data);
+                host.replaceWith(replacement.firstElementChild);
+                bindTaskActions(result.data);
+                if (
+                    result.data.some(function (x) {
+                        return x.status === "pending" || x.status === "running";
+                    })
+                )
+                    taskTimer = setTimeout(refreshTasks, 3000);
+            })
+            .catch(function () {
+                taskTimer = setTimeout(refreshTasks, 5000);
+            });
+    }
     function distribution() {
         if (taskTimer) {
             clearTimeout(taskTimer);
@@ -436,13 +558,6 @@
         Promise.all([api("/templates"), api("/distribution/tasks")])
             .then(function (all) {
                 cache.templates = all[0].data;
-                var statusLabels = {
-                    pending: "等待执行",
-                    running: "执行中",
-                    completed: "已完成",
-                    partial: "部分失败",
-                    cancelled: "已取消",
-                };
                 content(
                     '<div class="row"><div class="col-lg-5"><div class="block"><div class="block-header"><h3 class="block-title">创建发放任务</h3></div><div class="block-content"><form data-task><div class="form-group"><label>模板</label><select class="form-control" name="template_id">' +
                         cache.templates
@@ -472,32 +587,10 @@
                             "text",
                         ) +
                         '<div class="form-group"><label>订阅状态</label><select class="form-control" name="subscription_status"><option value="">不限</option><option value="active">有效</option><option value="expired">已过期</option></select></div><label><input type="checkbox" name="never_purchased"> 从未购买</label><div class="mt-3"><button type="button" class="btn btn-light" data-estimate>预估人数</button> <button class="btn btn-primary">创建并执行</button></div><div data-estimate-result class="mt-2"></div></form></div></div></div><div class="col-lg-7">' +
-                        table(
-                            [
-                                "任务",
-                                "模板",
-                                "状态",
-                                "预计",
-                                "成功",
-                                "跳过",
-                                "失败",
-                                "完成时间",
-                            ],
-                            all[1].data.map(function (x) {
-                                return [
-                                    x.name,
-                                    x.template_id,
-                                    statusLabels[x.status] || x.status,
-                                    x.estimated_count,
-                                    x.success_count,
-                                    x.skipped_count,
-                                    x.failed_count,
-                                    dt(x.completed_at),
-                                ];
-                            }),
-                        ) +
+                        taskTableHtml(all[1].data) +
                         "</div></div>",
                 );
+                bindTaskActions(all[1].data);
                 var form = root.querySelector("[data-task]"),
                     filters = function () {
                         var split = function (v) {
@@ -541,12 +634,7 @@
                             alert(er.message);
                         });
                 };
-                if (
-                    all[1].data.some(function (x) {
-                        return x.status === "pending" || x.status === "running";
-                    })
-                )
-                    taskTimer = setTimeout(distribution, 2000);
+                if (all[1].data.some(function (x) { return x.status === "pending" || x.status === "running"; })) taskTimer = setTimeout(refreshTasks, 3000);
             })
             .catch(fail);
     }

@@ -172,6 +172,7 @@ class AdminRoute
             $router->post('/coupon/distribution/create', 'V1\\Admin\\CouponCenterController@createTask');
             $router->get ('/coupon/distribution/tasks', 'V1\\Admin\\CouponCenterController@tasks');
             $router->post('/coupon/distribution/cancel', 'V1\\Admin\\CouponCenterController@cancelTask');
+            $router->post('/coupon/distribution/retry', 'V1\\Admin\\CouponCenterController@retryTask');
             $router->get ('/coupon/user-coupons', 'V1\\Admin\\CouponCenterController@userCoupons');
             $router->post('/coupon/user-coupon/issue', 'V1\\Admin\\CouponCenterController@issueUser');
             $router->post('/coupon/user-coupon/revoke', 'V1\\Admin\\CouponCenterController@revoke');

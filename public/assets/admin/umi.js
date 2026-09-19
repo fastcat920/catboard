@@ -82382,6 +82382,14 @@
             exact: !0,
             component: n("Q55k").default
         }, {
+            path: "/referral",
+            exact: !0,
+            component: n("Q55k").default
+        }, {
+            path: "/marketing",
+            exact: !0,
+            component: n("Q55k").default
+        }, {
             path: "/giftcard",
             exact: !0,
             component: n("showgiftcardpage").default

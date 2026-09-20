@@ -1227,11 +1227,11 @@ html body.dark-theme #app :is(
 
 /*
  * FastCat high-frequency service surfaces.
- * These rules intentionally leave Dashboard.vue untouched. They provide the
- * same compact, grouped-card hierarchy used by the native client for account,
- * purchase, invitation and order flows.
+ * These rules keep the main authenticated pages on the same content boundary
+ * and provide the grouped-card hierarchy used by the native client.
  */
 body #app :is(
+  .dashboard-container,
   .account-container,
   .shop-container,
   .orders-container,
@@ -1245,13 +1245,13 @@ body #app :is(
 }
 
 @media (min-width: 769px) {
-  body #app :is(.account-container, .shop-container, .orders-container, .profile-container, .more-container) {
+  body #app :is(.dashboard-container, .account-container, .shop-container, .orders-container, .profile-container, .more-container) {
     padding-bottom: 40px;
   }
 }
 
-body #app :is(.account-inner, .shop-inner, .orders-inner, .profile-inner, .more-inner) {
-  max-width: 1040px !important;
+body #app :is(.dashboard-inner, .account-inner, .shop-inner, .orders-inner, .profile-inner, .more-inner) {
+  max-width: var(--page-max-width) !important;
 }
 
 /* Invitation: balances first, clear actions second, records last. */
@@ -1547,7 +1547,7 @@ body #app :is(
   .trafficlog-inner
 ) {
   width: 100%;
-  max-width: 1040px !important;
+  max-width: var(--page-max-width) !important;
   margin-inline: auto;
 }
 

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use App\Models\ReferralSetting;
 use Illuminate\Support\Facades\Schema;
+use App\Services\CommissionLedgerService;
 
 class CheckCommission extends Command
 {
@@ -103,6 +104,7 @@ class CheckCommission extends Command
             if (!isset($commissionShareLevels[$l])) continue;
             $commissionBalance = $order->commission_balance * ($commissionShareLevels[$l] / 100);
             if (!$commissionBalance) continue;
+            $balanceBefore = (int)$inviter->commission_balance;
             if ((int)config('v2board.withdraw_close_enable', 0)) {
                 $inviter->balance = $inviter->balance + $commissionBalance;
             } else {
@@ -112,16 +114,31 @@ class CheckCommission extends Command
                 DB::rollBack();
                 return false;
             }
-            if (!CommissionLog::create([
+            $commissionLog = CommissionLog::create([
                 'invite_user_id' => $inviteUserId,
                 'user_id' => $order->user_id,
                 'trade_no' => $order->trade_no,
                 'order_amount' => $order->total_amount,
                 'get_amount' => $commissionBalance
-            ])) {
+            ]);
+            if (!$commissionLog) {
                 DB::rollBack();
                 return false;
             }
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $inviteUserId,
+                'type' => 'commission_income',
+                'amount' => (int)$commissionBalance,
+                'balance_before' => $balanceBefore,
+                'balance_after' => (int)$inviter->commission_balance,
+                'source_key' => 'commission_log:' . $commissionLog->id,
+                'source_type' => 'commission_log',
+                'source_id' => $commissionLog->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '邀请订单返佣',
+                'meta' => ['order_amount' => (int)$order->total_amount, 'invited_user_id' => (int)$order->user_id],
+            ]);
             $inviteUserId = $inviter->invite_user_id;
             // update order actual commission balance
             $order->actual_commission_balance = $order->actual_commission_balance + $commissionBalance;

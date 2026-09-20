@@ -11,6 +11,7 @@ use App\Models\Plan;
 use App\Models\Order;
 use App\Services\TelegramService;
 use App\Services\TicketService;
+use App\Services\CommissionLedgerService;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Utils\Dict;
@@ -184,36 +185,48 @@ class TicketController extends Controller
             abort(500, __('Unsupported withdrawal method'));
         }
         $user = User::find($request->user['id']);
+        if (!$user) abort(500, __('The user does not exist'));
+        $amount = (int)$request->input('withdraw_amount');
         $limit = config('v2board.commission_withdraw_limit', 100);
-        if ($limit > ($user->commission_balance / 100)) {
+        if ($limit > ($amount / 100)) {
             abort(500, __('The current required minimum withdrawal commission is :limit', ['limit' => $limit]));
         }
-        DB::beginTransaction();
-        $subject = __('[Commission Withdrawal Request] This ticket is opened by the system');
-        $ticket = Ticket::create([
-            'subject' => $subject,
-            'level' => 2,
-            'user_id' => $request->user['id']
-        ]);
-        if (!$ticket) {
-            DB::rollback();
-            abort(500, __('Failed to open ticket'));
-        }
-        $message = sprintf(
-			"%s\r\n%s",
-            __('Withdrawal method') . "：" . $request->input('withdraw_method'),
-            __('Withdrawal account') . "：" . $request->input('withdraw_account')
-        );
-        $ticketMessage = TicketMessage::create([
-            'user_id' => $request->user['id'],
-            'ticket_id' => $ticket->id,
-            'message' => $message
-        ]);
-        if (!$ticketMessage) {
-            DB::rollback();
-            abort(500, __('Failed to open ticket'));
-        }
-        DB::commit();
+        if ($amount > (int)$user->commission_balance) abort(500, __('Insufficient commission balance'));
+
+        [$ticket, $message] = DB::transaction(function () use ($request, $amount) {
+            $user = User::where('id', $request->user['id'])->lockForUpdate()->firstOrFail();
+            if ($amount > (int)$user->commission_balance) abort(500, __('Insufficient commission balance'));
+            $before = (int)$user->commission_balance;
+            $subject = __('[Commission Withdrawal Request] This ticket is opened by the system');
+            $ticket = Ticket::create(['subject' => $subject, 'level' => 2, 'user_id' => $user->id]);
+            if (!$ticket) abort(500, __('Failed to open ticket'));
+            $message = sprintf(
+                "%s：%s\r\n%s：%s\r\n%s：%.2f",
+                __('Withdrawal method'), $request->input('withdraw_method'),
+                __('Withdrawal account'), $request->input('withdraw_account'),
+                __('Withdrawal amount'), $amount / 100
+            );
+            if (!TicketMessage::create(['user_id' => $user->id, 'ticket_id' => $ticket->id, 'message' => $message])) {
+                abort(500, __('Failed to open ticket'));
+            }
+            $user->commission_balance -= $amount;
+            $user->save();
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'withdrawal',
+                'amount' => -$amount,
+                'balance_before' => $before,
+                'balance_after' => (int)$user->commission_balance,
+                'status' => 'pending',
+                'source_key' => 'withdrawal_ticket:' . $ticket->id,
+                'source_type' => 'ticket',
+                'source_id' => $ticket->id,
+                'ticket_id' => $ticket->id,
+                'description' => '佣金提现申请',
+                'meta' => ['method' => $request->input('withdraw_method'), 'account' => $request->input('withdraw_account')],
+            ]);
+            return [$ticket, $message];
+        });
         $this->sendNotify($ticket, $message);
         return response([
             'data' => true

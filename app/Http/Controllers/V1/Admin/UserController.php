@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\ServerGroup;
 use App\Services\AuthService;
 use App\Services\AccountDeletionService;
+use App\Services\CommissionLedgerService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -212,10 +213,25 @@ class UserController extends Controller
             $authService->removeAllSession();
         }
 
+        $commissionBefore = (int)$user->commission_balance;
         try {
             $user->update($params);
         } catch (\Exception $e) {
             abort(500, '保存失败');
+        }
+        $commissionAfter = (int)$user->fresh()->commission_balance;
+        if ($commissionAfter !== $commissionBefore) {
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'admin_adjustment',
+                'amount' => $commissionAfter - $commissionBefore,
+                'balance_before' => $commissionBefore,
+                'balance_after' => $commissionAfter,
+                'source_key' => 'admin_adjustment:' . $user->id . ':' . time() . ':' . uniqid(),
+                'source_type' => 'admin',
+                'source_id' => $request->user['id'] ?? null,
+                'description' => '管理员调整佣金余额',
+            ]);
         }
         return response([
             'data' => true

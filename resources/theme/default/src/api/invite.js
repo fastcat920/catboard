@@ -34,13 +34,14 @@ export function getInviteData() {
  * - 获得佣金
  * - 状态
  */
-export function getInviteDetails(current, pageSize) {
+export function getInviteDetails(current, pageSize, type = '') {
   return request({
     url: '/user/invite/details',
     method: 'get',
     params: {
       current,
-      page_size: pageSize
+      page_size: pageSize,
+      type
     }
   });
 }
@@ -121,4 +122,4 @@ export function withdrawCommission(amount, account, method) {
       withdraw_method: method
     }
   });
-} 
+}

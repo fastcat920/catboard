@@ -32,6 +32,18 @@ CREATE TABLE `v2_commission_log` (
                                      PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+DROP TABLE IF EXISTS `v2_commission_ledger`;
+CREATE TABLE `v2_commission_ledger` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT, `user_id` int unsigned NOT NULL, `type` varchar(40) NOT NULL,
+  `amount` bigint NOT NULL, `balance_before` bigint unsigned DEFAULT NULL, `balance_after` bigint unsigned DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'completed', `source_key` varchar(120) NOT NULL, `source_type` varchar(40) DEFAULT NULL,
+  `source_id` bigint unsigned DEFAULT NULL, `order_id` int unsigned DEFAULT NULL, `ticket_id` int unsigned DEFAULT NULL,
+  `trade_no` varchar(64) DEFAULT NULL, `description` varchar(255) DEFAULT NULL, `meta` text,
+  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `source_key` (`source_key`), KEY `user_id` (`user_id`), KEY `type` (`type`),
+  KEY `status` (`status`), KEY `order_id` (`order_id`), KEY `ticket_id` (`ticket_id`), KEY `trade_no` (`trade_no`), KEY `created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DROP TABLE IF EXISTS `v2_referral_setting`;
 CREATE TABLE `v2_referral_setting` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,

@@ -6,7 +6,7 @@
       <section class="hero">
         <div><span>{{ text.membership }}</span><h1>{{ levelName(program.level) || text.normal }}</h1><p>{{ levelDescription(program.level) || text.normalDescription }}</p></div>
         <div class="benefits">
-          <div><small>{{ text.commission }}</small><strong>{{ program.level?.commission_rate ?? program.setting?.base_commission_rate ?? 0 }}%</strong></div>
+          <div><small>{{ text.commission }}</small><strong>{{ program.commission_rate ?? program.level?.commission_rate ?? program.setting?.base_commission_rate ?? 0 }}%</strong></div>
           <div><small>{{ text.discount }}</small><strong>{{ program.level?.member_discount ?? 0 }}%</strong></div>
           <div><small>{{ text.effective }}</small><strong>{{ program.effective_invites || 0 }}</strong></div>
           <div><small>{{ text.revenue }}</small><strong>¥{{ revenue }}</strong></div>

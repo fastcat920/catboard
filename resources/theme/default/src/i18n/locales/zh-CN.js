@@ -874,16 +874,19 @@ export default {
       shareDescription: '我正在使用这个服务，推荐您也来体验'
     },
     records: {
-      title: '佣金历史',
-      empty: '暂无返佣记录',
+      title: '佣金记录',
+      empty: '暂无佣金记录',
       date: '时间',
+      type: '类型',
+      change: '变动金额',
+      balance: '佣金余额',
       commission: '佣金',
       details: '详情',
       user: '用户',
       registerTime: '注册时间',
       amount: '消费金额',
       userPlaceholder: '用户',
-      noRecords: '您还没有邀请记录，生成邀请码并分享给朋友吧！',
+      noRecords: '暂无佣金记录',
       refresh: '刷新',
       refreshing: '刷新中...',
       refreshingData: '正在刷新数据...',
@@ -892,16 +895,29 @@ export default {
       status: {
         title: '状态',
         confirmed: '已确认',
-        pending: '确认中',
+        pending: '处理中',
+        completed: '已完成',
+        failed: '失败',
+        refunded: '已退回',
+        reversed: '已撤销',
         waiting: '等待中',
         processing: '处理中',
         invalid: '无效',
         unknown: '未知'
       },
       types: {
-        confirmed_commission: '已确认佣金',
-        pending_commission: '确认中佣金',
-        all: '全部'
+        commission_income: '邀请返佣',
+        reward_income: '奖励佣金',
+        transfer_out: '佣金划转',
+        withdrawal: '提现申请',
+        withdrawal_refund: '提现退回',
+        commission_reversal: '佣金撤销',
+        admin_adjustment: '后台调整',
+        filterIncome: '收入',
+        filterTransfer: '划转',
+        filterWithdrawal: '提现',
+        filterReversal: '撤销与退回',
+        all: '全部记录'
       }
     }
   },

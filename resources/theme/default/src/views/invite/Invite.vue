@@ -200,10 +200,19 @@
         <div v-if="activeTab === 'records'" class="card-body">
           <div class="tab-content-toolbar">
             <span><IconReceipt :size="16" />{{ $t('invite.records.title') }}</span>
-            <button class="btn-action" @click="refreshRecords" :disabled="loading.inviteDetails">
-              <IconRefresh class="action-icon" :class="{ spin: loading.inviteDetails }" />
-              {{ loading.inviteDetails ? $t('invite.records.refreshing') : $t('invite.records.refresh') }}
-            </button>
+            <div class="record-toolbar-actions">
+              <select v-model="recordFilter" class="record-filter" @change="fetchInviteDetails(1)">
+                <option value="">{{ $t('invite.records.types.all') }}</option>
+                <option value="income">{{ $t('invite.records.types.filterIncome') }}</option>
+                <option value="transfer">{{ $t('invite.records.types.filterTransfer') }}</option>
+                <option value="withdrawal">{{ $t('invite.records.types.filterWithdrawal') }}</option>
+                <option value="reversal">{{ $t('invite.records.types.filterReversal') }}</option>
+              </select>
+              <button class="btn-action" @click="refreshRecords" :disabled="loading.inviteDetails">
+                <IconRefresh class="action-icon" :class="{ spin: loading.inviteDetails }" />
+                {{ loading.inviteDetails ? $t('invite.records.refreshing') : $t('invite.records.refresh') }}
+              </button>
+            </div>
           </div>
           <div v-if="loading.inviteDetails" class="skeleton-loading">
             <div class="skeleton-table">
@@ -224,20 +233,24 @@
                 <table class="records-table desktop-table">
                   <thead>
                     <tr>
-                      <th>{{ $t('invite.records.registerTime') }}</th>
-                      <th>{{ $t('invite.records.amount') }}</th>
-                      <th>{{ $t('invite.records.commission') }}</th>
+                      <th>{{ $t('invite.records.date') }}</th>
+                      <th>{{ $t('invite.records.type') }}</th>
+                      <th>{{ $t('invite.records.details') }}</th>
+                      <th>{{ $t('invite.records.change') }}</th>
+                      <th>{{ $t('invite.records.balance') }}</th>
                       <th>{{ $t('invite.records.status.title') }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="record in inviteRecords" :key="record.id">
                       <td data-label="时间">{{ formatDate(record.created_at) }}</td>
-                      <td data-label="金额">{{ currencySymbol }}{{ formatAmount(record.amount) }}</td>
-                      <td data-label="佣金">{{ currencySymbol }}{{ formatAmount(record.commission_amount) }}</td>
+                      <td>{{ recordTypeText(record.type) }}</td>
+                      <td>{{ record.description || record.trade_no || '—' }}</td>
+                      <td><strong :class="record.amount >= 0 ? 'amount-income' : 'amount-expense'">{{ signedAmount(record.amount) }}</strong></td>
+                      <td>{{ record.balance_after === null ? '—' : currencySymbol + formatAmount(record.balance_after) }}</td>
                       <td data-label="状态">
-                        <span class="status-badge" :class="record.commission_status === 1 ? 'confirmed' : 'pending'">
-                          {{ record.commission_status === 1 ? $t('invite.records.status.confirmed') : $t('invite.records.status.pending') }}
+                        <span class="status-badge" :class="record.status === 'completed' ? 'confirmed' : 'pending'">
+                          {{ recordStatusText(record.status) }}
                         </span>
                       </td>
                     </tr>
@@ -253,18 +266,18 @@
                   >
                     <div class="record-header">
                       <span class="record-date">{{ formatDate(record.created_at) }}</span>
-                      <span class="status-badge" :class="record.commission_status === 1 ? 'confirmed' : 'pending'">
-                        {{ record.commission_status === 1 ? $t('invite.records.status.confirmed') : $t('invite.records.status.pending') }}
+                      <span class="status-badge" :class="record.status === 'completed' ? 'confirmed' : 'pending'">
+                        {{ recordStatusText(record.status) }}
                       </span>
                     </div>
                     <div class="record-body">
                       <div class="record-row">
-                        <span class="record-label">{{ $t('invite.records.amount') }}:</span>
-                        <span class="record-value">{{ currencySymbol }}{{ formatAmount(record.amount) }}</span>
+                        <span class="record-label">{{ recordTypeText(record.type) }}</span>
+                        <span class="record-value" :class="record.amount >= 0 ? 'amount-income' : 'amount-expense'">{{ signedAmount(record.amount) }}</span>
                       </div>
                       <div class="record-row">
-                        <span class="record-label">{{ $t('invite.records.commission') }}:</span>
-                        <span class="record-value commission">{{ currencySymbol }}{{ formatAmount(record.commission_amount) }}</span>
+                        <span class="record-label">{{ record.description || record.trade_no || '—' }}</span>
+                        <span class="record-value">{{ $t('invite.records.balance') }}: {{ record.balance_after === null ? '—' : currencySymbol + formatAmount(record.balance_after) }}</span>
                       </div>
                     </div>
                   </div>
@@ -535,8 +548,9 @@ export default {
       effectiveInvites: 0,
       availableCommission: 0
     });
-    const currentCommissionRate = computed(() => Number(referralProgram.value?.level?.commission_rate ?? inviteStats.commissionRate ?? 0));
+    const currentCommissionRate = computed(() => Number(referralProgram.value?.commission_rate ?? inviteStats.commissionRate ?? 0));
     const inviteRecords = ref([]);
+    const recordFilter = ref('');
     const milestoneProgress = computed(() => referralProgram.value?.next_milestone
       ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
       : 100);
@@ -586,6 +600,9 @@ export default {
       if (amount === undefined || amount === null) return '0.00';
       return parseFloat(amount).toFixed(2);
     };
+    const signedAmount = amount => `${Number(amount) >= 0 ? '+' : '-'}${currencySymbol.value}${formatAmount(Math.abs(Number(amount || 0)))}`;
+    const recordTypeText = type => t(`invite.records.types.${type}`);
+    const recordStatusText = status => t(`invite.records.status.${status || 'unknown'}`);
     
     const formatDate = (timestamp) => {
       if (!timestamp) return '-';
@@ -693,15 +710,19 @@ export default {
     
     const fetchInviteDetails = async (page = 1) => {
       loading.inviteDetails = true;
+      currentPage.value = page;
       try {
-        const res = await getInviteDetails(page, pageSize.value);
+        const res = await getInviteDetails(page, pageSize.value, recordFilter.value);
         if (res.data) {
           inviteRecords.value = Array.isArray(res.data) ? res.data.map(record => ({
             id: record.id,
             created_at: record.created_at,
-            amount: record.order_amount ? (record.order_amount / 100) : 0,
-            commission_amount: record.get_amount ? (record.get_amount / 100) : 0,
-            commission_status: record.commission_status || 1
+            type: record.type || 'commission_income',
+            amount: Number(record.amount || 0) / 100,
+            balance_after: record.balance_after === null || record.balance_after === undefined ? null : Number(record.balance_after) / 100,
+            status: record.status || 'completed',
+            description: record.description || '',
+            trade_no: record.trade_no || ''
           })) : [];
           totalRecords.value = res.total || inviteRecords.value.length;
         }
@@ -775,7 +796,7 @@ export default {
         const res = await transferCommission(amountInCents);
         if (res.data === true) {
           showToast(t('invite.transfer.success'), 'success');
-          await fetchInviteData();
+          await Promise.all([fetchInviteData(), fetchInviteDetails(1), fetchWalletBalance()]);
           closeTransferCard();
         }
       } catch (error) {
@@ -832,7 +853,7 @@ export default {
         const res = await withdrawCommission(amountInCents, withdrawAccount.value, selectedWithdrawMethod.value);
         if (res.data === true) {
           showToast(t('invite.withdraw.success'), 'success');
-          await fetchInviteData();
+          await Promise.all([fetchInviteData(), fetchInviteDetails(1)]);
           closeWithdrawCard();
         }
       } catch (error) {
@@ -873,6 +894,7 @@ export default {
       inviteStats,
       walletBalance,
       inviteRecords,
+      recordFilter,
       currencySymbol,
       copyInviteCode,
       copyInviteLink,
@@ -882,6 +904,10 @@ export default {
       formatDate,
       formatCodeDate,
       formatAmount,
+      signedAmount,
+      recordTypeText,
+      recordStatusText,
+      fetchInviteDetails,
       showConfirmModal,
       confirmModalMessage,
       confirmAction,
@@ -1502,6 +1528,10 @@ export default {
   > span svg { color: var(--theme-color); }
   .btn-action { color: #fff !important; background: var(--theme-color) !important; }
 }
+.record-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.record-filter { min-width: 128px; height: 36px; padding: 0 30px 0 10px; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 9px; background: var(--card-bg-color, #fff); }
+.amount-income { color: #16a34a !important; }
+.amount-expense { color: #dc2626 !important; }
 
 @media (max-width: 576px) {
   .invite-balance-card { padding: 14px; }
@@ -1509,6 +1539,9 @@ export default {
   .combined-card .tab-header { align-items: stretch; flex-direction: column; }
   .combined-card .tab-header .card-actions { margin: 6px 0 0; }
   .combined-card .tab-header .btn-action { width: 100%; justify-content: center; }
+  .tab-content-toolbar { align-items: flex-start; flex-direction: column; }
+  .record-toolbar-actions { width: 100%; }
+  .record-filter { flex: 1; min-width: 0; }
 }
 
 /* 暗黑模式修复：卡片背景与页面背景一致（不独立），弹窗背景独立 */

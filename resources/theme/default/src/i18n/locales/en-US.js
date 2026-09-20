@@ -827,16 +827,19 @@ export default {
       shareDescription: 'I am using this service, I recommend you try it too'
     },
     records: {
-      title: 'Commission History',
+      title: 'Commission Records',
       empty: 'No commission records',
       date: 'Date',
+      type: 'Type',
+      change: 'Change',
+      balance: 'Commission balance',
       commission: 'Commission',
       details: 'Details',
       user: 'User',
       registerTime: 'Registration Time',
       amount: 'Purchase Amount',
       userPlaceholder: 'User',
-      noRecords: 'You have no invite records yet. Generate an invite code and share it with friends!',
+      noRecords: 'No commission records yet',
       refresh: 'Refresh',
       refreshing: 'Refreshing...',
       refreshingData: 'Refreshing data...',
@@ -846,15 +849,28 @@ export default {
         title: 'Status',
         confirmed: 'Confirmed',
         pending: 'Pending',
+        completed: 'Completed',
+        failed: 'Failed',
+        refunded: 'Refunded',
+        reversed: 'Reversed',
         waiting: 'Waiting',
         processing: 'Processing',
         invalid: 'Invalid',
         unknown: 'Unknown'
       },
       types: {
-        confirmed_commission: 'Confirmed Commission',
-        pending_commission: 'Pending Commission',
-        all: 'All'
+        commission_income: 'Referral commission',
+        reward_income: 'Commission reward',
+        transfer_out: 'Wallet transfer',
+        withdrawal: 'Withdrawal request',
+        withdrawal_refund: 'Withdrawal refund',
+        commission_reversal: 'Commission reversal',
+        admin_adjustment: 'Admin adjustment',
+        filterIncome: 'Income',
+        filterTransfer: 'Transfers',
+        filterWithdrawal: 'Withdrawals',
+        filterReversal: 'Reversals & refunds',
+        all: 'All records'
       }
     }
   },

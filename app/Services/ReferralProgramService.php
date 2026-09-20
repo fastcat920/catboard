@@ -54,8 +54,23 @@ class ReferralProgramService
                     if ((int)$user->{$field} < (int)$reward->reward_value) {
                         throw new \RuntimeException('用户可用余额不足，无法自动撤销奖励');
                     }
+                    $commissionBefore = (int)$user->commission_balance;
                     $user->{$field} -= (int)$reward->reward_value;
                     $user->save();
+                    if ($reward->reward_type === 'commission_balance') {
+                        app(CommissionLedgerService::class)->record([
+                            'user_id' => $user->id,
+                            'type' => 'commission_reversal',
+                            'amount' => -(int)$reward->reward_value,
+                            'balance_before' => $commissionBefore,
+                            'balance_after' => (int)$user->commission_balance,
+                            'source_key' => 'referral_reward_reverse:' . $reward->id,
+                            'source_type' => 'referral_reward',
+                            'source_id' => $reward->id,
+                            'order_id' => $reward->order_id,
+                            'description' => $reason ?: '邀请奖励撤销',
+                        ]);
+                    }
                 }
                 if (in_array($reward->reward_type, ['traffic', 'duration'], true) && $reward->reward_value > 0) {
                     $user = User::where('id', $reward->user_id)->lockForUpdate()->first();
@@ -100,10 +115,17 @@ class ReferralProgramService
 
     public function commissionRate(User $inviter): int
     {
-        if ($inviter->commission_rate) return (int)$inviter->commission_rate;
         $setting = $this->setting();
-        return $setting && $setting->enabled
-            ? (int)$setting->base_commission_rate
+        if ($setting && $setting->enabled) {
+            if ($inviter->referral_level_id && (!$inviter->referral_level_expires_at || $inviter->referral_level_expires_at > time())) {
+                $level = ReferralLevel::where('id', $inviter->referral_level_id)->where('enabled', 1)->first();
+                if ($level) return (int)$level->commission_rate;
+            }
+            return (int)$setting->base_commission_rate;
+        }
+
+        return $inviter->commission_rate
+            ? (int)$inviter->commission_rate
             : (int)config('v2board.invite_commission', 10);
     }
 
@@ -207,6 +229,7 @@ class ReferralProgramService
         if (!$user || $amount <= 0) return;
         $existing = ReferralReward::where('event_key', $eventKey)->lockForUpdate()->first();
         if ($existing && $existing->status !== 'reversed') return;
+        $commissionBefore = (int)$user->commission_balance;
         if ($type === 'commission_balance') $user->commission_balance += $amount;
         else $user->balance += $amount;
         $user->save();
@@ -220,8 +243,27 @@ class ReferralProgramService
             'description' => $description,
             'granted_at' => time(),
         ];
-        if ($existing) $existing->fill($data)->save();
-        else ReferralReward::create(array_merge(['event_key' => $eventKey], $data));
+        if ($existing) {
+            $existing->fill($data)->save();
+            $reward = $existing;
+        } else {
+            $reward = ReferralReward::create(array_merge(['event_key' => $eventKey], $data));
+        }
+        if ($type === 'commission_balance') {
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'reward_income',
+                'amount' => $amount,
+                'balance_before' => $commissionBefore,
+                'balance_after' => (int)$user->commission_balance,
+                'source_key' => 'referral_reward:' . $reward->id,
+                'source_type' => 'referral_reward',
+                'source_id' => $reward->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => $description,
+            ]);
+        }
     }
 
     private function grantEntitlement($user, string $type, int $value, string $eventKey, Order $order, string $description): void

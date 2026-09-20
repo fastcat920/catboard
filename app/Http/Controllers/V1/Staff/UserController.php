@@ -8,6 +8,7 @@ use App\Http\Requests\Staff\UserUpdate;
 use App\Jobs\SendEmailJob;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\CommissionLedgerService;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
@@ -51,10 +52,25 @@ class UserController extends Controller
             $params['group_id'] = $plan->group_id;
         }
 
+        $commissionBefore = (int)$user->commission_balance;
         try {
             $user->update($params);
         } catch (\Exception $e) {
             abort(500, '保存失败');
+        }
+        $commissionAfter = (int)$user->fresh()->commission_balance;
+        if ($commissionAfter !== $commissionBefore) {
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'admin_adjustment',
+                'amount' => $commissionAfter - $commissionBefore,
+                'balance_before' => $commissionBefore,
+                'balance_after' => $commissionAfter,
+                'source_key' => 'staff_adjustment:' . $user->id . ':' . time() . ':' . uniqid(),
+                'source_type' => 'staff',
+                'source_id' => $request->user['id'] ?? null,
+                'description' => '客服调整佣金余额',
+            ]);
         }
         return response([
             'data' => true

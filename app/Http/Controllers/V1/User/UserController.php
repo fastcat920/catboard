@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Jobs\SendEmailJob;
 use App\Services\AuthService;
 use App\Services\AccountDeletionService;
+use App\Services\CommissionLedgerService;
 use App\Services\OrderService;
 use App\Services\UserService;
 use App\Support\ContentLocale;
@@ -653,37 +654,46 @@ class UserController extends Controller
 
     public function transfer(UserTransfer $request)
     {
-        $user = User::find($request->user['id']);
-        if (!$user) {
-            abort(500, __('The user does not exist'));
-        }
-        if ($request->input('transfer_amount') > $user->commission_balance) {
-            abort(500, __('Insufficient commission balance'));
-        }
-        DB::beginTransaction();
-        $order = new Order();
-        $orderService = new OrderService($order);
-        $order->user_id = $request->user['id'];
-        $order->plan_id = 0;
-        $order->period = 'deposit';
-        $order->trade_no = Helper::generateOrderNo();
-        $order->total_amount = $request->input('transfer_amount');
+        DB::transaction(function () use ($request) {
+            $user = User::where('id', $request->user['id'])->lockForUpdate()->first();
+            if (!$user) abort(500, __('The user does not exist'));
+            $amount = (int)$request->input('transfer_amount');
+            if ($amount > $user->commission_balance) abort(500, __('Insufficient commission balance'));
 
-        $orderService->setOrderType($user);
-        $orderService->setInvite($user);
+            $before = (int)$user->commission_balance;
+            $order = new Order();
+            $orderService = new OrderService($order);
+            $order->user_id = $request->user['id'];
+            $order->plan_id = 0;
+            $order->period = 'deposit';
+            $order->trade_no = Helper::generateOrderNo();
+            $order->total_amount = $amount;
+            $orderService->setOrderType($user);
+            $orderService->setInvite($user);
 
-        $user->commission_balance = $user->commission_balance - $request->input('transfer_amount');
-        $user->balance = $user->balance + $request->input('transfer_amount');
-        $order->status = 3;
-        $order->total_amount = 0;
-        $order->surplus_amount = $request->input('transfer_amount');
-        $order->callback_no = Order::CALLBACK_COMMISSION_TRANSFER;
-        if (!$order->save()||!$user->save()) {
-            DB::rollback();
-            abort(500, __('Transfer failed'));
-        }
+            $user->commission_balance -= $amount;
+            $user->balance += $amount;
+            $order->status = 3;
+            $order->total_amount = 0;
+            $order->surplus_amount = $amount;
+            $order->callback_no = Order::CALLBACK_COMMISSION_TRANSFER;
+            if (!$order->save() || !$user->save()) abort(500, __('Transfer failed'));
 
-        DB::commit();
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'transfer_out',
+                'amount' => -$amount,
+                'balance_before' => $before,
+                'balance_after' => (int)$user->commission_balance,
+                'source_key' => 'commission_transfer:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '佣金划转至钱包余额',
+                'meta' => ['wallet_balance_after' => (int)$user->balance],
+            ]);
+        });
 
         return response([
             'data' => true

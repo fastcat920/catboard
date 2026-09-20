@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommissionLog;
+use App\Models\CommissionLedger;
 use App\Models\InviteCode;
 use App\Models\Order;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\UserCoupon;
 use App\Models\ReferralLeaderboardSetting;
+use App\Services\ReferralProgramService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -35,8 +37,22 @@ class InviteController extends Controller
 
     public function details(Request $request)
     {
-        $current = $request->input('current') ? $request->input('current') : 1;
-        $pageSize = $request->input('page_size') >= 10 ? $request->input('page_size') : 10;
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = min(max((int)$request->input('page_size', 10), 10), 100);
+        if (Schema::hasTable('v2_commission_ledger')) {
+            $builder = CommissionLedger::where('user_id', $request->user['id'])->orderBy('created_at', 'DESC')->orderBy('id', 'DESC');
+            $type = $request->input('type');
+            if ($type === 'income') $builder->whereIn('type', ['commission_income', 'reward_income']);
+            elseif ($type === 'transfer') $builder->where('type', 'transfer_out');
+            elseif ($type === 'withdrawal') $builder->whereIn('type', ['withdrawal', 'withdrawal_refund']);
+            elseif ($type === 'reversal') $builder->where('type', 'commission_reversal');
+            $total = $builder->count();
+            return response([
+                'data' => $builder->forPage($current, $pageSize)->get(),
+                'total' => $total,
+            ]);
+        }
+
         $builder = CommissionLog::where('invite_user_id', $request->user['id'])
             ->where('get_amount', '>', 0)
             ->select([
@@ -48,8 +64,20 @@ class InviteController extends Controller
             ])
             ->orderBy('created_at', 'DESC');
         $total = $builder->count();
-        $details = $builder->forPage($current, $pageSize)
-            ->get();
+        $details = $builder->forPage($current, $pageSize)->get()->map(function ($row) {
+            return [
+                'id' => $row->id,
+                'type' => 'commission_income',
+                'amount' => (int)$row->get_amount,
+                'balance_before' => null,
+                'balance_after' => null,
+                'status' => 'completed',
+                'trade_no' => $row->trade_no,
+                'description' => '邀请订单返佣',
+                'meta' => ['order_amount' => (int)$row->order_amount],
+                'created_at' => $row->created_at,
+            ];
+        });
         return response([
             'data' => $details,
             'total' => $total
@@ -61,11 +89,8 @@ class InviteController extends Controller
         $codes = InviteCode::where('user_id', $request->user['id'])
             ->where('status', 0)
             ->get();
-        $commission_rate = config('v2board.invite_commission', 10);
         $user = User::find($request->user['id']);
-        if ($user->commission_rate) {
-            $commission_rate = $user->commission_rate;
-        }
+        $commission_rate = app(ReferralProgramService::class)->commissionRate($user);
         $uncheck_commission_balance = (int)Order::where('status', 3)
             ->where('commission_status', 0)
             ->where('invite_user_id', $request->user['id'])
@@ -110,6 +135,7 @@ class InviteController extends Controller
                 'setting' => $setting,
                 'effective_invites' => $effectiveCount,
                 'referral_revenue' => $referralRevenue,
+                'commission_rate' => (int)$commission_rate,
                 'level' => $level,
                 'level_expires_at' => $user->referral_level_expires_at,
                 'next_level' => $nextLevel,

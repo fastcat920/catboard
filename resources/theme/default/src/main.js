@@ -36,6 +36,8 @@ const legacyCrispMatch = typeof theme.customer_service_html === 'string'
   : null;
 const crispId = normalizeCrispId(theme.crisp_id || (legacyCrispMatch ? legacyCrispMatch[1] : ''));
 const crispHtml = crispId
+  // Keep the escaped closing tag so this string remains safe if the bootstrap is inlined.
+  // eslint-disable-next-line no-useless-escape
   ? `<script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="${crispId}";(function(){var d=document;var s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();<\/script>`
   : '';
 

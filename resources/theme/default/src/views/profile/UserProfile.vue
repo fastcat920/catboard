@@ -125,20 +125,20 @@
         <!-- 安全设置 -->
         <div class="profile-card password-card">
           <div class="settings-content">
-            <div class="password-row" @click="showChangeEmailModal = true">
+            <button type="button" class="password-row" @click="showChangeEmailModal = true">
               <div class="password-row-left">
                 <IconMail :size="18" />
                 <span>{{ $t('profile.changeEmail') }}</span>
               </div>
               <IconChevronRight :size="18" class="password-row-chevron" />
-            </div>
-            <div class="password-row" @click="showPasswordModal = true">
+            </button>
+            <button type="button" class="password-row" @click="showPasswordModal = true">
               <div class="password-row-left">
                 <IconLock :size="18" />
                 <span>{{ $t('profile.changePassword') }}</span>
               </div>
               <IconChevronRight :size="18" class="password-row-chevron" />
-            </div>
+            </button>
           </div>
         </div>
 
@@ -198,7 +198,7 @@
       <!-- 修改邮箱弹窗 -->
       <transition name="modal-fade">
         <div v-if="showChangeEmailModal" class="modal-overlay" @click.self="closeChangeEmailModal">
-          <div class="password-modal email-modal" role="dialog" aria-modal="true" :aria-label="$t('profile.changeEmailTitle')" @click.stop>
+          <div v-accessible-dialog="closeChangeEmailModal" class="password-modal email-modal" :aria-label="$t('profile.changeEmailTitle')" @click.stop>
             <div class="pm-header">
               <div class="pm-header-icon">
                 <IconMail :size="22" />
@@ -289,7 +289,7 @@
       <!-- 注销账号弹窗 -->
       <transition name="modal-fade">
         <div v-if="showDeleteAccountModal" class="modal-overlay" @click.self="closeDeleteAccountModal">
-          <div class="password-modal deletion-modal" role="dialog" aria-modal="true" :aria-label="$t('profile.deleteAccountTitle')" @click.stop>
+          <div v-accessible-dialog="closeDeleteAccountModal" class="password-modal deletion-modal" :aria-label="$t('profile.deleteAccountTitle')" @click.stop>
             <div class="pm-header deletion-header">
               <div class="pm-header-icon">
                 <IconUserX :size="22" />
@@ -350,7 +350,7 @@
       <!-- 修改密码弹窗 -->
       <transition name="modal-fade">
         <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
-          <div class="password-modal" role="dialog" aria-modal="true" :aria-label="$t('profile.changePasswordTitle')" @click.stop>
+          <div v-accessible-dialog="() => showPasswordModal = false" class="password-modal" :aria-label="$t('profile.changePasswordTitle')" @click.stop>
             <!-- 标题栏 -->
             <div class="pm-header">
               <div class="pm-header-icon">
@@ -438,10 +438,10 @@
       <!-- 重置订阅弹窗 -->
       <transition name="modal-fade">
         <div v-if="showResetModal" class="modal-overlay" @click="showResetModal = false">
-          <div class="modal-content" @click.stop>
+          <div v-accessible-dialog="() => showResetModal = false" class="modal-content" :aria-label="$t('profile.resetSecurityTitle')" @click.stop>
             <div class="modal-header">
               <h3>{{ $t('profile.resetSecurityTitle') }}</h3>
-              <button class="modal-close" @click="showResetModal = false"><IconX :size="20" /></button>
+              <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="showResetModal = false"><IconX :size="20" /></button>
             </div>
             <div class="modal-body">
               <p>{{ $t('profile.resetSecurityConfirm') }}</p>
@@ -461,42 +461,6 @@
     <div class="bottom-safe-area"></div>
   </div>
 
-  <!-- Telegram机器人绑定弹窗 -->
-  <transition name="modal-fade">
-    <div v-if="showTelegramBotModal" class="modal-overlay" @click="closeTelegramBotModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ $t('profile.bindTelegram') }}</h3>
-          <button class="modal-close" @click="closeTelegramBotModal"><IconX :size="20" /></button>
-        </div>
-        <div class="modal-body">
-          <div class="step-container">
-            <div class="step-item">
-              <div class="step-number">{{ $t('profile.telegramStep1') }}</div>
-              <div class="step-content">
-                <p>{{ $t('profile.telegramSearchTip') }}
-                  <a :href="`https://t.me/${telegramBotInfo?.username}`" target="_blank" class="tg-link">@{{ telegramBotInfo?.username }}</a>
-                </p>
-              </div>
-            </div>
-            <div class="step-item">
-              <div class="step-number">{{ $t('profile.telegramStep2') }}</div>
-              <div class="step-content">
-                <p>{{ $t('profile.telegramSendCommand') }}</p>
-                <div class="command-container">
-                  <pre class="command-text">/bind {{ subscriptionUrl }}</pre>
-                  <button class="copy-command-btn" @click="copyCommand"><IconCopy :size="16" /></button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-submit" @click="closeTelegramBotModal">{{ $t('profile.iKnow') }}</button>
-        </div>
-      </div>
-    </div>
-  </transition>
 </template>
 
 <script setup name="UserProfile">
@@ -513,23 +477,17 @@ import {
   resetSecurity as apiResetSecurity, 
   updateRemindSettings as apiUpdateRemind, 
   redeemGiftCard as apiRedeemGiftCard, 
-  getActiveSession, 
-  getCommConfig, 
-  getTelegramBotInfo,
-  getUserSubscribe
+  getActiveSession
 } from '@/api/user';
 import { 
   IconAlertTriangle,
   IconLock,
-  IconRefresh,
-  IconCopy,
   IconX,
   IconGift,
   IconDevices,
   IconDeviceMobile,
   IconDeviceDesktop,
   IconBrowser,
-  IconBrandTelegram,
   IconLogout,
   IconEye,
   IconEyeOff,
@@ -566,14 +524,6 @@ const changingEmail = ref(false);
 const resetting = ref(false);
 const remindExpire = ref(false);
 const remindTraffic = ref(false);
-const subscriptionUrl = ref('');
-
-const telegramConfig = ref({ is_telegram: 0, telegram_discuss_link: '' });
-const telegramBotInfo = ref(null);
-const loadingTelegram = ref(false);
-const telegramError = ref('');
-const showTelegramBotModal = ref(false);
-
 const activeSessions = ref([]);
 const loadingSessions = ref(false);
 const sessionError = ref('');
@@ -687,14 +637,13 @@ const fetchUserInfo = async (showLoading = true) => {
       changeEmailForm.value.currentEmail = response.data.email || '';
       remindExpire.value = !!response.data.remind_expire;
       remindTraffic.value = !!response.data.remind_traffic;
-      await fetchSubscribeInfo();
     } else error.value = t('common.unknownError');
   } catch (err) {
     console.error(err);
     error.value = err?.message || t('common.networkError');
     showError(error.value);
   } finally {
-    if (showLoading && !loadingTelegram.value && !loadingSessions.value) loading.value = false;
+    if (showLoading && !loadingSessions.value) loading.value = false;
     checkOpenPasswordModal();
   }
 };
@@ -827,39 +776,6 @@ const submitChangeEmail = async () => {
   }
 };
 
-const fetchSubscribeInfo = async () => {
-  try {
-    const response = await getUserSubscribe();
-    if (response?.data) subscriptionUrl.value = response.data.subscribe_url || '';
-  } catch (err) { console.error(err); }
-};
-
-const fetchTelegramInfo = async () => {
-  loadingTelegram.value = true;
-  try {
-    const configResponse = await getCommConfig();
-    if (configResponse?.data) telegramConfig.value = configResponse.data;
-    try {
-      const botResponse = await getTelegramBotInfo();
-      if (botResponse?.data && !botResponse.data.message?.includes('Not Found')) telegramBotInfo.value = botResponse.data;
-      else telegramBotInfo.value = null;
-    } catch (botErr) { telegramBotInfo.value = null; }
-  } catch (err) { console.error(err); }
-  finally {
-    loadingTelegram.value = false;
-    if (!loading.value && !loadingSessions.value) loading.value = false;
-  }
-};
-
-const openTelegramGroup = () => { if (telegramConfig.value?.telegram_discuss_link) window.open(telegramConfig.value.telegram_discuss_link, '_blank'); };
-const openTelegramBotModal = () => { showTelegramBotModal.value = true; };
-const closeTelegramBotModal = () => { showTelegramBotModal.value = false; };
-const copyCommand = () => {
-  if (telegramBotInfo.value && subscriptionUrl.value) {
-    navigator.clipboard.writeText(`/bind ${subscriptionUrl.value}`).then(() => success(t('profile.commandCopied'))).catch(err => { console.error(err); error(t('common.copyFailed')); });
-  }
-};
-
 const updateRemindSettings = async (type) => {
   updatingSettings.value = true;
   if (type === 'expire') updatingExpire.value = true;
@@ -896,8 +812,7 @@ const changePassword = async () => {
 const resetSecurity = async () => {
   resetting.value = true;
   try {
-    const response = await apiResetSecurity();
-    if (response?.data) subscriptionUrl.value = response.data;
+    await apiResetSecurity();
     success(t('profile.resetSuccess'));
     showResetModal.value = false;
   } catch (err) { showError(t('profile.resetError')); }
@@ -981,11 +896,6 @@ const submitDeleteAccount = async () => {
   }
 };
 
-const copySubscriptionUrl = () => {
-  if (!subscriptionUrl.value) return;
-  navigator.clipboard.writeText(subscriptionUrl.value).then(() => success(t('profile.subscriptionCopied'))).catch(err => console.error(err));
-};
-
 const redeemGiftCard = async () => {
   if (!giftCardCode.value) { showError(t('profile.giftCardEmpty')); return; }
   isRedeeming.value = true;
@@ -1010,7 +920,6 @@ const fetchActiveSessions = async () => {
   } catch (err) { sessionError.value = err?.message || t('common.networkError'); }
   finally {
     loadingSessions.value = false;
-    if (!loading.value && !loadingTelegram.value) loading.value = false;
   }
 };
 
@@ -1080,7 +989,7 @@ onUnmounted(() => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
   overflow: hidden;
   
   &:hover {
@@ -1258,7 +1167,7 @@ onUnmounted(() => {
         font-size: 13px;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         &:hover {
           background-color: rgba(var(--theme-color-rgb), 0.2);
           transform: translateY(-1px);
@@ -1290,7 +1199,7 @@ onUnmounted(() => {
           background-color: var(--bg-secondary);
           color: var(--text-color);
           font-size: 14px;
-          transition: all 0.3s ease;
+          transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
           &:focus {
             outline: none;
             border-color: var(--theme-color);
@@ -1310,7 +1219,7 @@ onUnmounted(() => {
           font-size: 13px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
           @media(max-width:576px) {
             width: 100%;
           }
@@ -1568,7 +1477,8 @@ body.dark-theme { --skeleton-color: rgba(255,255,255,0.06); }
   border: 1px solid rgba(244, 67, 54, 0.18);
   box-shadow: none;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background-color var(--motion-base) ease, border-color var(--motion-base) ease,
+    color var(--motion-base) ease, transform var(--motion-base) ease;
   .logout-text {
     font-size: 15px;
     font-weight: 600;
@@ -1705,7 +1615,7 @@ body.dark-theme { --skeleton-color: rgba(255,255,255,0.06); }
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: all 0.2s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 
     &:hover {
       background: rgba(var(--text-color-rgb), 0.06);
@@ -1829,7 +1739,7 @@ body.dark-theme { --skeleton-color: rgba(255,255,255,0.06); }
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 
       &:hover:not(:disabled) {
         background: rgba(var(--theme-color-rgb), 0.16);
@@ -1907,7 +1817,7 @@ body.dark-theme { --skeleton-color: rgba(255,255,255,0.06); }
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     border: none;
   }
   .pm-btn-cancel {
@@ -1996,10 +1906,6 @@ body.dark-theme { --skeleton-color: rgba(255,255,255,0.06); }
 .modal-content { max-width: 400px; }
 .modal-body { padding: 16px; .form-group { margin-bottom: 14px; } }
 .modal-footer { padding: 12px 16px; }
-.tgbot-modal { max-width: 380px; }
-.step-container { gap: 16px; }
-.command-container { padding: 8px 12px; .command-text { font-size: 13px; } }
-
 /* 动画和辅助 */
 @keyframes spin { to { transform: rotate(360deg); } }
 .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.3s ease; }

@@ -364,7 +364,7 @@ watch(locale, () => {
   font-size: 14px;
   border: 1px solid rgba(var(--theme-color-rgb), 0.3);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   &:hover {
     transform: translateY(-2px);

@@ -27,6 +27,8 @@
         <button 
           v-if="PROFILE_CONFIG.showGiftCardRedeem" 
           class="gift-btn" 
+          :title="$t('profile.giftCardTitle')"
+          :aria-label="$t('profile.giftCardTitle')"
           @click="$router.push('/profile')"
         >
           <IconGift :size="20" />
@@ -59,6 +61,10 @@
         </keep-alive>
       </transition>
     </router-view>
+
+    <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+      {{ routeAnnouncement }}
+    </div>
     
     <!-- 全局Toast通知 - 放在最外层，确保不受页面切换影响 -->
     <Toast />
@@ -137,11 +143,12 @@ export default {
     const route = useRoute();
     const store = useStore();
     useTheme();
-    const { locale, mergeLocaleMessage } = useI18n();
+    const { t, locale, mergeLocaleMessage } = useI18n();
     
     const siteConfig = ref(SITE_CONFIG);
     const cachedRoutes = computed(() => pageCache.getCachedRoutes());
     const customerServiceConfig = computed(() => CUSTOMER_SERVICE_CONFIG);
+    const routeAnnouncement = computed(() => route.meta.titleKey ? t(route.meta.titleKey) : siteConfig.value.siteName);
     
     // ========== 添加语言持久化逻辑 ==========
     // 初始化语言设置（在组件加载时立即执行）
@@ -359,6 +366,7 @@ export default {
       PROFILE_CONFIG,
       cachedRoutes,
       customerServiceConfig,
+      routeAnnouncement,
       useFallbackLogo
     };
   }
@@ -367,10 +375,10 @@ export default {
 
 <style lang="scss">
 @use "sass:math";
-@use "@/assets/styles/base/variables.scss" as *;
-@use "@/assets/styles/base/reset.scss" as *;
-@use "@/assets/styles/base/animations.scss" as *;
-@use "@/assets/styles/base/scrollbar.scss" as *;
+@use "assets/styles/base/variables.scss" as *;
+@use "assets/styles/base/reset.scss" as *;
+@use "assets/styles/base/animations.scss" as *;
+@use "assets/styles/base/scrollbar.scss" as *;
 
 /* 强制隐藏所有球形 */
 .background-decoration,
@@ -394,13 +402,6 @@ html, body, #app {
 #app {
   opacity: 1;
   animation: none;
-}
-
-/* 语言切换时的平滑过渡 */
-* {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-duration: 0.2s;
-  transition-timing-function: ease;
 }
 
 /* 防止文本在语言切换时闪烁 */
@@ -478,6 +479,12 @@ html, body, #app {
   gap: 8px;
   z-index: 110;
 
+  > button,
+  > :deep(button),
+  > :deep(.avatar-wrapper) {
+    flex: 0 0 auto;
+  }
+
   .coupon-shortcut {
     position: relative;
     display: flex;
@@ -493,7 +500,7 @@ html, body, #app {
     border-radius: 50%;
     box-shadow: 0 5px 14px rgba(255, 77, 141, .28);
     cursor: pointer;
-    transition: transform .2s ease, box-shadow .2s ease;
+    transition: transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 
     &::after {
       position: absolute;
@@ -521,7 +528,9 @@ html, body, #app {
     border: 1px solid rgba(var(--theme-color-rgb), 0.3);
     color: var(--theme-color);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease,
+      border-color var(--motion-base) ease, box-shadow var(--motion-base) ease,
+      transform var(--motion-fast) ease;
     
     &:hover {
       box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), 0.15);

@@ -49,6 +49,8 @@ export default {
     enterEmail: 'Please enter your email address',
     enterVerificationCode: 'Please enter verification code',
     enterPassword: 'Please enter your password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     selectEmailDomain: 'Select Email Domain',
     domainNotAuthorized: 'Domain Not Authorized',
     contactAdmin: 'Please contact administrator for authorization',
@@ -645,7 +647,10 @@ export default {
     order_failed: 'Failed to create order',
     no_plan_selected: 'No plan selected',
     plan_not_found: 'Plan not found',
-    failed_to_fetch_plan: 'Failed to fetch plan information'
+    failed_to_fetch_plan: 'Failed to fetch plan information',
+    choose_coupon: 'Choose a coupon',
+    no_coupon: 'Do not use a coupon',
+    no_eligible_coupon: 'No eligible coupons for this order'
   },
   payment: {
     title: 'Payment',
@@ -729,6 +734,12 @@ export default {
   },
   invite: {
     ticketAction: 'Tickets',
+    currentLevel: 'Current level',
+    defaultMember: 'Member',
+    commissionRate: 'Commission rate',
+    viewMembershipBenefits: 'View membership benefits',
+    milestoneReward: 'Milestone reward',
+    oneTimeReward: 'One-time reward: ',
     statsTitle: 'Invite Stats',
     title: 'My Commission',
     description: 'Invite friends to register and earn commissions',

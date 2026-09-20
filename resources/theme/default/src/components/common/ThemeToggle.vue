@@ -1,9 +1,12 @@
 <template>
   <button 
+    type="button"
     class="theme-toggle" 
     :class="{ 'theme-toggle-dark': isDarkTheme }" 
     @click="toggleTheme"
     :title="$t('common.toggleTheme')"
+    :aria-label="$t('common.toggleTheme')"
+    :aria-pressed="isDarkTheme"
   >
     <div class="theme-toggle-icon">
       <svg v-if="isDarkTheme" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -55,7 +58,7 @@ export default {
   border: 1px solid var(--border-color);
   color: var(--text-color);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   padding: 0;
   overflow: hidden;
   
@@ -69,7 +72,7 @@ export default {
   
   &:active {
     transform: translateY(0);
-    transition: all 0.1s ease;
+    transition: color 0.1s ease, background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
   }
   
   &-icon {
@@ -86,4 +89,4 @@ export default {
     transform: rotate(20deg);
   }
 }
-</style> 
+</style>

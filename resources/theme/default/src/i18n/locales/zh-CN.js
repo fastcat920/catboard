@@ -49,6 +49,8 @@ export default {
     enterEmail: '请输入邮箱地址',
     enterVerificationCode: '请输入验证码',
     enterPassword: '请输入密码',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
     selectEmailDomain: '选择邮箱域名',
     domainNotAuthorized: '域名未授权',
     contactAdmin: '请联系管理员获取授权',
@@ -691,7 +693,10 @@ export default {
     order_failed: '订单创建失败',
     no_plan_selected: '未选择套餐',
     plan_not_found: '套餐不存在',
-    failed_to_fetch_plan: '获取套餐信息失败'
+    failed_to_fetch_plan: '获取套餐信息失败',
+    choose_coupon: '选择优惠券',
+    no_coupon: '本次不使用优惠券',
+    no_eligible_coupon: '当前订单暂无可用优惠券'
   },
   payment: {
     title: '支付订单',
@@ -776,6 +781,12 @@ export default {
   // 邀请页面
   invite: {
     ticketAction: '工单',
+    currentLevel: '当前等级',
+    defaultMember: '普通会员',
+    commissionRate: '佣金比例',
+    viewMembershipBenefits: '查看会员等级权益',
+    milestoneReward: '里程碑奖励',
+    oneTimeReward: '一次性奖励：',
     statsTitle: '邀请统计',
     title: '我的返佣',
     description: '邀请好友注册使用，获取佣金收入',

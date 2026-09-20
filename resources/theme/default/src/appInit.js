@@ -15,6 +15,7 @@ import store from './store';
 import i18n from './i18n';
 import { MotionPlugin } from '@vueuse/motion';
 import { useToast } from './composables/useToast';
+import accessibleDialog from './directives/accessibleDialog';
 // 导入页面标题设置功能
 import initPageTitle from './utils/exposeConfig';
 // default 是项目内置主题，不执行第三方主题授权和反调试逻辑。
@@ -30,6 +31,7 @@ const initApp = async () => {
 
     // 创建应用实例
     const app = createApp(App);
+    app.directive('accessible-dialog', accessibleDialog);
 
     // 创建全局Toast实例
     const toast = useToast();

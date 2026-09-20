@@ -7,9 +7,12 @@
     </div>
     
     <button 
+      type="button"
       class="language-btn" 
       @click="toggleDropdown"
       :title="$t('common.language')"
+      :aria-label="$t('common.language')"
+      :aria-expanded="isOpen"
     >
       <span class="flag-icon">
         <transition name="flag-fade" mode="out-in">
@@ -20,16 +23,18 @@
     
     <transition name="fade">
       <div class="language-dropdown" v-if="isOpen" ref="dropdown">
-        <div 
+        <button
           v-for="lang in languages" 
           :key="lang.code" 
+          type="button"
           class="language-item"
           :class="{ 'active': currentLanguage === lang.code }"
+          :aria-pressed="currentLanguage === lang.code"
           @click="changeLanguage(lang.code)"
         >
           <span class="flag-icon" v-html="lang.flag"></span>
           <span class="lang-name">{{ lang.name }}</span>
-        </div>
+        </button>
       </div>
     </transition>
   </div>
@@ -165,7 +170,7 @@ export default {
   border: 1px solid var(--border-color);
   color: var(--text-color);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   padding: 6px;
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -230,7 +235,7 @@ export default {
 .language-item {
   padding: 12px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
   font-size: 14px;
   display: flex;

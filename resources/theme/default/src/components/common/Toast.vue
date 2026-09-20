@@ -101,7 +101,7 @@ export default {
   gap: 12px;
   opacity: 0;
   transform: translateX(100%);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: auto;
   cursor: pointer;
   overflow: hidden;
@@ -272,12 +272,12 @@ export default {
 }
 
 .toast-list-enter-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   transition-delay: 0.1s;
 }
 
 .toast-list-leave-active {
-  transition: all 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335);
+  transition: color 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335), background-color 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335), border-color 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335), box-shadow 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335), opacity 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335), transform 0.4s cubic-bezier(0.6, 0.04, 0.98, 0.335);
   position: absolute;
   
   @media (max-width: 576px) {

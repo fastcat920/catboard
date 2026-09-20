@@ -20,6 +20,8 @@
   margin-bottom: 0.5rem;
   font-weight: $font-weight-medium;
   color: var(--text-color);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 // 表单控件 — 对齐客户端 14px 圆角与 48px 触控高度
@@ -28,7 +30,7 @@
   width: 100%;
   min-height: var(--control-height);
   padding: 0.75rem 1rem;
-  font-size: $font-size-base;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   color: var(--text-color);
   background-color: var(--input-background);
@@ -36,7 +38,8 @@
   border: 1px solid var(--card-border);
   border-radius: $border-radius;
   box-shadow: none;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease,
+    background-color var(--motion-base) ease;
   transform: none !important;
 
   &:focus {
@@ -74,7 +77,10 @@
 
 // 按钮 — 对齐客户端 14px 圆角与 48px 触控高度
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-weight: $font-weight-medium;
   text-align: center;
   white-space: nowrap;
@@ -82,15 +88,22 @@
   user-select: none;
   padding: 0.75rem 1.5rem;
   min-height: var(--control-height);
-  font-size: $font-size-base;
+  font-size: var(--font-size-base);
   line-height: 1.5;
   border-radius: $border-radius;
-  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  transition: color var(--motion-base) ease, background-color var(--motion-base) ease,
+    border-color var(--motion-base) ease, box-shadow var(--motion-base) ease,
+    transform var(--motion-fast) ease;
   cursor: pointer;
 
   &:disabled {
     opacity: 0.65;
     cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
   }
 }
 
@@ -100,7 +113,7 @@
   background-color: var(--theme-color);
   border: 1px solid var(--theme-color);
 
-  &:hover, &:focus {
+  &:hover {
     background-color: rgba(var(--theme-color-rgb), 0.85);
     border-color: var(--theme-color);
     transform: translateY(-1px);
@@ -119,7 +132,7 @@
   background-color: transparent;
   border: 1px solid var(--border-color);
 
-  &:hover, &:focus {
+  &:hover {
     background-color: rgba(var(--card-background-rgb), 0.5);
     border-color: var(--theme-color);
     color: var(--theme-color);
@@ -134,7 +147,7 @@
   background-color: transparent;
   border: 1px solid var(--theme-color);
 
-  &:hover, &:focus {
+  &:hover {
     background-color: rgba(var(--theme-color-rgb), 0.1);
   }
 
@@ -152,7 +165,7 @@
   border: none;
   padding: 0.5rem;
 
-  &:hover, &:focus {
+  &:hover {
     color: var(--theme-hover-color, rgba(var(--theme-color-rgb), 0.8));
     text-decoration: none;
   }

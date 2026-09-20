@@ -191,10 +191,10 @@
 
       <!-- 新建工单弹窗 -->
       <div class="modal-overlay" v-if="showModal" @click="closeModal" :class="{ 'show-overlay': overlayVisible }">
-        <div class="modal-content" :class="{ 'modal-close-animation': modalCloseAnimation }" @click.stop>
+        <div v-accessible-dialog="closeModal" class="modal-content" :class="{ 'modal-close-animation': modalCloseAnimation }" :aria-label="$t('tickets.createNew')" @click.stop>
           <div class="modal-header">
             <h3>{{ $t('tickets.createNew') }}</h3>
-            <button class="modal-close" @click="closeModal">
+            <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="closeModal">
               <IconX :size="20" />
             </button>
           </div>
@@ -210,7 +210,7 @@
             <div class="form-group">
               <label>{{ $t('tickets.level') }}</label>
               <div class="level-tags">
-                <div 
+                <button type="button"
                   class="level-tag" 
                   :class="{ 'active': newTicket.level === '0', 'level-low': true }"
                   @click="newTicket.level = '0'"
@@ -218,8 +218,8 @@
                   <IconCircleCheck v-if="newTicket.level === '0'" :size="16" class="tag-icon" />
                   <IconCircle v-else :size="16" class="tag-icon" />
                   {{ $t('tickets.levelLow') }}
-                </div>
-                <div 
+                </button>
+                <button type="button"
                   class="level-tag" 
                   :class="{ 'active': newTicket.level === '1', 'level-medium': true }"
                   @click="newTicket.level = '1'"
@@ -227,8 +227,8 @@
                   <IconCircleCheck v-if="newTicket.level === '1'" :size="16" class="tag-icon" />
                   <IconCircle v-else :size="16" class="tag-icon" />
                   {{ $t('tickets.levelMedium') }}
-                </div>
-                <div 
+                </button>
+                <button type="button"
                   class="level-tag" 
                   :class="{ 'active': newTicket.level === '2', 'level-high': true }"
                   @click="newTicket.level = '2'"
@@ -236,7 +236,7 @@
                   <IconCircleCheck v-if="newTicket.level === '2'" :size="16" class="tag-icon" />
                   <IconCircle v-else :size="16" class="tag-icon" />
                   {{ $t('tickets.levelHigh') }}
-                </div>
+                </button>
               </div>
             </div>
             <div class="form-group">
@@ -267,10 +267,10 @@
       
       <!-- 关闭工单确认弹窗 -->
       <div class="modal-overlay" v-if="showCloseTicketModal" @click="showCloseConfirm" :class="{ 'show-overlay': overlayVisible }">
-        <div class="modal-content" :class="{ 'modal-close-animation': modalCloseAnimation }" @click.stop>
+        <div v-accessible-dialog="showCloseConfirm" class="modal-content" :class="{ 'modal-close-animation': modalCloseAnimation }" :aria-label="$t('tickets.closeConfirmTitle')" @click.stop>
           <div class="modal-header">
             <h3>{{ $t('tickets.closeConfirmTitle') }}</h3>
-            <button class="modal-close" @click="showCloseTicketModal = false">
+            <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="showCloseTicketModal = false">
               <IconX :size="20" />
             </button>
           </div>
@@ -674,16 +674,6 @@ const closeModal = () => {
   }, 250); // 与动画时长匹配
 };
 
-// 修改显示模态框的方法
-const showNewTicketModal = () => {
-  modalCloseAnimation.value = false; // 确保重置动画状态
-  showModal.value = true;
-  // 添加小延迟以确保过渡效果平滑
-  setTimeout(() => {
-    overlayVisible.value = true;
-  }, 10);
-};
-
 // 修改 showCloseConfirm 方法
 const showCloseConfirm = () => {
   if (showCloseTicketModal.value) {
@@ -796,7 +786,7 @@ onUnmounted(() => {
   padding: 20px;
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   &:hover {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -863,7 +853,7 @@ onUnmounted(() => {
       background-color: var(--bg-secondary);
       color: var(--text-color);
       font-size: 14px;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
       
       &:focus {
@@ -904,7 +894,7 @@ onUnmounted(() => {
   padding: 1rem;
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   margin-bottom: 0.5rem;
   position: relative;
   
@@ -1023,7 +1013,7 @@ onUnmounted(() => {
       color: #f44336;
       border: none;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       
       &:hover {
         background-color: rgba(244, 67, 54, 0.2);
@@ -1254,7 +1244,7 @@ onUnmounted(() => {
     color: var(--text-color);
     font-size: 1rem;
     line-height: 1.5;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
     min-height: 90px;
     
@@ -1288,7 +1278,7 @@ onUnmounted(() => {
     color: white;
     border: none;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     white-space: nowrap;
     font-weight: 500;
     box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), 0.25);
@@ -1402,7 +1392,7 @@ onUnmounted(() => {
   z-index: 1000;
   backdrop-filter: blur(0px);
   -webkit-backdrop-filter: blur(0px);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   pointer-events: none; /* 默认不接收点击事件 */
   
   &.show-overlay {
@@ -1419,7 +1409,7 @@ onUnmounted(() => {
 
 .modal-enter-active, 
 .modal-leave-active {
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 
 .modal-enter-from,
@@ -1495,7 +1485,7 @@ onUnmounted(() => {
     color: var(--text-muted);
     cursor: pointer;
     border-radius: 50%;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     
     &:hover {
       color: var(--text-color);
@@ -1527,7 +1517,7 @@ onUnmounted(() => {
       background-color: var(--bg-secondary);
       color: var(--text-color);
       font-size: 0.95rem;
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
       
       &:focus {
@@ -1560,7 +1550,7 @@ onUnmounted(() => {
         padding: 8px 14px;
         border-radius: 20px;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
         border: 1px solid var(--card-border);
         background-color: var(--bg-secondary);
         font-size: 0.9rem;
@@ -1623,7 +1613,7 @@ onUnmounted(() => {
     font-weight: 500;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1777,7 +1767,7 @@ onUnmounted(() => {
       font-size: 1.05rem;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       display: inline-flex;
       align-items: center;
       gap: 0.75rem;

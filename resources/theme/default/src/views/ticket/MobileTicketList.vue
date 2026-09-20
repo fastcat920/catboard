@@ -143,10 +143,10 @@
 
     <!-- 创建工单模态框 -->
     <div v-if="showModal" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
+      <div v-accessible-dialog="closeModal" class="modal-content" :aria-label="$t('tickets.createNew')" @click.stop>
         <div class="modal-header">
           <h3>{{ $t('tickets.createNew') }}</h3>
-          <button class="close-btn" @click="closeModal">
+          <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="closeModal">
             <IconX :size="20" />
           </button>
         </div>
@@ -199,10 +199,10 @@
 
     <!-- 关闭工单确认弹窗 -->
     <div v-if="showCloseTicketModal" class="modal-overlay" @click="closeConfirmModal">
-      <div class="modal-content" @click.stop>
+      <div v-accessible-dialog="closeConfirmModal" class="modal-content" :aria-label="$t('tickets.closeConfirmTitle')" @click.stop>
         <div class="modal-header">
           <h3>{{ $t('tickets.closeConfirmTitle') }}</h3>
-          <button class="close-btn" @click="closeConfirmModal">
+          <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="closeConfirmModal">
             <IconX :size="20" />
           </button>
         </div>
@@ -352,11 +352,6 @@ const formatTimeShort = (timestamp) => {
            ' ' + 
            date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-};
-
-// 显示创建工单模态框
-const showCreateTicketModal = () => {
-  showModal.value = true;
 };
 
 // 关闭模态框
@@ -680,7 +675,7 @@ fetchTickets();
   padding: 20px;
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   &:hover {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -748,7 +743,7 @@ fetchTickets();
   padding: 1.25rem;
   margin-bottom: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 
   &:hover {
@@ -850,7 +845,7 @@ fetchTickets();
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     animation: fadeInLeft 0.4s ease;
 
     &:hover {
@@ -891,7 +886,7 @@ fetchTickets();
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
     &:hover {
       background-color: rgba(244, 67, 54, 0.1);
@@ -1110,7 +1105,7 @@ fetchTickets();
     color: var(--text-color);
     font-size: 0.95rem;
     resize: none;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     min-height: 100px;
 
     &:focus {
@@ -1133,7 +1128,7 @@ fetchTickets();
     font-size: 0.95rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), 0.2);
 
     &:hover:not(:disabled) {
@@ -1235,7 +1230,7 @@ fetchTickets();
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
     &:hover {
       background-color: rgba(var(--theme-color-rgb), 0.1);
@@ -1275,7 +1270,7 @@ fetchTickets();
       background-color: var(--card-bg);
       color: var(--text-color);
       font-size: 1rem;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
       &:focus {
         outline: none;
@@ -1306,7 +1301,7 @@ fetchTickets();
       background-color: var(--card-bg);
       color: var(--text-color);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       font-weight: 500;
       font-size: 0.95rem;
 
@@ -1340,7 +1335,7 @@ fetchTickets();
     font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
     &.cancel-btn {
       background-color: var(--card-bg);
@@ -1531,7 +1526,7 @@ fetchTickets();
       font-size: 1.05rem;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       display: inline-flex;
       align-items: center;
       gap: 0.75rem;

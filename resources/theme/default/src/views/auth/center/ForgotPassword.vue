@@ -43,9 +43,11 @@
               class="form-control"
               v-model="formData.email"
               :placeholder="$t('auth.emailPlaceholder')"
+              :aria-invalid="!!errors.email"
+              :aria-describedby="errors.email ? 'reset-email-error' : undefined"
             />
           </div>
-          <div v-if="errors.email" class="error-message">{{ errors.email }}</div>
+          <div v-if="errors.email" id="reset-email-error" class="error-message" role="alert">{{ errors.email }}</div>
         </div>
         
         <!-- 验证码输入组（无标签） -->
@@ -59,6 +61,8 @@
                 class="form-control"
                 v-model="formData.verificationCode"
                 :placeholder="$t('auth.codePlaceholder')"
+                :aria-invalid="!!errors.verificationCode"
+                :aria-describedby="errors.verificationCode ? 'reset-code-error' : undefined"
               />
             </div>
             <button
@@ -71,7 +75,7 @@
               <span>{{ cooldown > 0 ? `${cooldown}s` : $t('common.sendCode') }}</span>
             </button>
           </div>
-          <div v-if="errors.verificationCode" class="error-message">{{ errors.verificationCode }}</div>
+          <div v-if="errors.verificationCode" id="reset-code-error" class="error-message" role="alert">{{ errors.verificationCode }}</div>
         </div>
         
         <!-- 新密码输入组（无标签） -->
@@ -84,13 +88,15 @@
               class="form-control"
               v-model="formData.newPassword"
               :placeholder="$t('auth.newPasswordPlaceholder')"
+              :aria-invalid="!!errors.newPassword"
+              :aria-describedby="errors.newPassword ? 'reset-password-error' : undefined"
             />
-            <div class="password-toggle" @click="showPassword = !showPassword">
+            <button type="button" class="password-toggle" :aria-label="$t(showPassword ? 'common.hidePassword' : 'common.showPassword')" :aria-pressed="showPassword" @click="showPassword = !showPassword">
               <IconEye v-if="!showPassword" />
               <IconEyeOff v-else />
-            </div>
+            </button>
           </div>
-          <div v-if="errors.newPassword" class="error-message">{{ errors.newPassword }}</div>
+          <div v-if="errors.newPassword" id="reset-password-error" class="error-message" role="alert">{{ errors.newPassword }}</div>
         </div>
         
         <!-- 确认密码输入组（无标签） -->
@@ -103,13 +109,15 @@
               class="form-control"
               v-model="formData.confirmPassword"
               :placeholder="$t('auth.confirmPasswordPlaceholder')"
+              :aria-invalid="!!errors.confirmPassword"
+              :aria-describedby="errors.confirmPassword ? 'reset-confirm-error' : undefined"
             />
-            <div class="password-toggle" @click="showConfirmPassword = !showConfirmPassword">
+            <button type="button" class="password-toggle" :aria-label="$t(showConfirmPassword ? 'common.hidePassword' : 'common.showPassword')" :aria-pressed="showConfirmPassword" @click="showConfirmPassword = !showConfirmPassword">
               <IconEye v-if="!showConfirmPassword" />
               <IconEyeOff v-else />
-            </div>
+            </button>
           </div>
-          <div v-if="errors.confirmPassword" class="error-message">{{ errors.confirmPassword }}</div>
+          <div v-if="errors.confirmPassword" id="reset-confirm-error" class="error-message" role="alert">{{ errors.confirmPassword }}</div>
         </div>
         
         <button
@@ -141,10 +149,10 @@
     <!-- 验证码弹窗 -->
     <div class="captcha-modal" v-if="showCaptchaModal" :class="{ 'closing': isClosingModal }">
       <div class="captcha-modal-overlay" @click="closeCaptchaModal"></div>
-      <div class="captcha-modal-content" :class="{ 'closing': isClosingModal }">
+      <div v-accessible-dialog="closeCaptchaModal" class="captcha-modal-content" :class="{ 'closing': isClosingModal }" :aria-label="$t('auth.captcha')">
         <div class="captcha-modal-header">
           <h3>{{ $t('auth.captcha') }}</h3>
-          <button class="close-btn" @click="closeCaptchaModal">
+          <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="closeCaptchaModal">
             <span>&times;</span>
           </button>
         </div>
@@ -760,7 +768,7 @@ export default {
     border-radius: 12px;
     border: 1px solid var(--input-border-color, transparent);
     background-color: var(--input-bg-color, #f9f9f9);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     color: var(--primary-text-color);
     
     &[type="password"],
@@ -847,7 +855,7 @@ export default {
 .btn {
   height: 45px;
   border-radius: 12px;
-  transition: all 0.3s;
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -938,7 +946,7 @@ export default {
         width: 32px;
         height: 32px;
         border-radius: 50%;
-        transition: all 0.2s;
+        transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
         
         &:hover {
           background-color: var(--hover-bg-color, rgba(0, 0, 0, 0.05));
@@ -1090,7 +1098,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   svg {
     display: none;

@@ -859,7 +859,7 @@ onUnmounted(() => {
   font-size: 1rem;
   border: none;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: color 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), 0.3);
   
   .retry-text {
@@ -891,7 +891,7 @@ onUnmounted(() => {
   padding: 1.5rem;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   width: 100%;
   
   @media (min-width: 768px) {
@@ -934,7 +934,7 @@ onUnmounted(() => {
       color: var(--theme-color);
       border-radius: 4px;
       font-weight: 500;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
       
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.2);
@@ -1042,7 +1042,7 @@ onUnmounted(() => {
     border-radius: 6px;
     margin: 1.8rem auto;
     display: block;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     border: 1px solid var(--card-border);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     
@@ -1261,7 +1261,7 @@ onUnmounted(() => {
   color: var(--theme-color) !important;
   border: none !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
+  transition: color 0.2s ease !important, background-color 0.2s ease !important, border-color 0.2s ease !important, box-shadow 0.2s ease !important, opacity 0.2s ease !important, transform 0.2s ease !important;
   font-weight: 500 !important;
   margin: 8px 4px !important;
   text-decoration: none !important;

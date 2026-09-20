@@ -8,7 +8,7 @@
         </div>
         <div class="card-body">
           <div class="pending-items-list">
-            <div v-if="userStats.pendingOrders > 0" class="pending-item" @click="router.push('/orders')">
+            <button v-if="userStats.pendingOrders > 0" type="button" class="pending-item" @click="router.push('/orders')">
               <div class="pending-icon">
                 <IconShoppingCart :size="20" />
               </div>
@@ -18,9 +18,9 @@
               <div class="pending-action">
                 <IconChevronRight :size="16" />
               </div>
-            </div>
+            </button>
             
-            <div v-if="userStats.pendingTickets > 0" class="pending-item" @click="goToSupport">
+            <button v-if="userStats.pendingTickets > 0" type="button" class="pending-item" @click="goToSupport">
               <div class="pending-icon">
                 <IconMessage :size="20" />
               </div>
@@ -30,7 +30,7 @@
               <div class="pending-action">
                 <IconChevronRight :size="16" />
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -45,7 +45,7 @@
           <div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
         </div>
-        <div v-else class="notice-body" @click="showNoticeModal">
+        <div v-else class="notice-body" role="button" tabindex="0" @click="showNoticeModal" @keydown.enter="showNoticeModal" @keydown.space.prevent="showNoticeModal">
           <transition name="fade-slide" mode="out-in">
             <div class="notice-item" v-if="notices.data[currentNoticeIndex]" :key="currentNoticeIndex">
               <div class="notice-heading">
@@ -56,13 +56,15 @@
               <div class="notice-content-preview">{{ announcementPreviewText }}</div>
               <div class="notice-footer">
                 <div class="notice-dots" v-if="notices.data.length > 1">
-                  <span 
+                  <button
                     v-for="(_, idx) in notices.data" 
                     :key="idx"
+                    type="button"
                     class="dot"
                     :class="{ active: idx === currentNoticeIndex }"
+                    :aria-label="$t('common.noticeCount', { current: idx + 1, total: notices.data.length })"
                     @click.stop="setCurrentNotice(idx)"
-                  ></span>
+                  ></button>
                 </div>
               </div>
             </div>
@@ -74,10 +76,10 @@
       <transition name="fade">
         <div v-if="showNoticeDetails" class="notice-modal-overlay" @click="closeNoticeModal">
           <transition name="popup-slide">
-            <div v-if="showNoticeDetails" class="notice-modal" :style="noticeModalStyle" @click.stop>
+            <div v-if="showNoticeDetails" v-accessible-dialog="closeNoticeModal" class="notice-modal" :style="noticeModalStyle" :aria-label="notices.data[currentNoticeIndex]?.title || $t('common.info')" @click.stop>
               <div class="notice-modal-header">
                 <h2 class="popup-title">{{ notices.data[currentNoticeIndex]?.title || '' }}</h2>
-                <button class="popup-close-btn" @click="closeNoticeModal">
+                <button class="popup-close-btn" type="button" :aria-label="$t('common.close')" @click="closeNoticeModal">
                   <IconX :size="20" />
                 </button>
               </div>
@@ -144,7 +146,7 @@
         </div>
         <div class="card-body">
           <div class="download-options">
-            <div class="download-option" v-if="clientConfig.showIOS" @click="downloadClient('ios')">
+            <button type="button" class="download-option" v-if="clientConfig.showIOS" @click="downloadClient('ios')">
               <div class="option-icon ios">
                 <IconBrandApple :size="32" />
               </div>
@@ -152,8 +154,8 @@
                 <div class="option-name">iOS</div>
                 <div class="option-version">v2.2.0</div>
               </div>
-            </div>
-            <div class="download-option" v-if="clientConfig.showAndroid" @click="downloadClient('android')">
+            </button>
+            <button type="button" class="download-option" v-if="clientConfig.showAndroid" @click="downloadClient('android')">
               <div class="option-icon android">
                 <IconBrandAndroid :size="32" />
               </div>
@@ -161,8 +163,8 @@
                 <div class="option-name">Android</div>
                 <div class="option-version">v3.5.9</div>
               </div>
-            </div>
-            <div class="download-option" v-if="clientConfig.showMacOS" @click="downloadClient('macos')">
+            </button>
+            <button type="button" class="download-option" v-if="clientConfig.showMacOS" @click="downloadClient('macos')">
               <div class="option-icon macos">
                 <IconBrandFinder :size="32" />
               </div>
@@ -170,8 +172,8 @@
                 <div class="option-name">MacOS</div>
                 <div class="option-version">v3.5.9</div>
               </div>
-            </div>
-            <div class="download-option" v-if="clientConfig.showWindows" @click="downloadClient('windows')">
+            </button>
+            <button type="button" class="download-option" v-if="clientConfig.showWindows" @click="downloadClient('windows')">
               <div class="option-icon windows">
                 <IconBrandWindows :size="32" />
               </div>
@@ -179,8 +181,8 @@
                 <div class="option-name">Windows</div>
                 <div class="option-version">v3.5.9</div>
               </div>
-            </div>
-            <div class="download-option" v-if="clientConfig.showLinux" @click="downloadClient('linux')">
+            </button>
+            <button type="button" class="download-option" v-if="clientConfig.showLinux" @click="downloadClient('linux')">
               <div class="option-icon linux">
                 <IconBrandDebian :size="32" />
               </div>
@@ -188,8 +190,8 @@
                 <div class="option-name">Linux</div>
                 <div class="option-version">v3.5.9</div>
               </div>
-            </div>
-            <div class="download-option" v-if="clientConfig.showOpenWrt" @click="downloadClient('openwrt')">
+            </button>
+            <button type="button" class="download-option" v-if="clientConfig.showOpenWrt" @click="downloadClient('openwrt')">
               <div class="option-icon openwrt">
                 <IconRouter :size="32" />
               </div>
@@ -197,7 +199,7 @@
                 <div class="option-name">OpenWrt</div>
                 <div class="option-version">v3.5.9</div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -208,10 +210,10 @@
   <transition name="modal-fade">
     <div class="modal-overlay" v-if="showResetTrafficModal" @click.self="closeResetTrafficModal">
       <div class="reset-modal-container">
-        <div class="modal-card reset-traffic-modal">
+        <div v-accessible-dialog="closeResetTrafficModal" class="modal-card reset-traffic-modal" :aria-label="trafficRecoveryCopy.title">
           <div class="modal-header">
             <h3>{{ trafficRecoveryCopy.title }}</h3>
-            <button class="close-btn-icon" @click="closeResetTrafficModal">
+            <button class="close-btn-icon" type="button" :aria-label="$t('common.close')" @click="closeResetTrafficModal">
               <IconX :size="20" />
             </button>
           </div>
@@ -251,10 +253,10 @@
   <transition name="modal-fade">
     <div class="modal-overlay" v-if="showRenewPlanModal" @click.self="closeRenewPlanModal">
       <div class="reset-modal-container">
-        <div class="modal-card reset-traffic-modal renew-plan-modal">
+        <div v-accessible-dialog="closeRenewPlanModal" class="modal-card reset-traffic-modal renew-plan-modal" :aria-label="$t('dashboard.confirmRenewPlan')">
           <div class="modal-header">
             <h3>{{ $t('dashboard.confirmRenewPlan') }}</h3>
-            <button class="close-btn-icon" @click="closeRenewPlanModal">
+            <button class="close-btn-icon" type="button" :aria-label="$t('common.close')" @click="closeRenewPlanModal">
               <IconX :size="20" />
             </button>
           </div>
@@ -952,7 +954,7 @@ export default {
   padding: 20px;
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
   
   &:hover {
     box-shadow: 0 4px 16px var(--card-shadow-hover);
@@ -1077,7 +1079,7 @@ export default {
         font-size: 13px;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         background-color: transparent;
         color: var(--text-color);
         border: 1px solid var(--card-border);
@@ -1191,7 +1193,7 @@ export default {
             border-radius: 50%;
             background-color: var(--secondary-text-color);
             opacity: 0.4;
-            transition: all 0.2s ease;
+            transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
             cursor: pointer;
             
             &.active {
@@ -1240,7 +1242,7 @@ export default {
       border-radius: 10px;
       background-color: rgba(var(--theme-color-rgb), 0.05);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.1);
@@ -1290,7 +1292,7 @@ export default {
         align-items: center;
         justify-content: center;
         transform: rotate(-5deg);
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       }
       
       .no-plan-title {
@@ -1333,7 +1335,7 @@ export default {
       border-radius: 10px;
       cursor: pointer;
       border: 1px solid var(--card-border);
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.05);
@@ -1429,7 +1431,7 @@ export default {
       height: 36px;
       border-radius: 50%;
       color: var(--secondary-text-color, #6b7280);
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       padding: 0;
       
       &:hover {
@@ -1482,7 +1484,7 @@ export default {
       font-size: 14px;
       font-weight: 500;
       color: var(--text-color, #374151);
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.05);
@@ -1500,7 +1502,7 @@ export default {
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover:not(:disabled) {
         background-color: #d32f2f;
@@ -1566,11 +1568,12 @@ export default {
 }
 
 .popup-slide-enter-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity var(--motion-slow) cubic-bezier(0.16, 1, 0.3, 1),
+    transform var(--motion-slow) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .popup-slide-leave-active {
-  transition: all 0.2s ease-out;
+  transition: opacity var(--motion-base) ease-out, transform var(--motion-base) ease-out;
 }
 
 .popup-slide-enter-from {
@@ -1707,7 +1710,7 @@ export default {
   padding: 8px;
   margin: -8px;
   border-radius: 50%;
-  transition: all 0.3s ease;
+  transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 }
 
 .notice-modal .notice-modal-header .popup-close-btn:hover {
@@ -1746,7 +1749,7 @@ export default {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 }
 
 /* ========== 暗黑主题 - 使用和卡片相同的背景色 ========== */

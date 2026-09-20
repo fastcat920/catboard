@@ -2,10 +2,10 @@
   <transition name="fade">
     <div v-if="show" class="auth-popup-overlay" @click.self="attemptClose">
       <transition name="popup-slide">
-        <div v-if="show" class="auth-popup-container">
+        <div v-if="show" v-accessible-dialog="attemptClose" class="auth-popup-container" :aria-label="title">
           <div class="auth-popup-header">
             <h2 class="popup-title" v-html="safeTitle"></h2>
-            <button class="popup-close-btn" @click="attemptClose">
+            <button class="popup-close-btn" type="button" :aria-label="$t('common.close')" @click="attemptClose">
               <IconX :size="20" />
             </button>
           </div>
@@ -217,7 +217,7 @@ export default {
         padding: 8px;
         margin: -8px;
         border-radius: 50%;
-        transition: all 0.3s ease;
+        transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
         
         &:hover {
           background-color: rgba(0, 0, 0, 0.05);
@@ -274,7 +274,7 @@ export default {
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
         min-width: 120px;
         
         &:hover:not(:disabled) {
@@ -330,11 +330,11 @@ export default {
 }
 
 .popup-slide-enter-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .popup-slide-leave-active {
-  transition: all 0.2s ease-out;
+  transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 
 .popup-slide-enter-from {

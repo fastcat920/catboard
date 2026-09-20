@@ -173,7 +173,7 @@ onMounted(() => {
   padding: 1rem 1.25rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid var(--card-border);
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
   display: flex;
   align-items: center;
   
@@ -253,7 +253,7 @@ onMounted(() => {
       justify-content: center;
       color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.1);
         color: var(--theme-color);
@@ -320,7 +320,7 @@ onMounted(() => {
   border: 1px solid rgba(var(--theme-color-rgb), 0.3);
   box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), 0.25);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   backdrop-filter: blur(8px);
   &:hover {
     transform: translateY(-2px);

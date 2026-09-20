@@ -4,10 +4,10 @@
     <transition name="modal">
       <div v-if="showConfirmModal" class="custom-modal">
         <div class="modal-overlay" @click="cancelConfirmation"></div>
-        <div class="modal-container">
+        <div v-accessible-dialog="cancelConfirmation" class="modal-container" :aria-label="$t('invite.confirm.title')">
           <div class="modal-header">
             <h3>{{ $t('invite.confirm.title') }}</h3>
-            <button class="modal-close" @click="cancelConfirmation">
+            <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="cancelConfirmation">
               <IconX />
             </button>
           </div>
@@ -50,23 +50,23 @@
 
       <section v-if="referralProgram" class="member-summary-card">
         <div class="member-level-info">
-          <span>{{ locale === 'en-US' ? 'Current level' : '当前等级' }}</span>
-          <h2>{{ localizedLevel(referralProgram.level) || (locale === 'en-US' ? 'Member' : '普通会员') }}</h2>
+          <span>{{ $t('invite.currentLevel') }}</span>
+          <h2>{{ localizedLevel(referralProgram.level) || $t('invite.defaultMember') }}</h2>
         </div>
         <div class="member-commission-rate">
-          <span>{{ locale === 'en-US' ? 'Commission rate' : '佣金比例' }}</span>
+          <span>{{ $t('invite.commissionRate') }}</span>
           <strong>{{ currentCommissionRate }}%</strong>
         </div>
-        <button class="membership-link" @click="$router.push('/membership')">{{ locale === 'en-US' ? 'View membership benefits' : '查看会员等级权益' }}</button>
+        <button class="membership-link" @click="$router.push('/membership')">{{ $t('invite.viewMembershipBenefits') }}</button>
       </section>
 
       <section v-if="referralProgram?.next_milestone" class="growth-card milestone-card">
         <div class="growth-card-head">
-          <div><span>{{ locale === 'en-US' ? 'Milestone reward' : '里程碑奖励' }}</span><h3>{{ localizedMilestone(referralProgram.next_milestone) }}</h3></div>
+          <div><span>{{ $t('invite.milestoneReward') }}</span><h3>{{ localizedMilestone(referralProgram.next_milestone) }}</h3></div>
           <strong>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_milestone.required_invites }}</strong>
         </div>
         <div class="growth-progress"><i :style="{ width: milestoneProgress + '%' }"></i></div>
-        <p>{{ locale === 'en-US' ? 'One-time reward: ' : '一次性奖励：' }}{{ milestoneRewardText }}</p>
+        <p>{{ $t('invite.oneTimeReward') }}{{ milestoneRewardText }}</p>
       </section>
 
       <!-- 统计卡片组 -->
@@ -304,10 +304,10 @@
       <!-- 划转弹窗（佣金转余额） -->
       <transition name="modal-fade">
         <div v-if="showTransferCardState" class="modal-overlay" @click="closeTransferCard">
-          <div class="modal-content" @click.stop>
+          <div v-accessible-dialog="closeTransferCard" class="modal-content" :aria-label="$t('invite.transfer.title')" @click.stop>
             <div class="modal-header">
               <h3>{{ $t('invite.transfer.title') }}</h3>
-              <button class="modal-close" @click="closeTransferCard">
+              <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="closeTransferCard">
                 <IconX :size="20" />
               </button>
             </div>
@@ -362,10 +362,10 @@
       <!-- 提现弹窗 -->
       <transition name="modal-fade">
         <div v-if="showWithdrawCard" class="modal-overlay" @click="closeWithdrawCard">
-          <div class="modal-content" @click.stop>
+          <div v-accessible-dialog="closeWithdrawCard" class="modal-content" :aria-label="$t('invite.withdraw.title')" @click.stop>
             <div class="modal-header">
               <h3>{{ $t('invite.withdraw.title') }}</h3>
-              <button class="modal-close" @click="closeWithdrawCard">
+              <button class="modal-close" type="button" :aria-label="$t('common.close')" @click="closeWithdrawCard">
                 <IconX :size="20" />
               </button>
             </div>
@@ -998,7 +998,7 @@ export default {
         cursor: pointer;
         padding: 8px 0;
         position: relative;
-        transition: all 0.2s;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         
         &::after {
           content: '';
@@ -1365,7 +1365,7 @@ export default {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    transition: all 0.2s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     
     &:hover:not(:disabled) {
       opacity: 0.9;
@@ -1405,7 +1405,7 @@ export default {
     padding: 6px 12px;
     border-radius: 6px;
     color: var(--text-color, #1f2937);
-    transition: all 0.2s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     font-size: 13px;
     
     &:hover:not(:disabled) {
@@ -1906,7 +1906,7 @@ export default {
     border-radius: 20px;
     background: transparent;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     color: var(--text-color, #1f2937);
     
     &:hover {

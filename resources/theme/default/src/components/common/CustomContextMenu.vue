@@ -7,7 +7,7 @@
       @click.stop
     >
       <div class="menu-items">
-        <div class="menu-item" @click="handleCopy" v-if="canCopy">
+        <button type="button" class="menu-item" @click="handleCopy" v-if="canCopy">
           <div class="menu-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -15,9 +15,9 @@
             </svg>
           </div>
           <div class="menu-text">{{ $t('contextMenu.copy') }}</div>
-        </div>
+        </button>
         <div class="menu-divider" v-if="canCopy && (canRefresh || canNavigate)"></div>
-        <div class="menu-item" @click="handleRefresh">
+        <button type="button" class="menu-item" @click="handleRefresh">
           <div class="menu-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <path d="M23 4v6h-6"></path>
@@ -26,8 +26,8 @@
             </svg>
           </div>
           <div class="menu-text">{{ $t('contextMenu.refresh') }}</div>
-        </div>
-        <div class="menu-item" @click="handleBack">
+        </button>
+        <button type="button" class="menu-item" @click="handleBack">
           <div class="menu-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 12H5"></path>
@@ -35,8 +35,8 @@
             </svg>
           </div>
           <div class="menu-text">{{ $t('contextMenu.back') }}</div>
-        </div>
-        <div class="menu-item" @click="handleForward">
+        </button>
+        <button type="button" class="menu-item" @click="handleForward">
           <div class="menu-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14"></path>
@@ -44,7 +44,7 @@
             </svg>
           </div>
           <div class="menu-text">{{ $t('contextMenu.forward') }}</div>
-        </div>
+        </button>
       </div>
     </div>
   </transition>
@@ -195,11 +195,17 @@ export default {
 
 .menu-item {
   display: flex;
+  width: 100%;
   align-items: center;
   padding: 10px 14px;
+  border: 0;
   border-radius: 20px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: start;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   opacity: 0;
   transform: translateY(10px);
   
@@ -239,7 +245,7 @@ export default {
   margin-right: 12px;
   background-color: rgba(var(--theme-color-rgb), 0.08);
   color: var(--text-color);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, transform 0.3s ease;
 }
 
 .menu-text {
@@ -271,4 +277,4 @@ export default {
     background-color: rgba(255, 255, 255, 0.05);
   }
 }
-</style> 
+</style>

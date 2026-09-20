@@ -58,6 +58,12 @@ module.exports = defineConfig({
           generator: {
             filename: 'static/modules/core/[name][ext]'
           }
+        },
+        {
+          // Tabler 的入口会重导出全部图标，但当前版本未声明 sideEffects。
+          // 仅为其 ESM 模块补充无副作用标记，使 Webpack 能移除未使用图标。
+          test: /@tabler[/]icons-vue[/]dist[/]esm[/].*\.mjs$/,
+          sideEffects: false
         }
       ]
     };
@@ -76,7 +82,7 @@ module.exports = defineConfig({
             priority: 20,
             reuseExistingChunk: true
           },
-          // UI 库单独打包
+          // 图标与二维码依赖保持独立缓存，避免混入业务分包后体积进一步增加。
           uiVendor: {
             test: /[/]node_modules[/](@tabler[/]icons-vue|qrcode.vue)[/]/,
             name: 'chunk-ui-vendor',
@@ -121,14 +127,15 @@ module.exports = defineConfig({
     loaderOptions: {
       sass: {
         implementation: require('sass'),
+        api: 'modern',
         sassOptions: {
           outputStyle: 'expanded',
           fiber: false,
           indentedSyntax: false,
-          includePaths: ['node_modules']
+          loadPaths: [path.resolve(__dirname, 'node_modules'), path.resolve(__dirname, 'src')]
         },
         additionalData: `
-          @use "@/assets/styles/base/variables.scss" as *;
+          @use "assets/styles/base/variables.scss" as *;
         `
       }
     }

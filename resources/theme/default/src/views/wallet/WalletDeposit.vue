@@ -46,11 +46,13 @@
                 <button type="button" @click="fetchUserConfig">{{ $t('common.retry') }}</button>
               </div>
               <template v-else>
-                <div
+                <button
                   v-for="option in presetOptions"
                   :key="option.amount"
+                  type="button"
                   class="period-card"
                   :class="{ active: selectedAmount === option.amount }"
+                  :aria-pressed="selectedAmount === option.amount"
                   @click="selectAmount(option.amount)"
                 >
                   <div class="period-card-inner">
@@ -60,7 +62,7 @@
                     </div>
                   </div>
                   <span v-if="option.bonus > 0" class="bonus-badge">+{{ formatPresetAmount(option.bonus) }}</span>
-                </div>
+                </button>
               </template>
             </div>
           </div>
@@ -437,7 +439,7 @@ onMounted(() => {
     padding: 20px;
     margin-bottom: 24px;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     
     &:hover {
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -547,7 +549,7 @@ onMounted(() => {
           border-radius: 20px;
           overflow: visible;
           border: 2px solid var(--border-color);
-          transition: all 0.3s ease;
+          transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
           
           &.active {
             border-color: var(--theme-color);
@@ -670,7 +672,7 @@ onMounted(() => {
           padding: 0 12px 0 32px;
           font-size: 1.1rem;
           color: var(--text-color);
-          transition: all 0.3s ease;
+          transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
           
           &:focus {
             outline: none;
@@ -707,7 +709,7 @@ onMounted(() => {
         font-size: 1rem;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         min-width: 180px;
         box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), 0.3);
         

@@ -515,7 +515,7 @@ export default {
     border-radius: 20px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
   }
   
   // 暗黑模式卡片背景
@@ -795,7 +795,7 @@ export default {
             background-color: rgba(var(--border-color-rgb), 0.1);
             color: var(--secondary-text-color);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
             border: 1px solid transparent;
             display: flex;
             align-items: center;
@@ -906,7 +906,7 @@ export default {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     
     background-color: var(--theme-color);
     box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), 0.25);
@@ -957,7 +957,7 @@ export default {
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover {
         background-color: var(--primary-color-hover);

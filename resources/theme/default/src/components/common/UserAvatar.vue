@@ -1,6 +1,12 @@
 <template>
   <div class="user-avatar-container" ref="avatarContainer">
-    <div class="avatar-wrapper" @click="toggleDropdown">
+    <button
+      type="button"
+      class="avatar-wrapper"
+      :aria-label="$t('common.userCenter')"
+      :aria-expanded="isDropdownOpen"
+      @click="toggleDropdown"
+    >
       <img 
         v-if="avatarUrl" 
         :src="avatarUrl" 
@@ -10,7 +16,7 @@
       <div v-else class="avatar-placeholder">
         <IconUser class="user-icon" />
       </div>
-    </div>
+    </button>
     
     <transition name="fade">
       <div 
@@ -18,10 +24,10 @@
         v-if="isDropdownOpen"
       >
         <!-- 只保留退出登录 -->
-        <div class="menu-item" @click="logout">
+        <button type="button" class="menu-item" @click="logout">
           <IconLogout class="menu-icon" />
           <span>{{ $t('common.logoutText') }}</span>
-        </div>
+        </button>
       </div>
     </transition>
   </div>
@@ -118,7 +124,7 @@ export default {
   overflow: hidden;
   background-color: rgba(var(--theme-color-rgb), 0.1);
   border: 1px solid rgba(var(--theme-color-rgb), 0.3);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,7 +175,7 @@ export default {
     align-items: center;
     padding: 12px 16px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     
     .menu-icon {
       width: 18px;

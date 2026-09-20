@@ -1474,14 +1474,13 @@ body #app .more-container .menu-item:focus-visible {
 }
 
 @media (max-width: 640px) {
-  body #app .account-container .invite-primary-actions,
   body #app .account-container .invite-left-actions {
     flex-direction: column;
   }
 
   body #app .account-container .invite-balance-grid,
   body #app .account-container .stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   body #app .account-container .invite-code-item {
@@ -1790,7 +1789,7 @@ body #app :is(.modal-footer, .pm-footer, .ticket-popup-footer) {
   }
 
   body #app :is(.deposit-container, .gift-container) .period-cards {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   body #app .gift-container .redemption-table-wrap {

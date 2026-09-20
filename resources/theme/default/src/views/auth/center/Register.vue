@@ -51,27 +51,17 @@
                 class="form-control" 
                 v-model="emailPrefix" 
                 :placeholder="$t('auth.emailPrefixPlaceholder')"
+                :aria-invalid="!!errors.email"
+                :aria-describedby="errors.email ? 'register-email-error' : undefined"
                 @input="handleEmailPrefixChange"
                 :disabled="codeSent"
                 required
               />
             </div>
             <div class="email-suffix-separator">@</div>
-            <div class="email-suffix" @click="toggleSuffixDropdown" :class="{ disabled: codeSent }">
-              <div class="suffix-text">{{ selectedSuffix }}</div>
-              <IconChevronDown class="suffix-icon" :class="{ 'rotate-180': showSuffixDropdown }" />
-              <div class="suffix-dropdown" v-if="showSuffixDropdown">
-                <div 
-                  v-for="suffix in config.email_whitelist_suffix" 
-                  :key="suffix"
-                  class="suffix-option"
-                  :class="{ active: suffix === selectedSuffix }"
-                  @click.stop="selectSuffix(suffix)"
-                >
-                  {{ suffix }}
-                </div>
-              </div>
-            </div>
+            <select v-model="selectedSuffix" class="email-suffix" :disabled="codeSent" :aria-label="$t('common.selectEmailDomain')" @change="updateEmail">
+              <option v-for="suffix in config.email_whitelist_suffix" :key="suffix" :value="suffix">{{ suffix }}</option>
+            </select>
           </div>
           <div class="input-with-icon" v-else>
             <IconMail class="input-icon" />
@@ -81,11 +71,13 @@
               class="form-control" 
               v-model="formData.email" 
               :placeholder="$t('auth.emailPlaceholder')"
+              :aria-invalid="!!errors.email"
+              :aria-describedby="errors.email ? 'register-email-error' : undefined"
               :disabled="codeSent"
               required
             />
           </div>
-          <span v-if="errors.email" class="error-message">{{ errors.email }}</span>
+          <span v-if="errors.email" id="register-email-error" class="error-message" role="alert">{{ errors.email }}</span>
         </div>
         
         <!-- 验证码 -->
@@ -99,6 +91,8 @@
                 class="form-control" 
                 v-model="formData.verificationCode" 
                 :placeholder="$t('auth.codePlaceholder')"
+                :aria-invalid="!!errors.verificationCode"
+                :aria-describedby="errors.verificationCode ? 'register-code-error' : undefined"
                 required
               />
             </div>
@@ -113,7 +107,7 @@
               <span v-else class="">{{ $t('common.sendCode') }}</span>
             </button>
           </div>
-          <span v-if="errors.verificationCode" class="error-message">{{ errors.verificationCode }}</span>
+          <span v-if="errors.verificationCode" id="register-code-error" class="error-message" role="alert">{{ errors.verificationCode }}</span>
         </div>
         
         <!-- 密码 -->
@@ -126,14 +120,16 @@
               class="form-control" 
               v-model="formData.password" 
               :placeholder="$t('auth.passwordPlaceholder')"
+              :aria-invalid="!!errors.password"
+              :aria-describedby="errors.password ? 'register-password-error' : undefined"
               required
             />
-            <div class="password-toggle" @click="showPassword = !showPassword">
+            <button type="button" class="password-toggle" :aria-label="$t(showPassword ? 'common.hidePassword' : 'common.showPassword')" :aria-pressed="showPassword" @click="showPassword = !showPassword">
               <IconEye v-if="!showPassword" />
               <IconEyeOff v-else />
-            </div>
+            </button>
           </div>
-          <span v-if="errors.password" class="error-message">{{ errors.password }}</span>
+          <span v-if="errors.password" id="register-password-error" class="error-message" role="alert">{{ errors.password }}</span>
         </div>
         
         <!-- 确认密码 -->
@@ -146,14 +142,16 @@
               class="form-control" 
               v-model="formData.confirmPassword" 
               :placeholder="$t('auth.confirmPasswordPlaceholder')"
+              :aria-invalid="!!errors.confirmPassword"
+              :aria-describedby="errors.confirmPassword ? 'register-confirm-error' : undefined"
               required
             />
-            <div class="password-toggle" @click="showConfirmPassword = !showConfirmPassword">
+            <button type="button" class="password-toggle" :aria-label="$t(showConfirmPassword ? 'common.hidePassword' : 'common.showPassword')" :aria-pressed="showConfirmPassword" @click="showConfirmPassword = !showConfirmPassword">
               <IconEye v-if="!showConfirmPassword" />
               <IconEyeOff v-else />
-            </div>
+            </button>
           </div>
-          <span v-if="errors.confirmPassword" class="error-message">{{ errors.confirmPassword }}</span>
+          <span v-if="errors.confirmPassword" id="register-confirm-error" class="error-message" role="alert">{{ errors.confirmPassword }}</span>
         </div>
         
         <!-- 邀请码（选填时占位符后显示“（选填）”） -->
@@ -229,10 +227,10 @@
     <!-- 验证码弹窗 -->
     <div class="captcha-modal" v-if="showCaptchaModal" :class="{ 'closing': isClosingModal }">
       <div class="captcha-modal-overlay" @click="closeCaptchaModal"></div>
-      <div class="captcha-modal-content" :class="{ 'closing': isClosingModal }">
+      <div v-accessible-dialog="closeCaptchaModal" class="captcha-modal-content" :class="{ 'closing': isClosingModal }" :aria-label="$t('auth.captcha')">
         <div class="captcha-modal-header">
           <h3>{{ $t('auth.captcha') }}</h3>
-          <button class="close-btn" @click="closeCaptchaModal">
+          <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="closeCaptchaModal">
             <span>&times;</span>
           </button>
         </div>
@@ -276,7 +274,6 @@ import IconSend from '@/components/icons/IconSend.vue';
 import IconArrowRight from '@/components/icons/IconArrowRight.vue';
 import IconEye from '@/components/icons/IconEye.vue';
 import IconEyeOff from '@/components/icons/IconEyeOff.vue';
-import IconChevronDown from '@/components/icons/IconChevronDown.vue';
 import { register, checkLoginStatus, getWebsiteConfig, sendEmailVerify } from '@/api/auth';
 import { applyDomainAuth } from '@/utils/licenseAuth';
 import DomainAuthAlert from '@/components/common/DomainAuthAlert.vue';
@@ -311,7 +308,6 @@ export default {
     IconArrowRight,
     IconEye,
     IconEyeOff,
-    IconChevronDown,
     DomainAuthAlert,
     AuthPopup
   },
@@ -391,7 +387,6 @@ export default {
     
     const emailPrefix = ref('');
     const selectedSuffix = ref('');
-    const showSuffixDropdown = ref(false);
     
     const formData = reactive({
       email: '',
@@ -444,24 +439,6 @@ export default {
       } finally {
         configLoading.value = false;
       }
-    };
-    
-    const handleClickOutside = (event) => {
-      const suffixDropdown = document.querySelector('.email-suffix');
-      if (suffixDropdown && !suffixDropdown.contains(event.target)) {
-        showSuffixDropdown.value = false;
-      }
-    };
-    
-    const toggleSuffixDropdown = (event) => {
-      event.stopPropagation();
-      showSuffixDropdown.value = !showSuffixDropdown.value;
-    };
-    
-    const selectSuffix = (suffix) => {
-      selectedSuffix.value = suffix;
-      showSuffixDropdown.value = false;
-      updateEmail();
     };
     
     const updateEmail = () => {
@@ -766,13 +743,11 @@ export default {
         const newUrl = window.location.href.replace(/\?logout=true|&logout=true/, '');
         if (window.history && window.history.replaceState) window.history.replaceState({}, document.title, newUrl);
         fetchWebsiteConfig();
-        document.addEventListener('click', handleClickOutside);
         return;
       }
       try {
         if (window._isLoggingOut === true) {
           fetchWebsiteConfig();
-          document.addEventListener('click', handleClickOutside);
           return;
         }
         if (checkLoginStatus()) {
@@ -801,7 +776,6 @@ export default {
         if (config.is_recaptcha === 1) loadCaptchaScript();
         showAuthPopup.value = shouldShowAuthPopup(AUTH_CONFIG.popup);
       });
-      document.addEventListener('click', handleClickOutside);
       window.addEventListener('focus', handleWindowFocus);
     });
     
@@ -832,7 +806,6 @@ export default {
     });
     
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
       window.removeEventListener('focus', handleWindowFocus);
       isGoogleRecaptchaRendered = false;
       if (window.turnstile && window.turnstile.reset) {
@@ -878,9 +851,6 @@ export default {
       config,
       emailPrefix,
       selectedSuffix,
-      showSuffixDropdown,
-      toggleSuffixDropdown,
-      selectSuffix,
       handleEmailPrefixChange,
       inviteCodeFromUrl,
       authStatus,
@@ -959,7 +929,7 @@ export default {
   border-radius: 12px;
   background-color: var(--input-bg-color, #f9f9f9);
   border: 1px solid var(--input-border-color, transparent);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   position: relative;
   
   &:hover {
@@ -1010,7 +980,7 @@ export default {
     cursor: pointer;
     border-left: 1px solid var(--input-border-color, rgba(0, 0, 0, 0.08));
     background-color: transparent;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     border-radius: 0 8px 8px 0;
     
     &.disabled {
@@ -1083,7 +1053,7 @@ export default {
       .suffix-option {
         padding: 10px 16px;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
         color: var(--primary-text-color);
         font-size: 14px;
         display: flex;
@@ -1157,7 +1127,7 @@ export default {
     border-radius: 12px;
     border: 1px solid var(--input-border-color, transparent);
     background-color: var(--input-bg-color, #f9f9f9);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     color: var(--primary-text-color);
     
     &[type="password"],
@@ -1243,7 +1213,7 @@ export default {
 .btn {
   height: 45px;
   border-radius: 12px;
-  transition: all 0.3s;
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1307,7 +1277,7 @@ export default {
       background-color: transparent;
       border: 2px solid var(--border-color);
       border-radius: 4px;
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
       
       &:after {
         content: "";
@@ -1337,7 +1307,7 @@ export default {
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
-        transition: all 0.3s ease-in-out;
+        transition: color 0.3s ease-in-out, background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out, opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         
         &:hover {
           background-position: 100% 0;
@@ -1531,7 +1501,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   svg {
     display: none;

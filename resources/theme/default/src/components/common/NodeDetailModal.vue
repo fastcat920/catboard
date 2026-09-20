@@ -1,10 +1,10 @@
 <template>
   <transition name="fade">
     <div v-if="show" class="node-detail-modal-overlay" @click.self="close">
-      <div class="node-detail-modal-container">
+      <div v-accessible-dialog="close" class="node-detail-modal-container" :aria-label="node.name">
         <div class="node-detail-modal-header">
           <h3 class="modal-title">{{ node.name }}</h3>
-          <button class="modal-close-btn" @click="close">
+          <button class="modal-close-btn" type="button" :aria-label="$t('common.close')" @click="close">
             <IconX :size="20" />
           </button>
         </div>
@@ -466,7 +466,7 @@ watchEffect(() => {
 .slide-left-leave-active,
 .slide-right-enter-active,
 .slide-right-leave-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .slide-left-enter-from {
@@ -557,7 +557,7 @@ watchEffect(() => {
     padding: 8px;
     margin: -8px;
     border-radius: 50%;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     
     &:hover {
       background-color: rgba(0, 0, 0, 0.05);
@@ -641,7 +641,7 @@ watchEffect(() => {
         color: var(--text-muted);
         font-size: 12px;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
         
         &:hover {
           background-color: rgba(var(--theme-color-rgb), 0.1);
@@ -692,7 +692,7 @@ watchEffect(() => {
       display: flex;
       align-items: center;
       gap: 4px;
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
       
       &:hover {
         background-color: rgba(var(--theme-color-rgb), 0.2);
@@ -759,7 +759,7 @@ watchEffect(() => {
         display: flex;
         align-items: center;
         gap: 4px;
-        transition: all 0.2s ease;
+        transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
         width: auto;
         
         &:hover {
@@ -795,7 +795,7 @@ watchEffect(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   width: 100%;
   max-width: 240px;
   
@@ -872,4 +872,4 @@ watchEffect(() => {
     padding: 10px 16px; /* 稍微增加按钮尺寸，方便点击 */
   }
 }
-</style> 
+</style>

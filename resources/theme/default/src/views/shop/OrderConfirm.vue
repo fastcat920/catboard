@@ -46,11 +46,13 @@
             
             <div class="period-selection">
               <div class="period-cards">
-                <div 
+                <button
                   v-for="(price, type) in availablePrices" 
                   :key="type"
+                  type="button"
                   class="period-card"
                   :class="{ 'active': selectedPriceType === type }"
+                  :aria-pressed="selectedPriceType === type"
                   @click="selectPriceType(type)"
                 >
                   <div class="period-card-inner">
@@ -60,7 +62,7 @@
                       <span class="amount">{{ (price / 100).toFixed(2) }}</span>
                     </div>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -84,18 +86,18 @@
           <!-- 账户优惠券 -->
           <div class="section-wrapper">
             <div class="section-title">
-              <span>{{ locale === 'en-US' ? 'Choose a coupon' : '选择优惠券' }}</span>
+              <span>{{ $t('order.choose_coupon') }}</span>
             </div>
             <div class="coupon-selector">
               <label class="coupon-option none" :class="{ active: disableAutoCoupon }">
                 <input v-model="disableAutoCoupon" type="checkbox" @change="toggleCouponDisabled" />
-                <span>{{ locale === 'en-US' ? 'Do not use a coupon' : '本次不使用优惠券' }}</span>
+                <span>{{ $t('order.no_coupon') }}</span>
               </label>
               <label v-for="coupon in availableCoupons" :key="coupon.id" class="coupon-option" :class="{ active: selectedCouponId === coupon.id && !disableAutoCoupon }">
                 <input v-model="selectedCouponId" type="radio" :value="coupon.id" :disabled="disableAutoCoupon" @change="refreshPreview" />
                 <span class="coupon-option-copy"><strong>{{ couponName(coupon) }}</strong><small>-{{ currencySymbol }}{{ ((coupon.calculated_discount || 0) / 100).toFixed(2) }}</small></span>
               </label>
-              <div v-if="!loading.coupons && !availableCoupons.length" class="coupon-empty">{{ locale === 'en-US' ? 'No eligible coupons for this order' : '当前订单暂无可用优惠券' }}</div>
+              <div v-if="!loading.coupons && !availableCoupons.length" class="coupon-empty">{{ $t('order.no_eligible_coupon') }}</div>
             </div>
           </div>
 
@@ -549,7 +551,7 @@ export default {
     width: 100%;
     box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     
     &:hover {
       transform: translateY(-2px);
@@ -638,7 +640,7 @@ export default {
     padding: 20px; // 减小内边距优化视觉效果
     margin-bottom: 25px;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     
     &.glassmorphism {
       background-color: rgba(255, 255, 255, 0.7);
@@ -725,7 +727,7 @@ export default {
         border-radius: 20px;
         overflow: hidden;
         border: 2px solid var(--border-color);
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         
         &.active {
           border-color: var(--theme-color);
@@ -802,7 +804,7 @@ export default {
       color: var(--text-color);
       font-size: 14px;
       outline: none;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       min-width: 0;
       
       &.applied {
@@ -830,7 +832,7 @@ export default {
       gap: 8px;
       border: none;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       box-shadow: 0 4px 10px rgba(var(--theme-color-rgb), 0.2);
       white-space: nowrap;
       flex-shrink: 0;
@@ -875,7 +877,7 @@ export default {
       gap: 6px;
       border: none;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       box-shadow: 0 4px 10px rgba(244, 67, 54, 0.2);
       white-space: nowrap;
       flex-shrink: 0;
@@ -974,7 +976,7 @@ export default {
       gap: 8px;
       border: 1px solid var(--card-border);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       
       &:hover {
         background-color: rgba(0, 0, 0, 0.05);
@@ -996,7 +998,9 @@ export default {
       gap: 8px;
       border: none;
       cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: background-color var(--motion-base) cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow var(--motion-base) cubic-bezier(0.4, 0, 0.2, 1),
+        transform var(--motion-base) cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), 0.2);
       
       &:hover:not(:disabled) {

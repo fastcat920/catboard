@@ -47,7 +47,7 @@
         <div v-for="(items, category) in documents" :key="category" class="doc-category">
           <h2 class="category-title"><IconFolder :size="20" />{{ category }}</h2>
           <div class="doc-items">
-            <div v-for="item in items" :key="item.id" class="doc-item" @click="goToDocument(item.id)">
+            <button v-for="item in items" :key="item.id" type="button" class="doc-item" @click="goToDocument(item.id)">
               <div class="doc-icon"><IconFileText :size="20" /></div>
               <div class="doc-info">
                 <h3 class="doc-title">{{ item.title }}</h3>
@@ -55,7 +55,7 @@
               <div class="doc-action">
                 <IconChevronRight :size="20" />
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -186,7 +186,7 @@ onUnmounted(() => {
   padding: 20px;
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   &:hover {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     border-color: rgba(var(--theme-color-rgb), 0.3);
@@ -232,7 +232,7 @@ onUnmounted(() => {
     background-color: #ffffff;
     color: var(--text-color);
     font-size: 1rem;
-    transition: all 0.3s;
+    transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
     &:focus {
       outline: none;
       border-color: var(--theme-color);
@@ -250,7 +250,7 @@ onUnmounted(() => {
     cursor: pointer;
     padding: 0.25rem;
     border-radius: 50%;
-    transition: all 0.3s;
+    transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
     &:hover {
       background-color: rgba(var(--theme-color-rgb), 0.1);
       color: var(--theme-color);
@@ -302,7 +302,7 @@ onUnmounted(() => {
   border-radius: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   border: 1px solid var(--card-border);
-  transition: all 0.25s;
+  transition: color 0.25s, background-color 0.25s, border-color 0.25s, box-shadow 0.25s, opacity 0.25s, transform 0.25s;
 
   .doc-icon {
     display: inline-flex;
@@ -348,7 +348,7 @@ onUnmounted(() => {
   .doc-action {
     color: var(--text-muted);
     margin-left: 1rem;
-    transition: all 0.3s;
+    transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   }
 }
 
@@ -387,7 +387,7 @@ onUnmounted(() => {
   border: 1px solid rgba(var(--theme-color-rgb), 0.3);
   box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), 0.25);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   backdrop-filter: blur(8px);
   &:hover {
     transform: translateY(-2px);

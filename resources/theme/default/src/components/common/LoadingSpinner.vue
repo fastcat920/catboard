@@ -1,9 +1,9 @@
 <template>
-  <div class="loading-spinner" :class="{ 'loading-spinner-overlay': overlay }">
+  <div class="loading-spinner" :class="{ 'loading-spinner-overlay': overlay }" role="status" aria-live="polite" aria-busy="true">
     <div class="spinner">
       <div class="spinner-circle"></div>
     </div>
-    <div v-if="text" class="spinner-text">{{ text }}</div>
+    <div class="spinner-text" :class="{ 'visually-hidden': !text }">{{ text || $t('common.loading') }}</div>
   </div>
 </template>
 
@@ -24,7 +24,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "@/assets/styles/base/variables.scss" as *;
+@use "assets/styles/base/variables.scss" as *;
 
 .loading-spinner {
   display: flex;
@@ -69,4 +69,4 @@ export default {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-</style> 
+</style>

@@ -140,11 +140,13 @@
               <span>{{ $t('payment.payment_method') }}</span>
             </div>
             <div class="payment-methods" v-if="!loading.methods">
-              <div 
+              <button
                 class="payment-method-item" 
                 v-for="method in paymentMethods" 
                 :key="method.id" 
+                type="button"
                 :class="{ 'active': selectedMethod === method.id }"
+                :aria-pressed="selectedMethod === method.id"
                 @click="selectMethod(method.id)"
               >
                 <div class="method-icon">
@@ -161,7 +163,7 @@
                   <IconCircleCheck v-if="selectedMethod === method.id" />
                   <IconCircle v-else />
                 </div>
-              </div>
+              </button>
             </div>
             <div class="skeleton-card" v-else>
               <div class="skeleton-payment-method" v-for="i in 2" :key="'method-'+i"></div>
@@ -250,7 +252,7 @@
       <div class="cancel-modal" v-if="showCancelConfirm">
         <div class="cancel-modal-overlay" @click="closeModal"></div>
         <div class="cancel-modal-container">
-          <div class="cancel-modal-content">
+          <div v-accessible-dialog="closeModal" class="cancel-modal-content" :aria-label="$t('payment.confirm_cancel_title')">
             <div class="cancel-modal-icon">
               <IconAlertTriangle :size="28" />
             </div>
@@ -271,8 +273,8 @@
       <div class="modal-wrapper" v-if="showPaymentModal">
         <div class="modal-backdrop" @click="closePaymentModal"></div>
         <div class="modal-container">
-          <div class="modal-card">
-            <button class="close-button" @click="closePaymentModal">×</button>
+          <div v-accessible-dialog="closePaymentModal" class="modal-card" :aria-label="selectedMethod ? getSelectedMethodName() : $t('payment.payment_method')">
+            <button class="close-button" type="button" :aria-label="$t('common.close')" @click="closePaymentModal">×</button>
             <div class="modal-header">
               <div class="icon-wrapper payment">
                 <IconCreditCard :size="32" />
@@ -870,7 +872,7 @@ export default {
     padding: 20px;
     margin-bottom: 24px;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     &:hover {
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
       border-color: rgba(var(--theme-color-rgb), 0.3);
@@ -898,7 +900,7 @@ export default {
       margin-bottom: 0px;
       padding: 10px;
       border-radius: 20px;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       &:hover { background-color: rgba(var(--theme-color-rgb), 0.05); }
       .info-label { width: 120px; color: var(--secondary-text-color); font-size: 14px; }
       .info-value { flex: 1; color: var(--text-color); font-weight: 500; font-size: 14px; }
@@ -916,7 +918,7 @@ export default {
     margin-bottom: 12px;
     cursor: pointer;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     &:hover { border-color: rgba(var(--theme-color-rgb), 0.5); background-color: rgba(var(--theme-color-rgb), 0.05); transform: translateY(-2px); }
     &.active { border-color: var(--theme-color); background-color: rgba(var(--theme-color-rgb), 0.1); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(var(--theme-color-rgb), 0.15); }
     .method-icon { width: 40px; height: 40px; margin-right: 15px; display: flex; align-items: center; justify-content: center; color: var(--theme-color); img { max-width: 100%; max-height: 100%; object-fit: contain; } }
@@ -1026,7 +1028,7 @@ export default {
       font-weight: 500;
       padding: 0 24px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       &:disabled { opacity: 0.6; cursor: not-allowed; }
     }
     .btn-back { background-color: transparent; color: var(--text-color); border: 1px solid var(--border-color); &:hover:not(:disabled) { background-color: var(--hover-color); transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); } }
@@ -1097,7 +1099,7 @@ export default {
         .payment-link { margin-top:16px; .btn-link { padding:10px 16px; background-color:transparent; border:1px solid var(--border-color); border-radius:8px; display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--theme-color); cursor:pointer; &:hover { background-color:rgba(var(--theme-color-rgb),0.05); border-color:var(--theme-color); } } }
       }
       .modal-footer { padding:16px 24px 28px; display:flex; gap:16px;
-        button { flex:1; height:46px; border-radius:14px; font-size:15px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:all 0.25s cubic-bezier(0.3,0.7,0.4,1.5); }
+        button { flex:1; height:46px; border-radius:14px; font-size:15px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease; }
         .btn-secondary { background-color:transparent; border:1px solid var(--border-color); color:var(--text-color); &:hover { background-color:var(--hover-color); transform:translateY(-2px); } }
         .btn-primary { background-color:var(--theme-color); color:white; box-shadow:0 4px 10px rgba(var(--theme-color-rgb),0.25); &:hover { background-color:var(--primary-color-hover); transform:translateY(-2px); } }
       }

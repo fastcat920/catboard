@@ -246,7 +246,7 @@ const redeemGiftCard = async () => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
   border: 1px solid var(--card-border);
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   overflow: hidden;
 
   &:hover {
@@ -291,7 +291,7 @@ const redeemGiftCard = async () => {
       background-color: var(--bg-secondary);
       color: var(--text-color);
       font-size: 15px;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
       &:focus {
         outline: none;
@@ -313,7 +313,7 @@ const redeemGiftCard = async () => {
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 
       @media (max-width: 576px) {
         width: 100%;

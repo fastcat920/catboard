@@ -185,7 +185,7 @@ onMounted(() => {
     padding: 14px;
     box-shadow: none;
     border: 1px solid var(--card-border);
-    transition: all 0.2s;
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s, transform 0.2s;
     
     &:hover {
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);

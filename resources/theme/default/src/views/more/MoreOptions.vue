@@ -8,7 +8,7 @@
 
     <div class="more-inner">
       <!-- 欢迎卡片 -->
-      <div class="dashboard-card welcome-card" :class="{ 'card-animate': !loading.userInfo }" @click="goToProfile">
+      <button type="button" class="dashboard-card welcome-card" :class="{ 'card-animate': !loading.userInfo }" @click="goToProfile">
         <div class="account-icon">
           <IconUser :size="20" />
         </div>
@@ -21,7 +21,7 @@
         <div class="card-arrow">
           <IconChevronRight :size="20" />
         </div>
-      </div>
+      </button>
 
       <!-- 有套餐时显示套餐信息卡片 -->
       <SubscriptionUsageCard
@@ -68,53 +68,53 @@
       <!-- 原有菜单项 -->
       <h2 class="section-heading">{{ $t('mine.myServices') }}</h2>
       <div class="unified-card">
-        <div class="menu-item" @click="$router.push('/membership')">
+        <button type="button" class="menu-item" @click="$router.push('/membership')">
           <div class="menu-icon"><IconCrown :size="24" /></div>
-          <div class="menu-info"><div class="menu-title">{{ locale === 'en-US' ? 'Membership' : '会员等级' }}</div></div>
+          <div class="menu-info"><div class="menu-title">{{ $t('membership.title') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
-        <div class="menu-item" @click="$router.push('/orders')">
+        <button type="button" class="menu-item" @click="$router.push('/orders')">
           <div class="menu-icon"><IconReceipt :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('orders.title') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
-        <div v-if="showTrafficLog" class="menu-item" @click="$router.push('/traffic')">
+        <button v-if="showTrafficLog" type="button" class="menu-item" @click="$router.push('/traffic')">
           <div class="menu-icon"><IconChartDonut :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('trafficLog.title') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
-        <div class="menu-item" @click="$router.push('/wallet/deposit')">
+        <button type="button" class="menu-item" @click="$router.push('/wallet/deposit')">
           <div class="menu-icon"><IconWallet :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('common.myWallet') }}</div></div>
           <div class="menu-right"><span class="balance-text">{{ currencySymbol }}{{ userBalance }}</span></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
-        <div class="menu-item" @click="$router.push('/docs')">
+        <button type="button" class="menu-item" @click="$router.push('/docs')">
           <div class="menu-icon"><IconBook :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('docs.title') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
         <template v-if="morePageConfig.enableCustomCards">
-          <div v-for="card in morePageConfig.customCards" :key="card.id" class="menu-item" @click="handleCustomCardClick(card)">
+          <button v-for="card in morePageConfig.customCards" :key="card.id" type="button" class="menu-item" @click="handleCustomCardClick(card)">
             <div class="menu-icon">
               <div v-if="card.svgIcon" class="custom-svg-icon" v-html="card.svgIcon"></div>
               <component v-else-if="card.icon" :is="getIconComponent(card.icon)" :size="24" />
             </div>
             <div class="menu-info"><div class="menu-title">{{ card.title }}</div></div>
             <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-          </div>
+          </button>
         </template>
 
-        <div class="menu-item" @click="$router.push('/gift')">
+        <button type="button" class="menu-item" @click="$router.push('/gift')">
           <div class="menu-icon"><IconGift :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('profile.giftCardTitle') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
+        </button>
 
       </div>
 
@@ -124,10 +124,10 @@
     <transition name="modal-fade">
       <div class="modal-overlay" v-if="showResetTrafficModal">
         <div class="modal-container">
-          <div class="modal-card reset-traffic-modal">
+          <div v-accessible-dialog="closeResetTrafficModal" class="modal-card reset-traffic-modal" :aria-label="trafficRecoveryCopy.title">
             <div class="modal-header">
               <h3>{{ trafficRecoveryCopy.title }}</h3>
-              <button class="close-button" @click="closeResetTrafficModal">×</button>
+              <button class="close-button" type="button" :aria-label="$t('common.close')" @click="closeResetTrafficModal">×</button>
             </div>
             <div class="modal-body">
               <div class="warning-icon"><IconAlertTriangle :size="48" /></div>
@@ -152,10 +152,10 @@
     <transition name="modal-fade">
       <div class="modal-overlay" v-if="showRenewPlanModal">
         <div class="modal-container">
-          <div class="modal-card reset-traffic-modal renew-plan-modal">
+          <div v-accessible-dialog="closeRenewPlanModal" class="modal-card reset-traffic-modal renew-plan-modal" :aria-label="$t('dashboard.confirmRenewPlan')">
             <div class="modal-header">
               <h3>{{ $t('dashboard.confirmRenewPlan') }}</h3>
-              <button class="close-button" @click="closeRenewPlanModal">×</button>
+              <button class="close-button" type="button" :aria-label="$t('common.close')" @click="closeRenewPlanModal">×</button>
             </div>
             <div class="modal-body">
               <div class="warning-icon"><IconAlertTriangle :size="48" /></div>
@@ -566,7 +566,7 @@ onUnmounted(() => {
     padding: 20px;
     margin-bottom: 24px;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 
     &:hover {
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -734,7 +734,7 @@ onUnmounted(() => {
         background-color: transparent;
         color: var(--text-color);
         border: 1px solid var(--card-border);
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         &:hover {
           border-color: var(--theme-color);
           color: var(--theme-color);
@@ -810,7 +810,7 @@ onUnmounted(() => {
       align-items: center;
       justify-content: center;
       transform: rotate(-5deg);
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     }
     &:hover .no-plan-icon { transform: rotate(0deg) scale(1.05); }
     .no-plan-message { flex: 1; }
@@ -832,7 +832,7 @@ onUnmounted(() => {
         font-size: 15px;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
         &.primary {
           background-color: var(--theme-color);
           color: white;
@@ -854,7 +854,7 @@ onUnmounted(() => {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     overflow: hidden;
     border: 1px solid var(--card-border);
-    transition: all 0.3s ease;
+    transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
     margin-top: 0;
     &:hover {
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -906,7 +906,7 @@ onUnmounted(() => {
     .menu-arrow {
       color: var(--chevron-color);
       opacity: 1;
-      transition: all 0.3s ease;
+      transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
       margin-left: 8px;
     }
   }
@@ -963,7 +963,7 @@ onUnmounted(() => {
       justify-content: flex-end;
       gap: 12px;
       border-top: 1px solid var(--border-color);
-      button { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; }
+      button { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: color var(--motion-base) ease, background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease; }
       .cancel-btn { background: transparent; border: 1px solid var(--border-color); color: var(--text-color); }
       .confirm-btn { background-color: #f44336; color: white; border: none; &:hover { background-color: #e53935; transform: translateY(-2px); } }
     }

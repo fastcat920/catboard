@@ -43,10 +43,12 @@
               v-model="formData.email"
               class="form-control"
               :placeholder="$t('auth.emailPlaceholder')"
+              :aria-invalid="!!errors.email"
+              :aria-describedby="errors.email ? 'login-email-error' : undefined"
               required
             />
           </div>
-          <div v-if="errors.email" class="error-message">{{ errors.email }}</div>
+          <div v-if="errors.email" id="login-email-error" class="error-message" role="alert">{{ errors.email }}</div>
         </div>
         
         <!-- 密码输入框（去掉 label） -->
@@ -59,14 +61,16 @@
               v-model="formData.password"
               class="form-control"
               :placeholder="$t('auth.passwordPlaceholder')"
+              :aria-invalid="!!errors.password"
+              :aria-describedby="errors.password ? 'login-password-error' : undefined"
               required
             />
-            <div class="password-toggle" @click="showPassword = !showPassword">
+            <button type="button" class="password-toggle" :aria-label="$t(showPassword ? 'common.hidePassword' : 'common.showPassword')" :aria-pressed="showPassword" @click="showPassword = !showPassword">
               <IconEye v-if="!showPassword" />
               <IconEyeOff v-else />
-            </div>
+            </button>
           </div>
-          <div v-if="errors.password" class="error-message">{{ errors.password }}</div>
+          <div v-if="errors.password" id="login-password-error" class="error-message" role="alert">{{ errors.password }}</div>
         </div>
         
         <div class="form-options">
@@ -408,7 +412,7 @@ export default {
     border-radius: 12px;
     border: 1px solid var(--input-border-color, transparent);
     background-color: var(--input-bg-color, #f9f9f9);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     color: var(--primary-text-color);
     
     &[type="password"],
@@ -469,7 +473,7 @@ export default {
       background-color: transparent;
       border: 2px solid var(--border-color);
       border-radius: 4px;
-      transition: all 0.2s ease;
+      transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
       
       &:after {
         content: "";
@@ -506,7 +510,7 @@ export default {
 .btn {
   height: 45px;
   border-radius: 12px;
-  transition: all 0.3s;
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -644,7 +648,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   
   svg {
     display: none;

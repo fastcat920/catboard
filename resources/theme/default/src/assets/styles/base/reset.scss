@@ -18,17 +18,10 @@ html {
   scroll-behavior: smooth;
 }
 
-/* 响应式字体大小 */
-@media (max-width: map.get($breakpoints, sm)) {
-  html {
-    font-size: 14px;
-  }
-}
-
 body {
   font-family: $font-family-base;
-  font-size: $font-size-base;
-  line-height: 1.5;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
   color: var(--text-color);
   background-color: var(--background-color);
   overflow-x: hidden;
@@ -53,6 +46,25 @@ button {
   background: none;
 }
 
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 3px;
+  box-shadow: var(--focus-ring);
+}
+
+:where(button, input, textarea, select):disabled {
+  cursor: not-allowed;
+}
+
+:where(h1, h2, h3, h4) {
+  line-height: var(--line-height-tight);
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 img {
   max-width: 100%;
   height: auto;
@@ -69,18 +81,18 @@ input, button, textarea, select {
 /* 响应式容器 */
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--page-max-width);
   margin-left: auto;
   margin-right: auto;
-  padding-left: 15px;
-  padding-right: 15px;
+  padding-left: var(--page-padding-x);
+  padding-right: var(--page-padding-x);
 }
 
 @media (max-width: map.get($breakpoints, md)) {
   .container {
     max-width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 
@@ -149,4 +161,31 @@ input, button, textarea, select {
 // 禁止选择文本
 .no-select {
   user-select: none;
-} 
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -13,6 +13,15 @@
       
       <!-- 顶部工具栏：语言选择器、主题切换和用户头像 -->
       <div class="top-toolbar">
+        <button
+          class="coupon-shortcut"
+          :class="{ active: $route.path === '/coupons' || $route.path === '/coupon' }"
+          :title="$t('couponCenter.title')"
+          :aria-label="$t('couponCenter.title')"
+          @click="$router.push('/coupons')"
+        >
+          <IconTicket :size="21" :stroke-width="2.2" />
+        </button>
         <ThemeToggle />
         <LanguageSelector />
         <button 
@@ -94,7 +103,7 @@ import BackToTop from '@/components/common/BackToTop.vue';
 import CustomContextMenu from '@/components/common/CustomContextMenu.vue';
 import CrispEmbed from '@/components/common/CrispEmbed.vue';
 import ResourcePreloader from '@/components/common/ResourcePreloader.vue';
-import { IconGift } from '@tabler/icons-vue';
+import { IconGift, IconTicket } from '@tabler/icons-vue';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 import pageCache from '@/utils/pageCache';
@@ -120,7 +129,8 @@ export default {
     CustomContextMenu,
     CrispEmbed,
     ResourcePreloader,
-    IconGift
+    IconGift,
+    IconTicket
   },
   setup() {
     const router = useRouter();
@@ -467,6 +477,38 @@ html, body, #app {
   display: flex;
   gap: 8px;
   z-index: 110;
+
+  .coupon-shortcut {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    overflow: hidden;
+    color: #fff;
+    background: linear-gradient(135deg, #ff9f1c 0%, #ff4d8d 52%, #7c5cff 100%);
+    border: 1px solid rgba(255, 255, 255, .42);
+    border-radius: 50%;
+    box-shadow: 0 5px 14px rgba(255, 77, 141, .28);
+    cursor: pointer;
+    transition: transform .2s ease, box-shadow .2s ease;
+
+    &::after {
+      position: absolute;
+      inset: 2px;
+      content: '';
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    svg { position: relative; z-index: 1; filter: drop-shadow(0 1px 2px rgba(69, 30, 110, .24)); }
+    &:hover { transform: translateY(-2px) rotate(-5deg); box-shadow: 0 8px 18px rgba(255, 77, 141, .38); }
+    &:active { transform: translateY(0) scale(.96); }
+    &.active { box-shadow: 0 0 0 3px rgba(255, 77, 141, .2), 0 7px 17px rgba(124, 92, 255, .3); }
+  }
   
   .gift-btn {
     display: flex;
@@ -493,7 +535,7 @@ html, body, #app {
   .site-logo {
     top: max(12px, env(safe-area-inset-top));
     left: max(16px, env(safe-area-inset-left));
-    max-width: calc(100vw - 190px);
+    max-width: calc(100vw - 230px);
     padding: 6px 10px;
     border-radius: 12px;
   }

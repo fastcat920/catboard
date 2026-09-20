@@ -74,12 +74,6 @@
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
         </div>
 
-        <div class="menu-item" @click="$router.push('/coupons')">
-          <div class="menu-icon"><IconTicket :size="24" /></div>
-          <div class="menu-info"><div class="menu-title">{{ locale === 'en-US' ? 'My coupons' : '我的优惠券' }}</div></div>
-          <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </div>
-
         <div class="menu-item" @click="$router.push('/orders')">
           <div class="menu-icon"><IconReceipt :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('orders.title') }}</div></div>

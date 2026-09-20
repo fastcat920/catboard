@@ -124,7 +124,6 @@
                 <tr>
                   <th>{{ $t('wallet.records.time') }}</th>
                   <th>{{ $t('wallet.records.type') }}</th>
-                  <th>{{ $t('wallet.records.description') }}</th>
                   <th class="amount-cell">{{ $t('wallet.records.amount') }}</th>
                   <th>{{ $t('wallet.records.status') }}</th>
                 </tr>
@@ -133,7 +132,6 @@
                 <tr v-for="record in balanceRecords" :key="record.id">
                   <td data-label="time">{{ formatRecordTime(record.created_at) }}</td>
                   <td data-label="type"><span class="record-type">{{ recordTypeLabel(record.type) }}</span></td>
-                  <td data-label="description" class="description-cell">{{ recordDescription(record) }}</td>
                   <td data-label="amount" class="amount-cell" :class="record.amount >= 0 ? 'income' : 'expense'">
                     {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
                   </td>
@@ -210,11 +208,6 @@ const formatPresetAmount = (amount) => {
 
 const recordTypeLabel = (type) => t(`wallet.records.types.${type}`, type);
 const recordStatusLabel = (status) => t(`wallet.records.statuses.${status}`, status);
-const recordDescription = (record) => {
-  const key = `wallet.records.descriptions.${record.type}`;
-  const translated = t(key);
-  return translated === key ? (record.description || recordTypeLabel(record.type)) : translated;
-};
 const formatRecordTime = (timestamp) => {
   const value = Number(timestamp);
   if (!value) return '-';
@@ -788,14 +781,14 @@ onMounted(() => {
     .records-table-wrap { overflow-x: auto; }
     .records-table {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
       font-size: 13px;
 
-      th, td { padding: 13px 10px; border-bottom: 1px solid var(--card-border); text-align: left; }
+      th, td { width: 25%; padding: 13px 10px; border-bottom: 1px solid var(--card-border); text-align: center; }
       th { color: var(--secondary-text-color); font-weight: 600; white-space: nowrap; }
       tbody tr:last-child td { border-bottom: 0; }
-      .description-cell { max-width: 240px; color: var(--secondary-text-color); }
-      .amount-cell { text-align: right; white-space: nowrap; font-weight: 700; }
+      .amount-cell { text-align: center; white-space: nowrap; font-weight: 700; }
       .income { color: #16a34a; }
       .expense { color: #ef4444; }
     }
@@ -883,8 +876,7 @@ onMounted(() => {
       .records-table, .records-table tbody, .records-table tr, .records-table td { display: block; width: 100%; }
       .records-table tr { padding: 11px 0; border-bottom: 1px solid var(--card-border); }
       .records-table tr:last-child { border-bottom: 0; }
-      .records-table td { padding: 3px 0; border: 0; }
-      .records-table .description-cell { max-width: none; }
+      .records-table td { padding: 3px 0; border: 0; text-align: left; }
       .records-table .amount-cell { margin-top: 4px; text-align: left; font-size: 15px; }
       .records-pagination { align-items: flex-start; flex-direction: column; }
       .pagination-actions { width: 100%; justify-content: space-between; }

@@ -967,9 +967,8 @@ export default {
     },
     records: {
       title: 'Balance records', refresh: 'Refresh', loading: 'Loading balance records...', loadFailed: 'Failed to load balance records', empty: 'No balance records',
-      time: 'Time', type: 'Type', description: 'Description', amount: 'Amount', status: 'Status', total: '{total} records', previous: 'Previous', next: 'Next',
+      time: 'Time', type: 'Type', amount: 'Change', status: 'Status', total: '{total} records', previous: 'Previous', next: 'Next',
       types: { deposit: 'Balance deposit', purchase: 'Plan purchase', commission_transfer: 'Commission transfer', giftcard: 'Gift card', referral_reward: 'Referral reward', referral_reversal: 'Reward reversal', refund: 'Balance refund', admin_adjustment: 'Admin adjustment' },
-      descriptions: { deposit: 'Balance deposit credited', purchase: 'Balance used for an order', commission_transfer: 'Commission transferred to balance', giftcard: 'Gift card balance redeemed', referral_reward: 'Referral reward credited', referral_reversal: 'Referral reward reversed', refund: 'Order balance refunded', admin_adjustment: 'Balance adjusted by staff' },
       statuses: { completed: 'Completed', pending: 'Processing', reversed: 'Reversed', failed: 'Failed' }
     },
     welcome: {

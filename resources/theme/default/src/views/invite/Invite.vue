@@ -27,31 +27,6 @@
     </transition>
     
     <div class="account-inner">
-      <section v-if="referralProgram" class="program-card">
-        <div class="program-level">
-          <span>{{ locale === 'en-US' ? 'Current level' : '当前等级' }}</span>
-          <h2>{{ localizedLevel(referralProgram.level) || (locale === 'en-US' ? 'Member' : '普通会员') }}</h2>
-          <p>{{ localizedDescription(referralProgram.level) }}</p>
-        </div>
-        <div class="program-metrics">
-          <div><small>{{ locale === 'en-US' ? 'Qualified referrals' : '有效邀请' }}</small><strong>{{ referralProgram.effective_invites || 0 }}</strong></div>
-          <div><small>{{ locale === 'en-US' ? 'Referral revenue' : '邀请成交额' }}</small><strong>{{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }}</strong></div>
-          <div><small>{{ locale === 'en-US' ? 'Commission' : '返佣比例' }}</small><strong>{{ referralProgram.level?.commission_rate ?? referralProgram.setting?.base_commission_rate ?? 0 }}%</strong></div>
-          <div><small>{{ locale === 'en-US' ? 'Member discount' : '会员优惠' }}</small><strong>{{ referralProgram.level?.member_discount || 0 }}%</strong></div>
-        </div>
-        <div v-if="referralProgram.next_level" class="program-progress">
-          <span>{{ locale === 'en-US' ? 'Next: ' : '下一等级：' }}{{ localizedLevel(referralProgram.next_level) }}</span>
-          <b>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_level.required_invites }} · {{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }}/{{ currencySymbol }}{{ formatAmount(referralProgram.next_level.required_revenue || 0) }}</b>
-          <i><em :style="{width: levelProgress + '%'}"></em></i>
-        </div>
-        <div v-if="referralProgram.campaign" class="campaign-strip">
-          <strong>{{ localizedCampaign(referralProgram.campaign, 'name') }}</strong>
-          <span>{{ localizedCampaign(referralProgram.campaign, 'description') }}</span>
-          <time>{{ locale === 'en-US' ? 'Ends ' : '距结束 ' }}{{ campaignCountdown }}</time>
-        </div>
-        <button class="membership-link" @click="$router.push('/membership')">{{ locale === 'en-US' ? 'View membership benefits' : '查看会员等级权益' }}</button>
-      </section>
-
       <!-- FastCatAPP 双余额卡 -->
       <div class="invite-balance-grid">
         <div class="invite-balance-card">
@@ -77,6 +52,31 @@
           <IconArrowsExchange :size="18" />{{ $t('invite.balance.transferToBalance') }}
         </button>
       </div>
+
+      <section v-if="referralProgram" class="member-summary-card">
+        <div>
+          <span>{{ locale === 'en-US' ? 'Current level' : '当前等级' }}</span>
+          <h2>{{ localizedLevel(referralProgram.level) || (locale === 'en-US' ? 'Member' : '普通会员') }}</h2>
+        </div>
+        <button class="membership-link" @click="$router.push('/membership')">{{ locale === 'en-US' ? 'View membership benefits' : '查看会员等级权益' }}</button>
+      </section>
+
+      <section v-if="referralProgram?.next_milestone" class="growth-card milestone-card">
+        <div class="growth-card-head">
+          <div><span>{{ locale === 'en-US' ? 'Next milestone' : '下一里程碑' }}</span><h3>{{ referralProgram.next_milestone.name }}</h3></div>
+          <strong>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_milestone.required_invites }}</strong>
+        </div>
+        <div class="growth-progress"><i :style="{ width: milestoneProgress + '%' }"></i></div>
+        <p>{{ locale === 'en-US' ? 'One-time reward: ' : '一次性奖励：' }}{{ milestoneRewardText }}</p>
+      </section>
+
+      <section v-if="referralProgram?.campaign" class="growth-card campaign-card">
+        <div class="growth-card-head">
+          <div><span>{{ locale === 'en-US' ? 'Limited referral campaign' : '限时邀请活动' }}</span><h3>{{ localizedCampaign(referralProgram.campaign, 'name') }}</h3></div>
+          <time>{{ locale === 'en-US' ? 'Ends in ' : '距结束 ' }}{{ campaignCountdown }}</time>
+        </div>
+        <p>{{ localizedCampaign(referralProgram.campaign, 'description') }}</p>
+      </section>
   
       <!-- 统计卡片组 -->
       <div class="invite-section-title"><IconChartBar :size="18" />{{ $t('invite.statsTitle') }}</div>
@@ -541,16 +541,20 @@ export default {
       availableCommission: 0
     });
     const inviteRecords = ref([]);
-    const levelProgress = computed(() => {
-      const program = referralProgram.value;
-      if (!program?.next_level) return 100;
-      const inviteProgress = Number(program.effective_invites || 0) / Math.max(1, Number(program.next_level.required_invites || 1)) * 100;
-      const requiredRevenue = Number(program.next_level.required_revenue || 0);
-      const revenueProgress = requiredRevenue ? Number(program.referral_revenue || 0) / requiredRevenue * 100 : 100;
-      return Math.min(100, inviteProgress, revenueProgress);
+    const milestoneProgress = computed(() => referralProgram.value?.next_milestone
+      ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
+      : 100);
+    const milestoneRewardText = computed(() => {
+      const milestone = referralProgram.value?.next_milestone;
+      if (!milestone) return '';
+      if (milestone.reward_type === 'traffic') return `${milestone.reward_value} GB`;
+      if (milestone.reward_type === 'duration') return locale.value === 'en-US' ? `${milestone.reward_value} days` : `${milestone.reward_value} 天套餐时长`;
+      const label = milestone.reward_type === 'commission_balance'
+        ? (locale.value === 'en-US' ? 'commission' : '推广佣金')
+        : (locale.value === 'en-US' ? 'balance' : '账户余额');
+      return `${currencySymbol.value}${formatAmount(milestone.reward_value)} ${label}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
-    const localizedDescription = row => !row ? '' : (locale.value === 'en-US' ? row.description_en : row.description) || row.description || row.description_en || '';
     const localizedCampaign = (row, key) => !row ? '' : (locale.value === 'en-US' ? row[`${key}_en`] : row[key]) || row[key] || row[`${key}_en`] || '';
     const campaignCountdown = computed(() => {
       const seconds = Math.max(0, Number(referralProgram.value?.campaign?.ends_at || 0) - Math.floor(Date.now() / 1000));
@@ -870,9 +874,9 @@ export default {
       creatingCode,
       inviteCodes,
       referralProgram,
-      levelProgress,
+      milestoneProgress,
+      milestoneRewardText,
       localizedLevel,
-      localizedDescription,
       localizedCampaign,
       campaignCountdown,
       locale,
@@ -930,21 +934,19 @@ export default {
   display: flex;
   justify-content: center;
 
-  .program-card { margin-bottom: 20px; padding: 24px; color: #fff; border-radius: 22px; background: linear-gradient(135deg, #263d78, var(--theme-color)); box-shadow: 0 16px 38px rgba(38, 61, 120, .18); }
-  .program-level span, .program-level p, .program-metrics small { opacity: .78; }
-  .program-level h2 { margin: 6px 0; font-size: 28px; }
-  .program-level p { margin: 0 0 18px; }
-  .program-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .program-metrics div { display: flex; flex-direction: column; padding: 13px; border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(255,255,255,.09); }
-  .program-metrics strong { margin-top: 5px; font-size: 20px; }
-  .program-progress { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 16px; }
-  .program-progress i { grid-column: 1 / -1; height: 7px; overflow: hidden; border-radius: 10px; background: rgba(255,255,255,.2); }
-  .program-progress em { display: block; height: 100%; border-radius: inherit; background: #fff; }
-  .campaign-strip { display: grid; gap: 4px; margin-top: 16px; padding: 13px; border-radius: 14px; background: rgba(255,255,255,.11); }
-  .campaign-strip span, .campaign-strip time { font-size: 12px; opacity: .82; }
-  .membership-link { margin-top: 16px; padding: 10px 14px; color: var(--theme-color); font-weight: 700; border: 0; border-radius: 11px; background: #fff; }
+  .member-summary-card,.growth-card { margin-bottom: 18px; padding: 20px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--card-bg-color, #fff); }
+  .member-summary-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+  .member-summary-card span,.growth-card span { color: var(--secondary-text-color); font-size: 13px; }
+  .member-summary-card h2,.growth-card h3 { margin: 5px 0 0; color: var(--text-color); }
+  .membership-link { flex: none; padding: 10px 14px; color: #fff; font-weight: 700; border: 0; border-radius: 11px; background: var(--theme-color); }
+  .growth-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .growth-card-head>strong,.growth-card-head time { color: var(--theme-color); font-weight: 700; }
+  .growth-progress { height: 8px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
+  .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
+  .growth-card p { margin: 12px 0 0; color: var(--secondary-text-color); font-size: 13px; }
+  .campaign-card { border-color: rgba(var(--theme-color-rgb), .25); background: rgba(var(--theme-color-rgb), .05); }
 
-  @media (max-width: 600px) { .program-metrics { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { .member-summary-card,.growth-card-head { align-items: flex-start; flex-direction: column; } .membership-link { width: 100%; } }
   
   .account-inner {
     width: 100%;

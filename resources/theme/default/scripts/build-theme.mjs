@@ -88,10 +88,9 @@ const main = async () => {
       { label: 'Linux 下载地址', field_name: 'client_link_linux', field_type: 'input', default_value: 'https://github.com/xxx/releases/latest' },
       { label: 'OpenWrt 下载地址', field_name: 'client_link_openwrt', field_type: 'input', default_value: 'https://github.com/xxx/releases/latest' },
       { label: '启用客服系统', field_name: 'customer_service_enabled', field_type: 'select', select_options: { '1': '启用', '0': '关闭' }, default_value: '0' },
-      { label: '客服系统类型', field_name: 'customer_service_type', field_type: 'select', select_options: { crisp: 'Crisp', other: '其他' }, default_value: 'crisp' },
       { label: '客服嵌入模式', field_name: 'customer_service_embed_mode', field_type: 'select', select_options: { embed: '页面嵌入', popup: '弹出页面' }, default_value: 'embed' },
       { label: '未登录时显示客服', field_name: 'customer_service_guest_visible', field_type: 'select', select_options: { '1': '显示', '0': '隐藏' }, default_value: '1' },
-      { label: '客服系统 HTML', field_name: 'customer_service_html', field_type: 'textarea', default_value: '' },
+      { label: 'Crisp ID', placeholder: '填写 Crisp Website ID', field_name: 'crisp_id', field_type: 'input', default_value: '' },
       { label: '自定义页脚 HTML', placeholder: '可填写客服、统计等 HTML 或 JavaScript', field_name: 'custom_html', field_type: 'textarea', default_value: '' }
     ]
   }, null, 2) + '\n');

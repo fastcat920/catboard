@@ -747,8 +747,11 @@ const DEFAULT_CUSTOMER_SERVICE_CONFIG = {
   // 是否启用客服系统
   enabled: false,
   
-  // 客服系统类型: 'crisp' 或 'other'
+  // 客服系统固定使用 Crisp
   type: 'crisp',
+
+  // Crisp Website ID
+  crispId: '',
   
   // 客服系统HTML代码
   customHtml: '',

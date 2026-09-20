@@ -170,16 +170,6 @@
       "default_value": "0"
     },
     {
-      "label": "客服系统类型",
-      "field_name": "customer_service_type",
-      "field_type": "select",
-      "select_options": {
-        "crisp": "Crisp",
-        "other": "其他"
-      },
-      "default_value": "crisp"
-    },
-    {
       "label": "客服嵌入模式",
       "field_name": "customer_service_embed_mode",
       "field_type": "select",
@@ -200,9 +190,10 @@
       "default_value": "1"
     },
     {
-      "label": "客服系统 HTML",
-      "field_name": "customer_service_html",
-      "field_type": "textarea",
+      "label": "Crisp ID",
+      "placeholder": "填写 Crisp Website ID",
+      "field_name": "crisp_id",
+      "field_type": "input",
       "default_value": ""
     },
     {

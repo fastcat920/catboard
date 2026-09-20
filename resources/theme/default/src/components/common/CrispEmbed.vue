@@ -76,7 +76,7 @@ export default {
       try {
         // 从配置中提取Crisp ID
         const crispIdMatch = CUSTOMER_SERVICE_CONFIG.customHtml?.match(/CRISP_WEBSITE_ID="([^"]*)"/);
-        const websiteId = crispIdMatch ? crispIdMatch[1] : '';
+        const websiteId = CUSTOMER_SERVICE_CONFIG.crispId || (crispIdMatch ? crispIdMatch[1] : '');
         
         if (!websiteId) {
           console.error('无法从配置中提取Crisp ID');

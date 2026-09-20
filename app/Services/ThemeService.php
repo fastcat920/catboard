@@ -58,6 +58,12 @@ class ThemeService
         // 主题升级新增字段时使用新主题默认值，已有字段仍以管理员保存值为准。
         $defaults = $this->defaults();
         $saved = (array) config("theme.{$this->theme}", []);
+        // 兼容旧版客服 HTML 配置，升级后自动提取 Crisp Website ID。
+        if (array_key_exists('crisp_id', $defaults) && empty($saved['crisp_id']) && !empty($saved['customer_service_html'])) {
+            if (preg_match('/CRISP_WEBSITE_ID=["\']([^"\']+)["\']/', $saved['customer_service_html'], $matches)) {
+                $saved['crisp_id'] = $matches[1];
+            }
+        }
         foreach ($defaults as $field => $defaultValue) {
             if (!array_key_exists($field, $saved) || ($saved[$field] === '' && $defaultValue !== '')) {
                 $saved[$field] = $defaultValue;

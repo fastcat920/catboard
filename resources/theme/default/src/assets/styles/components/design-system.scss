@@ -571,7 +571,7 @@ body #app .payment-container button.payment-method-item.active {
   box-shadow: var(--focus-ring);
 }
 
-body #app .order-confirm-container .coupon-option {
+body #app .order-confirm-container .coupon-select {
   min-height: 56px;
   background: var(--input-background);
   border-color: var(--card-border);

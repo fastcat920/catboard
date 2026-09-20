@@ -695,6 +695,8 @@ export default {
     plan_not_found: '套餐不存在',
     failed_to_fetch_plan: '获取套餐信息失败',
     choose_coupon: '选择优惠券',
+    coupon_loading: '正在匹配可用优惠券…',
+    best_coupon: '最优优惠券',
     no_coupon: '本次不使用优惠券',
     no_eligible_coupon: '当前订单暂无可用优惠券'
   },

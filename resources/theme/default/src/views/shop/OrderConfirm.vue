@@ -89,15 +89,25 @@
               <span>{{ $t('order.choose_coupon') }}</span>
             </div>
             <div class="coupon-selector">
-              <label class="coupon-option none" :class="{ active: disableAutoCoupon }">
-                <input v-model="disableAutoCoupon" type="checkbox" @change="toggleCouponDisabled" />
-                <span>{{ $t('order.no_coupon') }}</span>
-              </label>
-              <label v-for="coupon in availableCoupons" :key="coupon.id" class="coupon-option" :class="{ active: selectedCouponId === coupon.id && !disableAutoCoupon }">
-                <input v-model="selectedCouponId" type="radio" :value="coupon.id" :disabled="disableAutoCoupon" @change="refreshPreview" />
-                <span class="coupon-option-copy"><strong>{{ couponName(coupon) }}</strong><small>-{{ currencySymbol }}{{ ((coupon.calculated_discount || 0) / 100).toFixed(2) }}</small></span>
-              </label>
-              <div v-if="!loading.coupons && !availableCoupons.length" class="coupon-empty">{{ $t('order.no_eligible_coupon') }}</div>
+              <select
+                id="order-coupon-select"
+                v-model="couponSelection"
+                class="coupon-select"
+                :disabled="loading.coupons || !selectedPriceType"
+                :aria-label="$t('order.choose_coupon')"
+                @change="refreshPreview"
+              >
+                <option v-if="loading.coupons" value="" disabled>{{ $t('order.coupon_loading') }}</option>
+                <option v-else-if="!availableCoupons.length" value="" disabled>{{ $t('order.no_eligible_coupon') }}</option>
+                <option
+                  v-for="(coupon, index) in availableCoupons"
+                  :key="coupon.id"
+                  :value="String(coupon.id)"
+                >
+                  {{ couponOptionLabel(coupon, index) }}
+                </option>
+                <option value="none">{{ $t('order.no_coupon') }}</option>
+              </select>
             </div>
           </div>
 
@@ -332,6 +342,20 @@ export default {
       return (locale.value === 'en-US' ? template?.name_en : template?.name) || template?.name || template?.name_en || '';
     };
 
+    const couponSelection = computed({
+      get: () => disableAutoCoupon.value ? 'none' : (selectedCouponId.value ? String(selectedCouponId.value) : ''),
+      set: value => {
+        disableAutoCoupon.value = value === 'none';
+        selectedCouponId.value = disableAutoCoupon.value || !value ? null : Number(value);
+      }
+    });
+
+    const couponOptionLabel = (coupon, index) => {
+      const discount = `${currencySymbol.value}${(Number(coupon?.calculated_discount || 0) / 100).toFixed(2)}`;
+      const best = index === 0 ? ` · ${t('order.best_coupon')}` : '';
+      return `${couponName(coupon)} · -${discount}${best}`;
+    };
+
     const refreshPreview = async () => {
       if (!plan.value?.id || !selectedPriceType.value) return;
       loading.coupons = true;
@@ -353,11 +377,6 @@ export default {
       } finally {
         loading.coupons = false;
       }
-    };
-
-    const toggleCouponDisabled = () => {
-      if (disableAutoCoupon.value) selectedCouponId.value = null;
-      refreshPreview();
     };
 
     // 提交订单
@@ -495,6 +514,7 @@ export default {
       availableCoupons,
       selectedCouponId,
       disableAutoCoupon,
+      couponSelection,
       couponInfo,
       locale,
       originalPrice,
@@ -507,8 +527,8 @@ export default {
       getPriceTypeKey,
       selectPriceType,
       refreshPreview,
-      toggleCouponDisabled,
       couponName,
+      couponOptionLabel,
       submitOrder,
       goBack,
       showExistingPlanWarning,
@@ -525,13 +545,12 @@ export default {
   justify-content: center;
   min-height: calc(100vh - 100px);
 
-  .coupon-selector { display: grid; gap: 10px; }
-  .coupon-option { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--card-background); cursor: pointer; transition: .2s ease; }
-  .coupon-option.active { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .1); }
-  .coupon-option input { accent-color: var(--theme-color); }
-  .coupon-option-copy { display: flex; flex: 1; justify-content: space-between; gap: 12px; }
-  .coupon-option-copy small { color: var(--theme-color); font-weight: 700; }
-  .coupon-empty { padding: 16px; color: var(--secondary-text-color); text-align: center; border: 1px dashed var(--border-color); border-radius: 14px; }
+  .coupon-selector { position: relative; }
+  .coupon-selector::after { content: ''; position: absolute; top: 50%; right: 17px; width: 8px; height: 8px; border-right: 2px solid var(--secondary-text-color); border-bottom: 2px solid var(--secondary-text-color); pointer-events: none; transform: translateY(-70%) rotate(45deg); }
+  .coupon-select { width: 100%; min-height: 52px; padding: 0 44px 0 16px; color: var(--text-color); background: var(--input-background); border: 1px solid var(--card-border); border-radius: 14px; outline: none; appearance: none; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+  .coupon-select:hover:not(:disabled) { border-color: rgba(var(--theme-color-rgb), .55); }
+  .coupon-select:focus-visible { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .12); }
+  .coupon-select:disabled { color: var(--secondary-text-color); cursor: wait; opacity: .72; }
   
   .order-confirm-inner {
     width: 100%;

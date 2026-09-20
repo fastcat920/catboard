@@ -649,6 +649,8 @@ export default {
     plan_not_found: 'Plan not found',
     failed_to_fetch_plan: 'Failed to fetch plan information',
     choose_coupon: 'Choose a coupon',
+    coupon_loading: 'Finding eligible coupons…',
+    best_coupon: 'Best coupon',
     no_coupon: 'Do not use a coupon',
     no_eligible_coupon: 'No eligible coupons for this order'
   },

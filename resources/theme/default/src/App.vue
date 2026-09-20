@@ -15,9 +15,12 @@
       <div class="top-toolbar">
         <button
           class="coupon-shortcut"
-          :class="{ active: $route.path === '/coupons' || $route.path === '/coupon' }"
-          :title="$t('couponCenter.title')"
-          :aria-label="$t('couponCenter.title')"
+          :class="{
+            active: $route.path === '/coupons' || $route.path === '/coupon',
+            'has-available-coupons': hasAvailableCoupons
+          }"
+          :title="couponShortcutLabel"
+          :aria-label="couponShortcutLabel"
           @click="$router.push('/coupons')"
         >
           <IconTicket :size="21" :stroke-width="2.2" />
@@ -96,6 +99,7 @@ import { SITE_CONFIG, PROFILE_CONFIG, CUSTOMER_SERVICE_CONFIG } from '@/utils/ba
 import { checkAuthAndReloadMessages } from '@/utils/authUtils';
 import { checkUserLoginStatus } from '@/api/auth';
 import { getWebsiteConfig } from '@/api/auth';
+import { fetchCouponWallet } from '@/api/shop';
 import { SUPPORTED_LOCALES } from '@/utils/locale';
 import { updatePageTitle } from '@/i18n';
 import { handleRedirectPath } from '@/utils/redirectHandler';
@@ -149,6 +153,35 @@ export default {
     const cachedRoutes = computed(() => pageCache.getCachedRoutes());
     const customerServiceConfig = computed(() => CUSTOMER_SERVICE_CONFIG);
     const routeAnnouncement = computed(() => route.meta.titleKey ? t(route.meta.titleKey) : siteConfig.value.siteName);
+    const availableCouponCount = ref(0);
+    const hasAvailableCoupons = computed(() => availableCouponCount.value > 0);
+    const couponShortcutLabel = computed(() => hasAvailableCoupons.value
+      ? (locale.value === 'en-US'
+        ? `${availableCouponCount.value} available coupon${availableCouponCount.value === 1 ? '' : 's'}`
+        : `${availableCouponCount.value} 张可用优惠券`)
+      : t('couponCenter.title'));
+
+    const refreshAvailableCoupons = async () => {
+      if (!route.meta.requiresAuth) {
+        availableCouponCount.value = 0;
+        return;
+      }
+
+      try {
+        const response = await fetchCouponWallet();
+        const coupons = Array.isArray(response?.data) ? response.data : [];
+        const now = Math.floor(Date.now() / 1000);
+        availableCouponCount.value = coupons.filter(coupon => {
+          const startsAt = Number(coupon.starts_at || 0);
+          const expiresAt = Number(coupon.expires_at || 0);
+          return coupon.status === 'available'
+            && (!startsAt || startsAt <= now)
+            && (!expiresAt || expiresAt >= now);
+        }).length;
+      } catch (_) {
+        availableCouponCount.value = 0;
+      }
+    };
     
     // ========== 添加语言持久化逻辑 ==========
     // 初始化语言设置（在组件加载时立即执行）
@@ -279,6 +312,7 @@ export default {
     
     watch(() => route.fullPath, () => {
       handleRedirectParam();
+      refreshAvailableCoupons();
     });
     
     const username = computed(() => store.getters.username);
@@ -299,6 +333,7 @@ export default {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         checkAuthAndReloadMessages();
+        refreshAvailableCoupons();
         
         checkUserLoginStatus().then(result => {
           if (result.isLoggedIn === false && result.message) {
@@ -330,6 +365,7 @@ export default {
       // 初始化语言（优先执行）
       initLanguage();
       refreshSiteIdentity();
+      refreshAvailableCoupons();
       
       window.addEventListener('languageChanged', onLanguageChanged);
       checkAuthAndReloadMessages();
@@ -367,6 +403,8 @@ export default {
       cachedRoutes,
       customerServiceConfig,
       routeAnnouncement,
+      hasAvailableCoupons,
+      couponShortcutLabel,
       useFallbackLogo
     };
   }
@@ -494,27 +532,34 @@ html, body, #app {
     height: 40px;
     padding: 0;
     overflow: hidden;
-    color: #fff;
-    background: linear-gradient(135deg, #ff9f1c 0%, #ff4d8d 52%, #7c5cff 100%);
-    border: 1px solid rgba(255, 255, 255, .42);
+    color: var(--theme-color);
+    background: rgba(var(--theme-color-rgb), .1);
+    border: 1px solid rgba(var(--theme-color-rgb), .3);
     border-radius: 50%;
-    box-shadow: 0 5px 14px rgba(255, 77, 141, .28);
+    box-shadow: none;
     cursor: pointer;
     transition: transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 
-    &::after {
-      position: absolute;
-      inset: 2px;
-      content: '';
-      border: 1px solid rgba(255, 255, 255, .28);
-      border-radius: inherit;
-      pointer-events: none;
-    }
-
-    svg { position: relative; z-index: 1; filter: drop-shadow(0 1px 2px rgba(69, 30, 110, .24)); }
-    &:hover { transform: translateY(-2px) rotate(-5deg); box-shadow: 0 8px 18px rgba(255, 77, 141, .38); }
+    svg { position: relative; z-index: 1; }
+    &:hover { transform: translateY(-2px); background: rgba(var(--theme-color-rgb), .16); }
     &:active { transform: translateY(0) scale(.96); }
-    &.active { box-shadow: 0 0 0 3px rgba(255, 77, 141, .2), 0 7px 17px rgba(124, 92, 255, .3); }
+    &.active { box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .16); }
+
+    &.has-available-coupons {
+      color: #fff;
+      background: linear-gradient(135deg, #ff9f1c 0%, #ff4d8d 52%, #7c5cff 100%);
+      border-color: rgba(255, 255, 255, .42);
+      box-shadow: 0 5px 14px rgba(255, 77, 141, .28);
+
+      &:hover {
+        transform: translateY(-2px) rotate(-5deg);
+        box-shadow: 0 8px 18px rgba(255, 77, 141, .38);
+      }
+
+      &.active {
+        box-shadow: 0 0 0 3px rgba(255, 77, 141, .2), 0 7px 17px rgba(124, 92, 255, .3);
+      }
+    }
   }
   
   .gift-btn {

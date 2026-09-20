@@ -1271,7 +1271,8 @@ onUnmounted(() => {
   &:active { transform: translateY(0); }
 }
 .logout-button {
-  min-width: 220px;
+  width: 100%;
+  min-width: 0;
   margin-left: auto;
   margin-right: auto;
   color: #475569;
@@ -1286,6 +1287,8 @@ onUnmounted(() => {
   }
 }
 .account-deletion-button {
+  display: flex;
+  width: fit-content;
   min-height: 40px;
   margin: 12px auto 0;
   color: #dc2626;

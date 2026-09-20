@@ -29,16 +29,6 @@ body #app :is(
   padding-inline: var(--page-padding-x);
 }
 
-body #app :is(
-  .account-inner,
-  .profile-inner,
-  .deposit-inner,
-  .order-confirm-inner,
-  .payment-inner
-) {
-  width: min(100%, var(--page-max-width-narrow));
-}
-
 /* Shared content hierarchy. */
 body #app :is(.page-title, .view-title, .main-title) {
   margin: 0;
@@ -320,6 +310,22 @@ body #app :is(
 }
 
 body #app :is(
+  .orders-container,
+  .trafficlog-container,
+  .docs-container,
+  .gift-container,
+  .nodes-container,
+  .ticket-container,
+  .wallet-page,
+  .membership-page
+) {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--page-padding-y) max(var(--page-padding-x), env(safe-area-inset-right))
+    calc(104px + env(safe-area-inset-bottom)) max(var(--page-padding-x), env(safe-area-inset-left));
+}
+
+body #app :is(
   .dashboard-inner,
   .shop-inner,
   .order-confirm-inner,
@@ -333,12 +339,38 @@ body #app :is(
   padding-inline: 0;
 }
 
-body #app :is(.order-confirm-inner, .payment-inner, .deposit-inner, .account-inner, .profile-inner, .more-inner) {
-  max-width: var(--page-max-width-narrow);
+body #app :is(
+  .dashboard-inner,
+  .shop-inner,
+  .order-confirm-inner,
+  .payment-inner,
+  .deposit-inner,
+  .account-inner,
+  .profile-inner,
+  .more-inner,
+  .orders-inner,
+  .trafficlog-inner,
+  .docs-inner,
+  .gift-inner,
+  .nodes-inner,
+  .ticket-list-container,
+  .wallet-page,
+  .membership-page
+) {
+  width: 100%;
+  max-width: var(--page-max-width);
+  margin-inline: auto;
 }
 
-body #app :is(.dashboard-inner, .shop-inner) {
-  max-width: var(--page-max-width);
+body #app :is(
+  .orders-inner,
+  .trafficlog-inner,
+  .docs-inner,
+  .gift-inner,
+  .nodes-inner,
+  .ticket-list-container
+) {
+  padding-inline: 0;
 }
 
 body #app :is(.dashboard-card, .section-wrapper, .plan-card, .profile-card, .combined-card) .card-header {
@@ -410,7 +442,8 @@ body #app .shop-container .plan-card {
 
 body #app .shop-container .plan-card .card-body {
   display: flex;
-  min-height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
 }
 
@@ -617,9 +650,9 @@ body #app .account-container .records-table-wrapper {
   overflow-x: auto;
 }
 
-/* Profile and more: one compact account column instead of page-specific widths. */
+/* Profile and more use the same desktop content width as every authenticated page. */
 body #app :is(.profile-container, .more-container) :is(.profile-inner, .more-inner) {
-  max-width: var(--page-max-width-narrow);
+  max-width: var(--page-max-width);
 }
 
 body #app .profile-container .profile-card + .profile-card,

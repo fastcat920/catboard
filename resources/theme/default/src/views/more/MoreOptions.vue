@@ -68,12 +68,6 @@
       <!-- 原有菜单项 -->
       <h2 class="section-heading">{{ $t('mine.myServices') }}</h2>
       <div class="unified-card">
-        <button type="button" class="menu-item" @click="$router.push('/membership')">
-          <div class="menu-icon"><IconCrown :size="24" /></div>
-          <div class="menu-info"><div class="menu-title">{{ $t('membership.title') }}</div></div>
-          <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </button>
-
         <button type="button" class="menu-item" @click="$router.push('/orders')">
           <div class="menu-icon"><IconReceipt :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('orders.title') }}</div></div>
@@ -189,8 +183,7 @@ import {
   IconGift,
   IconReceipt,
   IconChartDonut,
-  IconBook,
-  IconCrown
+  IconBook
 } from '@tabler/icons-vue';
 import { useToast } from '@/composables/useToast';
 import { getUserInfo, getSubscribe, getUserConfig, startNewTrafficPeriod } from '@/api/dashboard';

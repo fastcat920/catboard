@@ -54,9 +54,13 @@
       </div>
 
       <section v-if="referralProgram" class="member-summary-card">
-        <div>
+        <div class="member-level-info">
           <span>{{ locale === 'en-US' ? 'Current level' : '当前等级' }}</span>
           <h2>{{ localizedLevel(referralProgram.level) || (locale === 'en-US' ? 'Member' : '普通会员') }}</h2>
+        </div>
+        <div class="member-commission-rate">
+          <span>{{ locale === 'en-US' ? 'Commission rate' : '佣金比例' }}</span>
+          <strong>{{ currentCommissionRate }}%</strong>
         </div>
         <button class="membership-link" @click="$router.push('/membership')">{{ locale === 'en-US' ? 'View membership benefits' : '查看会员等级权益' }}</button>
       </section>
@@ -94,11 +98,11 @@
           </div>
           <div class="stats-card">
             <div class="stats-icon">
-              <IconPercentage :size="24" />
+              <IconUsers :size="24" />
             </div>
             <div class="stats-info">
-              <div class="stats-label">{{ $t('invite.stats.commissionRate') }}</div>
-              <div class="stats-value">{{ inviteStats.commissionRate }}%</div>
+              <div class="stats-label">{{ $t('invite.stats.effectiveInvites') }}</div>
+              <div class="stats-value">{{ inviteStats.effectiveInvites }}</div>
             </div>
           </div>
           <div class="stats-card">
@@ -476,7 +480,6 @@ import {
   IconLink,
   IconClock,
   IconTicket,
-  IconPercentage,
   IconPigMoney,
   IconHourglassHigh,
   IconCurrencyDollar,
@@ -499,7 +502,6 @@ export default {
     IconLink,
     IconClock,
     IconTicket,
-    IconPercentage,
     IconPigMoney,
     IconHourglassHigh,
     IconCurrencyDollar,
@@ -530,8 +532,10 @@ export default {
       pendingCommission: 0,
       totalCommission: 0,
       commissionRate: 0,
+      effectiveInvites: 0,
       availableCommission: 0
     });
+    const currentCommissionRate = computed(() => Number(referralProgram.value?.level?.commission_rate ?? inviteStats.commissionRate ?? 0));
     const inviteRecords = ref([]);
     const milestoneProgress = computed(() => referralProgram.value?.next_milestone
       ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
@@ -661,6 +665,7 @@ export default {
         if (res.data) {
           inviteCodes.value = res.data.codes || [];
           referralProgram.value = res.data.program || null;
+          inviteStats.effectiveInvites = Number(res.data.program?.effective_invites || 0);
           if (res.data.stat) {
             inviteStats.registeredUsers = res.data.stat[0] || 0;
             inviteStats.totalCommission = ((res.data.stat[1] || 0) / 100);
@@ -863,6 +868,7 @@ export default {
       milestoneProgress,
       milestoneRewardText,
       localizedLevel,
+      currentCommissionRate,
       locale,
       inviteStats,
       walletBalance,
@@ -922,13 +928,15 @@ export default {
   .member-summary-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
   .member-summary-card span,.growth-card span { color: var(--secondary-text-color); font-size: 13px; }
   .member-summary-card h2,.growth-card h3 { margin: 5px 0 0; color: var(--text-color); }
+  .member-commission-rate { margin-left: auto; text-align: right; }
+  .member-commission-rate strong { display: block; margin-top: 4px; color: var(--theme-color); font-size: 22px; line-height: 1.2; }
   .membership-link { flex: none; padding: 10px 14px; color: #fff; font-weight: 700; border: 0; border-radius: 11px; background: var(--theme-color); }
   .growth-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .growth-card-head>strong,.growth-card-head time { color: var(--theme-color); font-weight: 700; }
   .growth-progress { height: 8px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
   .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
   .growth-card p { margin: 12px 0 0; color: var(--secondary-text-color); font-size: 13px; }
-  @media (max-width: 600px) { .member-summary-card,.growth-card-head { align-items: flex-start; flex-direction: column; } .membership-link { width: 100%; } }
+  @media (max-width: 600px) { .member-summary-card,.growth-card-head { align-items: flex-start; flex-direction: column; } .member-commission-rate { margin-left: 0; text-align: left; } .membership-link { width: 100%; } }
   
   .account-inner {
     width: 100%;

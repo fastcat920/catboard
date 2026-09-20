@@ -734,6 +734,7 @@ export default {
     description: 'Invite friends to register and earn commissions',
     stats: {
       registeredUsers: 'Invites',
+      effectiveInvites: 'Qualified invites',
       pendingCommission: 'Pending',
       availableCommission: 'Earnings',
       commissionRate: 'Rate'

@@ -781,6 +781,7 @@ export default {
     description: '邀请好友注册使用，获取佣金收入',
     stats: {
       registeredUsers: '总邀请数',
+      effectiveInvites: '有效邀请数',
       pendingCommission: '待确认佣金',
       availableCommission: '累计佣金',
       commissionRate: '佣金比例'

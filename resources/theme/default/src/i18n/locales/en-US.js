@@ -651,6 +651,10 @@ export default {
     choose_coupon: 'Choose a coupon',
     coupon_loading: 'Finding eligible coupons…',
     best_coupon: 'Best coupon',
+    coupon_save: 'Save {amount}',
+    coupon_minimum: 'Min. {amount}',
+    coupon_no_minimum: 'No minimum',
+    coupon_no_description: 'No description',
     no_coupon: 'Do not use a coupon',
     no_eligible_coupon: 'No eligible coupons for this order'
   },

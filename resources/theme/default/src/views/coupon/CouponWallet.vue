@@ -38,6 +38,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { fetchCouponWallet } from '@/api/shop';
+import { formatCouponValue } from '@/utils/coupon';
 
 const { locale } = useI18n();
 const coupons = ref([]); const loading = ref(true); const error = ref(''); const tab = ref('available');
@@ -58,9 +59,7 @@ const filtered = computed(() => coupons.value.filter(x => groupedStatus(x.status
 const count = key => coupons.value.filter(x => groupedStatus(x.status) === key).length;
 const localized = (row, key) => !row ? '' : (en.value ? row[`${key}_en`] : row[key]) || row[key] || row[`${key}_en`] || '';
 const discount = item => {
-  if (!item) return '—';
-  const value = Number(item.discount_value || 0);
-  return item.discount_type === 'percentage' || item.discount_type === 2 ? `${value}% OFF` : `¥${(value / 100).toFixed(2)}`;
+  return formatCouponValue(item, { percentSuffix: en.value ? '% OFF' : '%' });
 };
 const minimum = item => Number(item?.minimum_amount || 0) > 0 ? (en.value ? `Min. ¥${(item.minimum_amount / 100).toFixed(2)}` : `满 ¥${(item.minimum_amount / 100).toFixed(2)} 可用`) : (en.value ? 'No minimum' : '无门槛');
 const date = value => value ? new Date(Number(value) * 1000).toLocaleDateString(en.value ? 'en-US' : 'zh-CN') : '—';

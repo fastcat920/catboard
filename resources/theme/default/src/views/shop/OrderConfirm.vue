@@ -88,26 +88,70 @@
             <div class="section-title">
               <span>{{ $t('order.choose_coupon') }}</span>
             </div>
-            <div class="coupon-selector">
-              <select
+            <div ref="couponSelectorRef" class="coupon-selector" :class="{ open: couponDropdownOpen }">
+              <button
                 id="order-coupon-select"
-                v-model="couponSelection"
-                class="coupon-select"
+                type="button"
+                class="coupon-select-trigger"
                 :disabled="loading.coupons || !selectedPriceType"
                 :aria-label="$t('order.choose_coupon')"
-                @change="refreshPreview"
+                :aria-expanded="couponDropdownOpen"
+                aria-haspopup="listbox"
+                aria-controls="order-coupon-options"
+                @click="toggleCouponDropdown"
+                @keydown.esc="couponDropdownOpen = false"
               >
-                <option v-if="loading.coupons" value="" disabled>{{ $t('order.coupon_loading') }}</option>
-                <option v-else-if="!availableCoupons.length" value="" disabled>{{ $t('order.no_eligible_coupon') }}</option>
-                <option
+                <span v-if="loading.coupons" class="coupon-placeholder">{{ $t('order.coupon_loading') }}</span>
+                <span v-else-if="selectedCoupon" class="coupon-trigger-card">
+                  <span class="coupon-trigger-value">{{ couponValue(selectedCoupon) }}</span>
+                  <span class="coupon-trigger-copy">
+                    <strong>{{ couponName(selectedCoupon) }}</strong>
+                    <small>{{ couponMinimum(selectedCoupon) }} · {{ $t('order.coupon_save', { amount: couponSavings(selectedCoupon) }) }}</small>
+                  </span>
+                  <span v-if="selectedCoupon.id === bestCouponId" class="best-coupon-badge">{{ $t('order.best_coupon') }}</span>
+                </span>
+                <span v-else class="coupon-placeholder">{{ disableAutoCoupon ? $t('order.no_coupon') : $t('order.no_eligible_coupon') }}</span>
+                <span class="coupon-chevron" aria-hidden="true"></span>
+              </button>
+
+              <div v-if="couponDropdownOpen" id="order-coupon-options" class="coupon-dropdown" role="listbox" :aria-label="$t('order.choose_coupon')">
+                <div v-if="!availableCoupons.length" class="coupon-dropdown-empty">{{ $t('order.no_eligible_coupon') }}</div>
+                <button
                   v-for="(coupon, index) in availableCoupons"
                   :key="coupon.id"
-                  :value="String(coupon.id)"
+                  type="button"
+                  class="coupon-dropdown-option"
+                  :class="{ selected: selectedCouponId === coupon.id && !disableAutoCoupon }"
+                  role="option"
+                  :aria-selected="selectedCouponId === coupon.id && !disableAutoCoupon"
+                  @click="selectCoupon(coupon.id)"
                 >
-                  {{ couponOptionLabel(coupon, index) }}
-                </option>
-                <option value="none">{{ $t('order.no_coupon') }}</option>
-              </select>
+                  <span class="coupon-option-value">
+                    <strong>{{ couponValue(coupon) }}</strong>
+                    <small>{{ couponMinimum(coupon) }}</small>
+                  </span>
+                  <span class="coupon-option-content">
+                    <span class="coupon-option-heading">
+                      <strong>{{ couponName(coupon) }}</strong>
+                      <em v-if="index === 0">{{ $t('order.best_coupon') }}</em>
+                    </span>
+                    <small>{{ couponDescription(coupon) || $t('order.coupon_no_description') }}</small>
+                    <span class="coupon-option-saving">{{ $t('order.coupon_save', { amount: couponSavings(coupon) }) }}</span>
+                  </span>
+                  <span class="coupon-option-check" aria-hidden="true">✓</span>
+                </button>
+                <button
+                  type="button"
+                  class="coupon-none-option"
+                  :class="{ selected: disableAutoCoupon }"
+                  role="option"
+                  :aria-selected="disableAutoCoupon"
+                  @click="selectCoupon('none')"
+                >
+                  <span>{{ $t('order.no_coupon') }}</span>
+                  <span v-if="disableAutoCoupon" aria-hidden="true">✓</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -187,13 +231,14 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from '@/composables/useToast';
 import { useRoute, useRouter } from 'vue-router';
 import { getCommConfig, fetchPlanById, previewOrder } from '@/api/shop';
 import { createOrderAfterUnpaidCleanup } from '@/utils/orderCleanup';
 import { getUserInfo } from '@/api/dashboard';
+import { formatCouponValue } from '@/utils/coupon';
 import {
   IconShoppingCart,
   IconArrowLeft,
@@ -235,6 +280,8 @@ export default {
     const selectedCouponId = ref(null);
     const disableAutoCoupon = ref(false);
     const couponInfo = ref(null);
+    const couponDropdownOpen = ref(false);
+    const couponSelectorRef = ref(null);
     const tradeOffAmount = ref(0);
     const previewTotal = ref(null);
     
@@ -342,18 +389,37 @@ export default {
       return (locale.value === 'en-US' ? template?.name_en : template?.name) || template?.name || template?.name_en || '';
     };
 
-    const couponSelection = computed({
-      get: () => disableAutoCoupon.value ? 'none' : (selectedCouponId.value ? String(selectedCouponId.value) : ''),
-      set: value => {
-        disableAutoCoupon.value = value === 'none';
-        selectedCouponId.value = disableAutoCoupon.value || !value ? null : Number(value);
-      }
+    const selectedCoupon = computed(() => {
+      if (disableAutoCoupon.value || !selectedCouponId.value) return null;
+      return availableCoupons.value.find(coupon => Number(coupon.id) === Number(selectedCouponId.value)) || couponInfo.value;
     });
-
-    const couponOptionLabel = (coupon, index) => {
-      const discount = `${currencySymbol.value}${(Number(coupon?.calculated_discount || 0) / 100).toFixed(2)}`;
-      const best = index === 0 ? ` · ${t('order.best_coupon')}` : '';
-      return `${couponName(coupon)} · -${discount}${best}`;
+    const bestCouponId = computed(() => availableCoupons.value[0]?.id || null);
+    const couponTemplate = coupon => coupon?.template || coupon || {};
+    const couponValue = coupon => formatCouponValue(couponTemplate(coupon), {
+      currency: currencySymbol.value,
+      percentSuffix: locale.value === 'en-US' ? '% OFF' : '%'
+    });
+    const couponMinimum = coupon => {
+      const amount = Number(couponTemplate(coupon).minimum_amount || 0);
+      if (!amount) return t('order.coupon_no_minimum');
+      return t('order.coupon_minimum', { amount: `${currencySymbol.value}${(amount / 100).toFixed(2)}` });
+    };
+    const couponDescription = coupon => {
+      const template = couponTemplate(coupon);
+      return (locale.value === 'en-US' ? template.description_en : template.description) || template.description || template.description_en || '';
+    };
+    const couponSavings = coupon => `${currencySymbol.value}${(Number(coupon?.calculated_discount || 0) / 100).toFixed(2)}`;
+    const toggleCouponDropdown = () => {
+      if (!loading.coupons && selectedPriceType.value) couponDropdownOpen.value = !couponDropdownOpen.value;
+    };
+    const selectCoupon = value => {
+      disableAutoCoupon.value = value === 'none';
+      selectedCouponId.value = disableAutoCoupon.value ? null : Number(value);
+      couponDropdownOpen.value = false;
+      refreshPreview();
+    };
+    const closeCouponDropdown = event => {
+      if (couponSelectorRef.value && !couponSelectorRef.value.contains(event.target)) couponDropdownOpen.value = false;
     };
 
     const refreshPreview = async () => {
@@ -497,8 +563,11 @@ export default {
     
     // 页面加载时获取数据
     onMounted(async () => {
+      document.addEventListener('click', closeCouponDropdown);
       await Promise.all([fetchPlanData(), fetchUserInfo(), fetchConfig()]);
     });
+
+    onBeforeUnmount(() => document.removeEventListener('click', closeCouponDropdown));
 
     watch(locale, () => {
       fetchPlanData();
@@ -514,8 +583,11 @@ export default {
       availableCoupons,
       selectedCouponId,
       disableAutoCoupon,
-      couponSelection,
       couponInfo,
+      couponDropdownOpen,
+      couponSelectorRef,
+      selectedCoupon,
+      bestCouponId,
       locale,
       originalPrice,
       discountAmount,
@@ -528,7 +600,12 @@ export default {
       selectPriceType,
       refreshPreview,
       couponName,
-      couponOptionLabel,
+      couponValue,
+      couponMinimum,
+      couponDescription,
+      couponSavings,
+      toggleCouponDropdown,
+      selectCoupon,
       submitOrder,
       goBack,
       showExistingPlanWarning,
@@ -545,12 +622,38 @@ export default {
   justify-content: center;
   min-height: calc(100vh - 100px);
 
-  .coupon-selector { position: relative; }
-  .coupon-selector::after { content: ''; position: absolute; top: 50%; right: 17px; width: 8px; height: 8px; border-right: 2px solid var(--secondary-text-color); border-bottom: 2px solid var(--secondary-text-color); pointer-events: none; transform: translateY(-70%) rotate(45deg); }
-  .coupon-select { width: 100%; min-height: 52px; padding: 0 44px 0 16px; color: var(--text-color); background: var(--input-background); border: 1px solid var(--card-border); border-radius: 14px; outline: none; appearance: none; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
-  .coupon-select:hover:not(:disabled) { border-color: rgba(var(--theme-color-rgb), .55); }
-  .coupon-select:focus-visible { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .12); }
-  .coupon-select:disabled { color: var(--secondary-text-color); cursor: wait; opacity: .72; }
+  .coupon-selector { position: relative; z-index: 12; }
+  .coupon-select-trigger { position: relative; width: 100%; min-height: 72px; padding: 7px 44px 7px 7px; color: var(--text-color); text-align: left; background: var(--input-background); border: 1px solid var(--card-border); border-radius: 15px; outline: none; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+  .coupon-select-trigger:hover:not(:disabled), .coupon-selector.open .coupon-select-trigger { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .1); }
+  .coupon-select-trigger:focus-visible { border-color: var(--theme-color); box-shadow: 0 0 0 3px rgba(var(--theme-color-rgb), .14); }
+  .coupon-select-trigger:disabled { color: var(--secondary-text-color); cursor: wait; opacity: .72; }
+  .coupon-placeholder { display: flex; align-items: center; min-height: 56px; padding-left: 10px; color: var(--secondary-text-color); }
+  .coupon-chevron { position: absolute; top: 50%; right: 17px; width: 8px; height: 8px; border-right: 2px solid var(--secondary-text-color); border-bottom: 2px solid var(--secondary-text-color); transform: translateY(-70%) rotate(45deg); transition: transform .2s ease; }
+  .coupon-selector.open .coupon-chevron { transform: translateY(-25%) rotate(225deg); }
+  .coupon-trigger-card { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; }
+  .coupon-trigger-value { align-self: stretch; display: flex; align-items: center; justify-content: center; padding: 8px; color: #fff; font-size: 16px; font-weight: 800; text-align: center; background: linear-gradient(145deg, var(--theme-color), rgba(var(--theme-color-rgb), .72)); border-radius: 10px; }
+  .coupon-trigger-copy { display: flex; flex-direction: column; min-width: 0; gap: 5px; }
+  .coupon-trigger-copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+  .coupon-trigger-copy small { overflow: hidden; color: var(--secondary-text-color); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .best-coupon-badge { padding: 4px 7px; color: var(--theme-color); font-size: 10px; font-weight: 700; white-space: nowrap; background: rgba(var(--theme-color-rgb), .1); border-radius: 999px; }
+  .coupon-dropdown { position: absolute; top: calc(100% + 8px); right: 0; left: 0; z-index: 30; display: grid; gap: 9px; max-height: 430px; padding: 10px; overflow-y: auto; background: var(--card-background); border: 1px solid var(--card-border); border-radius: 17px; box-shadow: 0 18px 46px rgba(28, 42, 72, .18); }
+  .coupon-dropdown-option { position: relative; display: grid; grid-template-columns: 100px minmax(0, 1fr) 20px; align-items: stretch; min-height: 94px; padding: 0; overflow: hidden; color: var(--text-color); text-align: left; background: var(--card-background); border: 1px solid var(--card-border); border-radius: 14px; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+  .coupon-dropdown-option:hover, .coupon-dropdown-option.selected { border-color: var(--theme-color); box-shadow: 0 5px 16px rgba(var(--theme-color-rgb), .12); }
+  .coupon-dropdown-option:hover { transform: translateY(-1px); }
+  .coupon-option-value { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 13px 9px; color: #fff; text-align: center; background: linear-gradient(145deg, var(--theme-color), rgba(var(--theme-color-rgb), .72)); }
+  .coupon-option-value strong { font-size: 18px; line-height: 1.15; }
+  .coupon-option-value small { font-size: 10px; line-height: 1.25; }
+  .coupon-option-content { display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 5px; padding: 12px; }
+  .coupon-option-heading { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .coupon-option-heading strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+  .coupon-option-heading em { flex: none; padding: 3px 6px; color: var(--theme-color); font-size: 9px; font-style: normal; font-weight: 700; background: rgba(var(--theme-color-rgb), .1); border-radius: 999px; }
+  .coupon-option-content > small { overflow: hidden; color: var(--secondary-text-color); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .coupon-option-saving { color: var(--theme-color); font-size: 12px; font-weight: 700; }
+  .coupon-option-check { align-self: center; color: var(--theme-color); font-weight: 800; opacity: 0; }
+  .coupon-dropdown-option.selected .coupon-option-check { opacity: 1; }
+  .coupon-none-option { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; color: var(--secondary-text-color); background: var(--input-background); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; }
+  .coupon-none-option:hover, .coupon-none-option.selected { color: var(--theme-color); border-color: var(--theme-color); }
+  .coupon-dropdown-empty { padding: 16px; color: var(--secondary-text-color); text-align: center; }
   
   .order-confirm-inner {
     width: 100%;
@@ -1148,6 +1251,12 @@ export default {
     .section-title {
       font-size: 16px;
     }
+
+    .coupon-trigger-card { grid-template-columns: 68px minmax(0, 1fr); }
+    .best-coupon-badge { display: none; }
+    .coupon-dropdown-option { grid-template-columns: 84px minmax(0, 1fr) 16px; }
+    .coupon-option-value strong { font-size: 16px; }
+    .coupon-option-content { padding: 10px; }
     
     .coupon-input {
       flex-direction: row;

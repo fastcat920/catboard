@@ -697,6 +697,10 @@ export default {
     choose_coupon: '选择优惠券',
     coupon_loading: '正在匹配可用优惠券…',
     best_coupon: '最优优惠券',
+    coupon_save: '预计优惠 {amount}',
+    coupon_minimum: '满 {amount} 可用',
+    coupon_no_minimum: '无门槛',
+    coupon_no_description: '暂无说明',
     no_coupon: '本次不使用优惠券',
     no_eligible_coupon: '当前订单暂无可用优惠券'
   },

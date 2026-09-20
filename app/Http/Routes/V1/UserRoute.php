@@ -28,6 +28,7 @@ class UserRoute
             $router->get ('/getStat', 'V1\\User\\UserController@getStat');
             $router->get ('/checkLogin', 'V1\\User\\UserController@checkLogin');
             $router->post('/transfer', 'V1\\User\\UserController@transfer');
+            $router->get ('/balance/records', 'V1\\User\\UserController@balanceRecords');
             $router->post('/getQuickLoginUrl', 'V1\\User\\UserController@getQuickLoginUrl');
             $router->get ('/getActiveSession', 'V1\\User\\UserController@getActiveSession');
             $router->post('/removeActiveSession', 'V1\\User\\UserController@removeActiveSession');

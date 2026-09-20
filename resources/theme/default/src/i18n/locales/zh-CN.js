@@ -1015,6 +1015,13 @@ export default {
         minimum: '最低充值金额为1元'
       }
     },
+    records: {
+      title: '余额记录', refresh: '刷新', loading: '正在加载余额记录...', loadFailed: '余额记录加载失败', empty: '暂无余额记录',
+      time: '时间', type: '类型', description: '说明', amount: '金额', status: '状态', total: '共 {total} 条', previous: '上一页', next: '下一页',
+      types: { deposit: '余额充值', purchase: '套餐消费', commission_transfer: '佣金划转', giftcard: '礼品卡兑换', referral_reward: '邀请奖励', referral_reversal: '奖励撤销', refund: '余额退回', admin_adjustment: '后台调整' },
+      descriptions: { deposit: '余额充值到账', purchase: '订单使用余额', commission_transfer: '佣金划转至余额', giftcard: '礼品卡兑换余额', referral_reward: '邀请奖励到账', referral_reversal: '邀请奖励撤销', refund: '订单余额退回', admin_adjustment: '后台调整余额' },
+      statuses: { completed: '已完成', pending: '处理中', reversed: '已撤销', failed: '失败' }
+    },
     welcome: {
       title: '账户充值',
       description: '在这里您可以轻松地为您的账户充值，选择预设金额或输入自定义金额进行充值。充值后的余额将立即到账并可用于购买我们的服务。'

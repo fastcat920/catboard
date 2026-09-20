@@ -55,6 +55,7 @@ class ReferralProgramService
                         throw new \RuntimeException('用户可用余额不足，无法自动撤销奖励');
                     }
                     $commissionBefore = (int)$user->commission_balance;
+                    $walletBefore = (int)$user->balance;
                     $user->{$field} -= (int)$reward->reward_value;
                     $user->save();
                     if ($reward->reward_type === 'commission_balance') {
@@ -64,6 +65,19 @@ class ReferralProgramService
                             'amount' => -(int)$reward->reward_value,
                             'balance_before' => $commissionBefore,
                             'balance_after' => (int)$user->commission_balance,
+                            'source_key' => 'referral_reward_reverse:' . $reward->id,
+                            'source_type' => 'referral_reward',
+                            'source_id' => $reward->id,
+                            'order_id' => $reward->order_id,
+                            'description' => $reason ?: '邀请奖励撤销',
+                        ]);
+                    } else {
+                        app(BalanceLedgerService::class)->record([
+                            'user_id' => $user->id,
+                            'type' => 'referral_reversal',
+                            'amount' => -(int)$reward->reward_value,
+                            'balance_before' => $walletBefore,
+                            'balance_after' => (int)$user->balance,
                             'source_key' => 'referral_reward_reverse:' . $reward->id,
                             'source_type' => 'referral_reward',
                             'source_id' => $reward->id,
@@ -230,6 +244,7 @@ class ReferralProgramService
         $existing = ReferralReward::where('event_key', $eventKey)->lockForUpdate()->first();
         if ($existing && $existing->status !== 'reversed') return;
         $commissionBefore = (int)$user->commission_balance;
+        $walletBefore = (int)$user->balance;
         if ($type === 'commission_balance') $user->commission_balance += $amount;
         else $user->balance += $amount;
         $user->save();
@@ -256,6 +271,20 @@ class ReferralProgramService
                 'amount' => $amount,
                 'balance_before' => $commissionBefore,
                 'balance_after' => (int)$user->commission_balance,
+                'source_key' => 'referral_reward:' . $reward->id,
+                'source_type' => 'referral_reward',
+                'source_id' => $reward->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => $description,
+            ]);
+        } else {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'referral_reward',
+                'amount' => $amount,
+                'balance_before' => $walletBefore,
+                'balance_after' => (int)$user->balance,
                 'source_key' => 'referral_reward:' . $reward->id,
                 'source_type' => 'referral_reward',
                 'source_id' => $reward->id,

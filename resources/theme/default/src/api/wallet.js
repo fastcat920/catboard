@@ -34,3 +34,15 @@ export function createOrderDeposit(amount) {
     }
   });
 }
+
+/**
+ * 获取余额流水，每页固定10条
+ * @param {number} current - 当前页码
+ */
+export function getBalanceRecords(current = 1) {
+  return request({
+    url: '/user/balance/records',
+    method: 'get',
+    params: { current }
+  });
+}

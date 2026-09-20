@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\BalanceLedgerService;
 
 class SettleReferralLeaderboard extends Command
 {
@@ -39,9 +40,15 @@ class SettleReferralLeaderboard extends Command
                     $exists = DB::table('v2_referral_leaderboard_award')->where('period_key', $awardKey)->where('period_type', $type)->where('user_id', $leader->user_id)->lockForUpdate()->exists();
                     if ($exists) return;
                     $user = User::where('id', $leader->user_id)->lockForUpdate()->first(); if (!$user) return;
-                    $value = (int)$rule['reward_value']; $user->balance += $value; $user->save();
+                    $value = (int)$rule['reward_value']; $balanceBefore = (int)$user->balance; $user->balance += $value; $user->save();
                     DB::table('v2_referral_leaderboard_award')->insert(['period_key'=>$awardKey,'period_type'=>$type,'user_id'=>$user->id,'rank'=>$rank,'reward_value'=>$value,'status'=>'granted','created_at'=>time(),'updated_at'=>time()]);
-                    ReferralReward::create(['event_key'=>'leaderboard:'.$type.':'.$awardKey.':'.$user->id,'user_id'=>$user->id,'reward_type'=>'balance','reward_value'=>$value,'status'=>'granted','description'=>'邀请排行榜奖励（第 '.$rank.' 名）','granted_at'=>time()]);
+                    $reward = ReferralReward::create(['event_key'=>'leaderboard:'.$type.':'.$awardKey.':'.$user->id,'user_id'=>$user->id,'reward_type'=>'balance','reward_value'=>$value,'status'=>'granted','description'=>'邀请排行榜奖励（第 '.$rank.' 名）','granted_at'=>time()]);
+                    app(BalanceLedgerService::class)->record([
+                        'user_id' => $user->id, 'type' => 'referral_reward', 'amount' => $value,
+                        'balance_before' => $balanceBefore, 'balance_after' => (int)$user->balance,
+                        'source_key' => 'referral_reward:' . $reward->id, 'source_type' => 'referral_reward',
+                        'source_id' => $reward->id, 'description' => $reward->description,
+                    ]);
                 });
             }
         }

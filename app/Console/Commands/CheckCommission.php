@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\ReferralSetting;
 use Illuminate\Support\Facades\Schema;
 use App\Services\CommissionLedgerService;
+use App\Services\BalanceLedgerService;
 
 class CheckCommission extends Command
 {
@@ -105,6 +106,7 @@ class CheckCommission extends Command
             $commissionBalance = $order->commission_balance * ($commissionShareLevels[$l] / 100);
             if (!$commissionBalance) continue;
             $balanceBefore = (int)$inviter->commission_balance;
+            $walletBefore = (int)$inviter->balance;
             if ((int)config('v2board.withdraw_close_enable', 0)) {
                 $inviter->balance = $inviter->balance + $commissionBalance;
             } else {
@@ -139,6 +141,21 @@ class CheckCommission extends Command
                 'description' => '邀请订单返佣',
                 'meta' => ['order_amount' => (int)$order->total_amount, 'invited_user_id' => (int)$order->user_id],
             ]);
+            if ((int)config('v2board.withdraw_close_enable', 0)) {
+                app(BalanceLedgerService::class)->record([
+                    'user_id' => $inviteUserId,
+                    'type' => 'referral_reward',
+                    'amount' => (int)$commissionBalance,
+                    'balance_before' => $walletBefore,
+                    'balance_after' => (int)$inviter->balance,
+                    'source_key' => 'commission_log:' . $commissionLog->id,
+                    'source_type' => 'commission_log',
+                    'source_id' => $commissionLog->id,
+                    'order_id' => $order->id,
+                    'trade_no' => $order->trade_no,
+                    'description' => '邀请订单返佣',
+                ]);
+            }
             $inviteUserId = $inviter->invite_user_id;
             // update order actual commission balance
             $order->actual_commission_balance = $order->actual_commission_balance + $commissionBalance;

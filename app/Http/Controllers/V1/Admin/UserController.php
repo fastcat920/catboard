@@ -15,6 +15,7 @@ use App\Models\ServerGroup;
 use App\Services\AuthService;
 use App\Services\AccountDeletionService;
 use App\Services\CommissionLedgerService;
+use App\Services\BalanceLedgerService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -214,12 +215,15 @@ class UserController extends Controller
         }
 
         $commissionBefore = (int)$user->commission_balance;
+        $balanceBefore = (int)$user->balance;
         try {
             $user->update($params);
         } catch (\Exception $e) {
             abort(500, '保存失败');
         }
-        $commissionAfter = (int)$user->fresh()->commission_balance;
+        $freshUser = $user->fresh();
+        $commissionAfter = (int)$freshUser->commission_balance;
+        $balanceAfter = (int)$freshUser->balance;
         if ($commissionAfter !== $commissionBefore) {
             app(CommissionLedgerService::class)->record([
                 'user_id' => $user->id,
@@ -231,6 +235,19 @@ class UserController extends Controller
                 'source_type' => 'admin',
                 'source_id' => $request->user['id'] ?? null,
                 'description' => '管理员调整佣金余额',
+            ]);
+        }
+        if ($balanceAfter !== $balanceBefore) {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'admin_adjustment',
+                'amount' => $balanceAfter - $balanceBefore,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'admin_balance_adjustment:' . $user->id . ':' . time() . ':' . uniqid(),
+                'source_type' => 'admin',
+                'source_id' => $request->user['id'] ?? null,
+                'description' => '管理员调整余额',
             ]);
         }
         return response([

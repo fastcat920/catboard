@@ -15,6 +15,7 @@ use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\UserService;
+use App\Services\BalanceLedgerService;
 use App\Support\ContentLocale;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
@@ -177,6 +178,7 @@ class OrderController extends Controller
         $userCoupon = $flashSale && !$flashSale->allow_coupon ? null : app(CouponWalletService::class)->lockForOrder($order, $user, $request->input('user_coupon_id') ? (int)$request->input('user_coupon_id') : null, $request->boolean('disable_auto_coupon'));
         if (!$userCoupon || $userCoupon->template->stackable) $orderService->setVipDiscount($user);
 
+        $balanceBefore = (int)$user->balance;
         if ($user->balance > 0 && $order->total_amount > 0) {
             $remainingBalance = $user->balance - $order->total_amount;
             $userService = new UserService();
@@ -202,6 +204,23 @@ class OrderController extends Controller
         if (!$order->save()) {
             DB::rollback();
             abort(500, __('Failed to create order'));
+        }
+
+        if ((int)$order->balance_amount > 0) {
+            $balanceAfter = (int)User::where('id', $order->user_id)->value('balance');
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $order->user_id,
+                'type' => 'purchase',
+                'amount' => -(int)$order->balance_amount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'purchase:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '订单使用余额',
+            ]);
         }
 
         DB::commit();

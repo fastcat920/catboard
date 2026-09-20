@@ -98,6 +98,60 @@
           </div>
         </div>
       </div>
+
+      <!-- 余额流水 -->
+      <div class="dashboard-card records-card">
+        <div class="card-header">
+          <h2 class="card-title">{{ $t('wallet.records.title') }}</h2>
+          <button class="records-refresh" type="button" :disabled="loading.records" @click="fetchBalanceRecords(currentPage)">
+            {{ $t('wallet.records.refresh') }}
+          </button>
+        </div>
+
+        <div v-if="loading.records" class="records-state">
+          <span class="loader records-loader"></span>
+          <span>{{ $t('wallet.records.loading') }}</span>
+        </div>
+        <div v-else-if="recordsError" class="records-state records-error">
+          <span>{{ $t('wallet.records.loadFailed') }}</span>
+          <button type="button" @click="fetchBalanceRecords(currentPage)">{{ $t('common.retry') }}</button>
+        </div>
+        <div v-else-if="!balanceRecords.length" class="records-state">{{ $t('wallet.records.empty') }}</div>
+        <template v-else>
+          <div class="records-table-wrap">
+            <table class="records-table">
+              <thead>
+                <tr>
+                  <th>{{ $t('wallet.records.time') }}</th>
+                  <th>{{ $t('wallet.records.type') }}</th>
+                  <th>{{ $t('wallet.records.description') }}</th>
+                  <th class="amount-cell">{{ $t('wallet.records.amount') }}</th>
+                  <th>{{ $t('wallet.records.status') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="record in balanceRecords" :key="record.id">
+                  <td data-label="time">{{ formatRecordTime(record.created_at) }}</td>
+                  <td data-label="type"><span class="record-type">{{ recordTypeLabel(record.type) }}</span></td>
+                  <td data-label="description" class="description-cell">{{ recordDescription(record) }}</td>
+                  <td data-label="amount" class="amount-cell" :class="record.amount >= 0 ? 'income' : 'expense'">
+                    {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
+                  </td>
+                  <td data-label="status"><span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="records-pagination">
+            <span>{{ $t('wallet.records.total', { total: recordsTotal }) }}</span>
+            <div class="pagination-actions">
+              <button type="button" :disabled="currentPage <= 1" @click="changeRecordsPage(currentPage - 1)">{{ $t('wallet.records.previous') }}</button>
+              <span>{{ currentPage }} / {{ totalPages }}</span>
+              <button type="button" :disabled="currentPage >= totalPages" @click="changeRecordsPage(currentPage + 1)">{{ $t('wallet.records.next') }}</button>
+            </div>
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -108,11 +162,11 @@ import { useI18n } from 'vue-i18n';
 import { useToast } from '@/composables/useToast';
 import { IconAlertCircle, IconWallet } from '@tabler/icons-vue';
 import { getUserInfo, updateRemindSettings as updateUserSettings } from '@/api/user';
-import { createOrderDeposit, getUserConfig } from '@/api/wallet';
+import { createOrderDeposit, getUserConfig, getBalanceRecords } from '@/api/wallet';
 import { useRouter } from 'vue-router';
 import { WALLET_CONFIG } from '@/utils/baseConfig';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { showToast } = useToast();
 const router = useRouter();
 
@@ -126,13 +180,19 @@ const selectedAmount = ref(null);
 const customAmount = ref('');
 const amountError = ref('');
 const configError = ref(false);
+const balanceRecords = ref([]);
+const recordsTotal = ref(0);
+const currentPage = ref(1);
+const recordsError = ref(false);
+const totalPages = computed(() => Math.max(1, Math.ceil(recordsTotal.value / 10)));
 const minimumDepositAmount = WALLET_CONFIG.minimumDepositAmount || 1;
 
 const loading = ref({
   balance: true,
   submitting: false,
   config: true,
-  renewal: false
+  renewal: false,
+  records: true
 });
 
 const canEnableAutoRenewal = computed(() => hasPlan.value || autoRenewal.value);
@@ -146,6 +206,42 @@ const formatPresetAmount = (amount) => {
   const value = Number(amount);
   if (!Number.isFinite(value)) return '';
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+};
+
+const recordTypeLabel = (type) => t(`wallet.records.types.${type}`, type);
+const recordStatusLabel = (status) => t(`wallet.records.statuses.${status}`, status);
+const recordDescription = (record) => {
+  const key = `wallet.records.descriptions.${record.type}`;
+  const translated = t(key);
+  return translated === key ? (record.description || recordTypeLabel(record.type)) : translated;
+};
+const formatRecordTime = (timestamp) => {
+  const value = Number(timestamp);
+  if (!value) return '-';
+  return new Intl.DateTimeFormat(locale.value === 'en-US' ? 'en-US' : 'zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }).format(new Date(value * 1000));
+};
+
+const fetchBalanceRecords = async (page = 1) => {
+  loading.value.records = true;
+  recordsError.value = false;
+  try {
+    const response = await getBalanceRecords(page);
+    balanceRecords.value = Array.isArray(response?.data) ? response.data : [];
+    recordsTotal.value = Number(response?.total || 0);
+    currentPage.value = Number(response?.current || page);
+  } catch (error) {
+    console.error('获取余额流水失败:', error);
+    recordsError.value = true;
+  } finally {
+    loading.value.records = false;
+  }
+};
+
+const changeRecordsPage = (page) => {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) return;
+  fetchBalanceRecords(page);
 };
 
 const parseDepositBonusOptions = (rawOptions) => {
@@ -282,6 +378,7 @@ const handleDeposit = async () => {
 onMounted(() => {
   fetchUserBalance();
   fetchUserConfig();
+  fetchBalanceRecords();
 });
 </script>
 
@@ -644,6 +741,96 @@ onMounted(() => {
       }
     }
   }
+
+  .records-card {
+    .card-header { margin-bottom: 16px; }
+
+    .records-refresh {
+      padding: 6px 12px;
+      color: var(--theme-color);
+      background: rgba(var(--theme-color-rgb), .08);
+      border: 1px solid rgba(var(--theme-color-rgb), .22);
+      border-radius: 9px;
+      font-size: 13px;
+      cursor: pointer;
+      &:disabled { opacity: .5; cursor: default; }
+    }
+
+    .records-state {
+      display: flex;
+      min-height: 128px;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--secondary-text-color);
+      font-size: 14px;
+    }
+
+    .records-error button {
+      padding: 5px 11px;
+      color: var(--theme-color);
+      background: transparent;
+      border: 1px solid rgba(var(--theme-color-rgb), .3);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .records-loader {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(var(--theme-color-rgb), .25);
+      border-top-color: var(--theme-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .records-table-wrap { overflow-x: auto; }
+    .records-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+
+      th, td { padding: 13px 10px; border-bottom: 1px solid var(--card-border); text-align: left; }
+      th { color: var(--secondary-text-color); font-weight: 600; white-space: nowrap; }
+      tbody tr:last-child td { border-bottom: 0; }
+      .description-cell { max-width: 240px; color: var(--secondary-text-color); }
+      .amount-cell { text-align: right; white-space: nowrap; font-weight: 700; }
+      .income { color: #16a34a; }
+      .expense { color: #ef4444; }
+    }
+
+    .record-type, .status-badge {
+      display: inline-flex;
+      padding: 4px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .record-type { color: var(--theme-color); background: rgba(var(--theme-color-rgb), .1); }
+    .status-badge { color: #15803d; background: rgba(34, 197, 94, .12); }
+    .status-badge.reversed, .status-badge.failed { color: #b91c1c; background: rgba(239, 68, 68, .12); }
+    .status-badge.pending { color: #b45309; background: rgba(245, 158, 11, .12); }
+
+    .records-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 16px;
+      color: var(--secondary-text-color);
+      font-size: 13px;
+    }
+    .pagination-actions { display: flex; align-items: center; gap: 10px; }
+    .pagination-actions button {
+      padding: 6px 12px;
+      color: var(--text-color);
+      background: var(--input-bg, rgba(0, 0, 0, .02));
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      cursor: pointer;
+      &:disabled { opacity: .4; cursor: default; }
+    }
+  }
 }
 
 @media (max-width: 560px) {
@@ -689,6 +876,18 @@ onMounted(() => {
         min-width: 160px;
         font-size: 0.95rem;
       }
+    }
+
+    .records-card {
+      .records-table thead { display: none; }
+      .records-table, .records-table tbody, .records-table tr, .records-table td { display: block; width: 100%; }
+      .records-table tr { padding: 11px 0; border-bottom: 1px solid var(--card-border); }
+      .records-table tr:last-child { border-bottom: 0; }
+      .records-table td { padding: 3px 0; border: 0; }
+      .records-table .description-cell { max-width: none; }
+      .records-table .amount-cell { margin-top: 4px; text-align: left; font-size: 15px; }
+      .records-pagination { align-items: flex-start; flex-direction: column; }
+      .pagination-actions { width: 100%; justify-content: space-between; }
     }
   }
 }

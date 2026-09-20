@@ -11,6 +11,7 @@ use App\Http\Requests\User\UserTransfer;
 use App\Http\Requests\User\UserUpdate;
 use App\Models\Giftcard;
 use App\Models\GiftcardRedemption;
+use App\Models\BalanceLedger;
 use App\Models\Order;
 use App\Models\Plan;
 use App\Models\Ticket;
@@ -19,6 +20,7 @@ use App\Jobs\SendEmailJob;
 use App\Services\AuthService;
 use App\Services\AccountDeletionService;
 use App\Services\CommissionLedgerService;
+use App\Services\BalanceLedgerService;
 use App\Services\OrderService;
 use App\Services\UserService;
 use App\Support\ContentLocale;
@@ -29,9 +31,34 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
+    public function balanceRecords(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = 10;
+        if (!Schema::hasTable('v2_balance_ledger')) {
+            return response(['data' => [], 'total' => 0, 'current' => $current, 'pageSize' => $pageSize]);
+        }
+
+        $builder = BalanceLedger::where('user_id', $request->user['id'])
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC');
+        $total = $builder->count();
+        $data = $builder->forPage($current, $pageSize)->get([
+            'id', 'type', 'amount', 'status', 'trade_no', 'description', 'created_at'
+        ]);
+
+        return response([
+            'data' => $data,
+            'total' => $total,
+            'current' => $current,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
     public function giftcardRedemptions(Request $request)
     {
         $current = max((int)$request->input('current', 1), 1);
@@ -418,6 +445,7 @@ class UserController extends Controller
             $usedUserIds[] = $user->id;
             $giftcard->used_user_ids = json_encode($usedUserIds);
 
+            $giftcardBalanceBefore = (int)$user->balance;
             switch ($giftcard->type) {
                 case 1:
                     $user->balance += $giftcard->value;
@@ -470,7 +498,7 @@ class UserController extends Controller
                 throw new \Exception(__('Save failed'));
             }
 
-            GiftcardRedemption::create([
+            $redemption = GiftcardRedemption::create([
                 'giftcard_id' => $giftcard->id,
                 'user_id' => $user->id,
                 'code_snapshot' => $giftcard->code,
@@ -480,6 +508,20 @@ class UserController extends Controller
                 'plan_id' => $giftcard->plan_id,
                 'redeemed_at' => $currentTime,
             ]);
+
+            if ((int)$giftcard->type === 1) {
+                app(BalanceLedgerService::class)->record([
+                    'user_id' => $user->id,
+                    'type' => 'giftcard',
+                    'amount' => (int)$giftcard->value,
+                    'balance_before' => $giftcardBalanceBefore,
+                    'balance_after' => (int)$user->balance,
+                    'source_key' => 'giftcard_redemption:' . $redemption->id,
+                    'source_type' => 'giftcard_redemption',
+                    'source_id' => $redemption->id,
+                    'description' => '礼品卡兑换余额',
+                ]);
+            }
 
             DB::commit();
 
@@ -661,6 +703,7 @@ class UserController extends Controller
             if ($amount > $user->commission_balance) abort(500, __('Insufficient commission balance'));
 
             $before = (int)$user->commission_balance;
+            $walletBefore = (int)$user->balance;
             $order = new Order();
             $orderService = new OrderService($order);
             $order->user_id = $request->user['id'];
@@ -692,6 +735,19 @@ class UserController extends Controller
                 'trade_no' => $order->trade_no,
                 'description' => '佣金划转至钱包余额',
                 'meta' => ['wallet_balance_after' => (int)$user->balance],
+            ]);
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'commission_transfer',
+                'amount' => $amount,
+                'balance_before' => $walletBefore,
+                'balance_after' => (int)$user->balance,
+                'source_key' => 'commission_transfer:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '佣金划转至钱包余额',
             ]);
         });
 

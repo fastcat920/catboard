@@ -32,7 +32,10 @@ class OrderService
         $this->user = User::find($order->user_id);
         if ($order->type == 9) {
             DB::beginTransaction();
-            $this->user->balance += $order->total_amount + $this->getbounus($order->total_amount);
+            $balanceBefore = (int)$this->user->balance;
+            $bonus = $this->getbounus($order->total_amount);
+            $creditedAmount = (int)$order->total_amount + $bonus;
+            $this->user->balance += $creditedAmount;
 
             if (!$this->user->save()) {
                 DB::rollBack();
@@ -43,12 +46,27 @@ class OrderService
                 DB::rollBack();
                 abort(500, '充值失败');
             }
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'deposit',
+                'amount' => $creditedAmount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'deposit:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '余额充值',
+                'meta' => ['paid_amount' => (int)$order->total_amount, 'bonus_amount' => $bonus],
+            ]);
             DB::commit();
             return;
         }
 
         $plan = Plan::find($order->plan_id);
 
+        $refundBalanceBefore = (int)$this->user->balance;
         if ($order->refund_amount) {
             $this->user->balance = $this->user->balance + $order->refund_amount;
         }
@@ -96,6 +114,21 @@ class OrderService
         if (!$order->save()) {
             DB::rollBack();
             abort(500, '开通失败');
+        }
+        if ((int)$order->refund_amount > 0) {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'refund',
+                'amount' => (int)$order->refund_amount,
+                'balance_before' => $refundBalanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'order_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '订单差额退回余额',
+            ]);
         }
         app(CouponWalletService::class)->consume($order);
         app(FlashSaleService::class)->complete($order);
@@ -288,11 +321,26 @@ class OrderService
             return false;
         }
         if ($order->balance_amount) {
+            $balanceBefore = (int)User::where('id', $order->user_id)->value('balance');
             $userService = new UserService();
             if (!$userService->addBalance($order->user_id, $order->balance_amount)) {
                 DB::rollBack();
                 return false;
             }
+            $balanceAfter = (int)User::where('id', $order->user_id)->value('balance');
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $order->user_id,
+                'type' => 'refund',
+                'amount' => (int)$order->balance_amount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'order_cancel_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '取消订单退回余额',
+            ]);
         }
         app(CouponWalletService::class)->release($order);
         DB::commit();

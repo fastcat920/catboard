@@ -12,7 +12,6 @@ use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\UserCoupon;
-use App\Models\ReferralCampaign;
 use App\Models\ReferralLeaderboardSetting;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
@@ -118,15 +117,6 @@ class InviteController extends Controller
                 'recent_rewards' => ReferralReward::where('user_id', $user->id)->where('reward_type', '!=', 'effective_invite')
                     ->orderBy('id', 'DESC')->limit(10)->get(),
             ];
-            if (Schema::hasTable('v2_referral_campaign')) {
-                $registeredAt = (int)$user->getRawOriginal('created_at');
-                $program['campaign'] = ReferralCampaign::where('enabled', 1)->where('starts_at', '<=', time())->where('ends_at', '>=', time())
-                    ->where(function ($query) use ($registeredAt) {
-                        $query->where('audience', 'all')
-                            ->orWhere(function ($q) use ($registeredAt) { $q->where('audience', 'new')->where('starts_at', '<=', $registeredAt); })
-                            ->orWhere(function ($q) use ($registeredAt) { $q->where('audience', 'existing')->where('starts_at', '>', $registeredAt); });
-                    })->orderBy('id', 'DESC')->first();
-            }
             if (Schema::hasTable('v2_referral_leaderboard_setting')) {
                 $leaderboardSetting = ReferralLeaderboardSetting::current();
                 if ($leaderboardSetting->enabled) {

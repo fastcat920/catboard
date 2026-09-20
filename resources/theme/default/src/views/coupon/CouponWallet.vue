@@ -65,7 +65,7 @@ const discount = item => {
 const minimum = item => Number(item?.minimum_amount || 0) > 0 ? (en.value ? `Min. ¥${(item.minimum_amount / 100).toFixed(2)}` : `满 ¥${(item.minimum_amount / 100).toFixed(2)} 可用`) : (en.value ? 'No minimum' : '无门槛');
 const date = value => value ? new Date(Number(value) * 1000).toLocaleDateString(en.value ? 'en-US' : 'zh-CN') : '—';
 const statusText = status => ({ available: en.value ? 'Available' : '可用', locked: en.value ? 'Reserved' : '已锁定', pending: en.value ? 'Upcoming' : '待生效', used: en.value ? 'Used' : '已使用', expired: en.value ? 'Expired' : '已过期', revoked: en.value ? 'Revoked' : '已撤销' }[status] || status);
-const sourceText = source => ({ manual: en.value ? 'Manual grant' : '后台手动发放', newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', referral_newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', distribution_task: en.value ? 'Platform distribution' : '平台批量发放', campaign: en.value ? 'Campaign reward' : '邀请活动奖励' }[source] || source || '—');
+const sourceText = source => ({ manual: en.value ? 'Manual grant' : '后台手动发放', newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', referral_newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', distribution_task: en.value ? 'Platform distribution' : '平台批量发放' }[source] || source || '—');
 const load = async () => { loading.value = true; error.value = ''; try { const result = await fetchCouponWallet(); coupons.value = Array.isArray(result.data) ? result.data : []; } catch (e) { error.value = e.response?.message || e.message || (en.value ? 'Failed to load coupons' : '优惠券加载失败'); } finally { loading.value = false; } };
 onMounted(load);
 </script>

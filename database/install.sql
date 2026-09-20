@@ -75,26 +75,12 @@ INSERT INTO `v2_referral_milestone` (`name`,`required_invites`,`reward_type`,`re
 DROP TABLE IF EXISTS `v2_referral_reward`;
 CREATE TABLE `v2_referral_reward` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT, `event_key` varchar(255) NOT NULL,
-  `user_id` int unsigned NOT NULL, `invited_user_id` int unsigned DEFAULT NULL, `order_id` int unsigned DEFAULT NULL, `campaign_id` int unsigned DEFAULT NULL,
+  `user_id` int unsigned NOT NULL, `invited_user_id` int unsigned DEFAULT NULL, `order_id` int unsigned DEFAULT NULL,
   `reward_type` enum('balance','commission_balance','level','effective_invite','traffic','duration') NOT NULL,
   `reward_value` int unsigned NOT NULL DEFAULT '0', `status` enum('pending','granted','reversed','rejected') NOT NULL DEFAULT 'pending',
   `description` varchar(255) DEFAULT NULL, `meta` text, `granted_at` int unsigned DEFAULT NULL,
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `campaign_id` (`campaign_id`), KEY `status` (`status`), KEY `referral_type_status_created_idx` (`reward_type`,`status`,`created_at`), KEY `referral_order_status_idx` (`order_id`,`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `v2_referral_campaign`;
-CREATE TABLE `v2_referral_campaign` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL,
-  `description` text, `description_en` text, `starts_at` int unsigned NOT NULL, `ends_at` int unsigned NOT NULL,
-  `audience` enum('all','new','existing') NOT NULL DEFAULT 'all', `plan_ids` text,
-  `first_order_min` int unsigned NOT NULL DEFAULT '0', `commission_multiplier` decimal(6,2) NOT NULL DEFAULT '1.00',
-  `inviter_reward_type` enum('none','balance','commission_balance','traffic','duration') NOT NULL DEFAULT 'none',
-  `inviter_reward_value` int unsigned NOT NULL DEFAULT '0', `bonus_required_invites` int unsigned NOT NULL DEFAULT '0',
-  `invitee_reward_type` enum('none','balance','traffic','duration') NOT NULL DEFAULT 'none', `invitee_reward_value` int unsigned NOT NULL DEFAULT '0',
-  `budget_total` int unsigned DEFAULT NULL, `per_user_limit` int unsigned DEFAULT NULL, `grant_limit` int unsigned DEFAULT NULL,
-  `granted_count` int unsigned NOT NULL DEFAULT '0', `spent_amount` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
-  `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `starts_at` (`starts_at`), KEY `ends_at` (`ends_at`), KEY `enabled` (`enabled`)
+  PRIMARY KEY (`id`), UNIQUE KEY `event_key` (`event_key`), KEY `user_id` (`user_id`), KEY `invited_user_id` (`invited_user_id`), KEY `order_id` (`order_id`), KEY `status` (`status`), KEY `referral_type_status_created_idx` (`reward_type`,`status`,`created_at`), KEY `referral_order_status_idx` (`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `v2_referral_visit`;

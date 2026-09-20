@@ -167,7 +167,7 @@ class OrderService
 
         if (!$isCommission) return;
         $referralService = app(ReferralProgramService::class);
-        $commissionRate = $referralService->commissionRate($inviter) * $referralService->campaignCommissionMultiplier($order, $user);
+        $commissionRate = $referralService->commissionRate($inviter);
         $commissionRate = min($commissionRate, 100);
         $order->commission_balance = $order->total_amount * ($commissionRate / 100);
     }

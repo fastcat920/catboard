@@ -53,7 +53,6 @@
                     "新人邀请奖励 / Newcomer referral reward",
                 distribution_task:
                     "平台批量发放 / Platform bulk distribution",
-                campaign: "邀请活动奖励 / Referral campaign reward",
             }[source] || source
         );
     }

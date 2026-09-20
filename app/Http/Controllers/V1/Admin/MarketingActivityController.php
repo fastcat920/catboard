@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\CouponTemplate;
 use App\Models\FlashSaleCampaign;
 use App\Models\Plan;
-use App\Models\ReferralCampaign;
 use App\Models\ReferralSetting;
 use Illuminate\Http\Request;
 
@@ -17,7 +16,6 @@ class MarketingActivityController extends Controller
         $type = $request->input('type'); $status = $request->input('status'); $keyword = trim((string)$request->input('keyword'));
         $rows = collect();
         if (!$type || $type === 'flash_sale') $rows = $rows->concat(FlashSaleCampaign::all()->map(function ($x) { return $this->row($x, 'flash_sale'); }));
-        if (!$type || $type === 'referral') $rows = $rows->concat(ReferralCampaign::all()->map(function ($x) { return $this->row($x, 'referral'); }));
         if (!$type || $type === 'coupon') $rows = $rows->concat(CouponTemplate::all()->map(function ($x) { return $this->couponRow($x); }));
         if (!$type || $type === 'newcomer') {
             $setting = ReferralSetting::current();

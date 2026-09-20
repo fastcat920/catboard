@@ -5,8 +5,6 @@ namespace App\Http\Controllers\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\CouponTemplate;
-use App\Models\Plan;
-use App\Models\ReferralCampaign;
 use App\Models\ReferralVisit;
 use App\Models\ReferralLeaderboardSetting;
 use App\Models\ReferralLevel;
@@ -98,43 +96,6 @@ class ReferralController extends Controller
         return response(['data' => ReferralMilestone::orderBy('required_invites')->get()]);
     }
 
-    public function campaigns()
-    {
-        $campaigns = ReferralCampaign::orderBy('id', 'DESC')->get();
-        $campaigns->each(function ($campaign) {
-            $rewards = ReferralReward::where('campaign_id', $campaign->id)->whereIn('reward_type', ['balance', 'commission_balance', 'traffic', 'duration'])->where('status', 'granted');
-            $campaign->reward_count = (clone $rewards)->count();
-            $campaign->reward_users = (clone $rewards)->distinct()->count('user_id');
-            $campaign->order_count = ReferralReward::where('campaign_id', $campaign->id)->whereNotNull('order_id')->distinct()->count('order_id');
-        });
-        return response(['data' => $campaigns, 'plans' => Plan::orderBy('id')->get(['id', 'name'])]);
-    }
-
-    public function saveCampaign(Request $request)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:100', 'name_en' => 'nullable|string|max:100',
-            'description' => 'nullable|string|max:1000', 'description_en' => 'nullable|string|max:1000',
-            'starts_at' => 'required|integer', 'ends_at' => 'required|integer|gt:starts_at',
-            'audience' => 'required|in:all,new,existing', 'plan_ids' => 'nullable|array', 'plan_ids.*' => 'integer|exists:v2_plan,id',
-            'first_order_min' => 'required|integer|min:0', 'commission_multiplier' => 'required|numeric|min:0|max:10',
-            'inviter_reward_type' => 'required|in:none,balance,commission_balance,traffic,duration',
-            'inviter_reward_value' => 'required|integer|min:0', 'bonus_required_invites' => 'required|integer|min:0',
-            'invitee_reward_type' => 'required|in:none,balance,traffic,duration', 'invitee_reward_value' => 'required|integer|min:0',
-            'budget_total' => 'nullable|integer|min:0', 'per_user_limit' => 'nullable|integer|min:1', 'grant_limit' => 'nullable|integer|min:1',
-            'enabled' => 'required|boolean',
-        ]);
-        $campaign = $request->input('id') ? ReferralCampaign::findOrFail($request->input('id')) : new ReferralCampaign();
-        $campaign->fill($data)->save();
-        return response(['data' => $campaign]);
-    }
-
-    public function dropCampaign(Request $request)
-    {
-        $campaign = ReferralCampaign::findOrFail($request->input('id'));
-        if (ReferralReward::where('campaign_id', $campaign->id)->exists()) abort(422, '活动已有奖励流水，请停用活动而不是删除');
-        return response(['data' => (bool)$campaign->delete()]);
-    }
 
     public function leaderboard(Request $request)
     {
@@ -189,7 +150,6 @@ class ReferralController extends Controller
             'monthly_trend' => $aggregate($trend, 'Y-m'),
             'channels' => ReferralVisit::where('created_at', '>=', $from)->select('channel', DB::raw('COUNT(*) visits'), DB::raw('COUNT(user_id) registrations'))->groupBy('channel')->orderBy('visits', 'DESC')->get(),
             'plans' => Order::whereNotNull('invite_user_id')->where('type', 1)->where('status', 3)->where('created_at', '>=', $from)->select('plan_id', DB::raw('COUNT(*) orders'), DB::raw('SUM(total_amount) revenue'))->groupBy('plan_id')->orderBy('orders', 'DESC')->get(),
-            'campaigns' => ReferralCampaign::select('id', 'name', 'name_en', 'granted_count', 'spent_amount')->orderBy('id', 'DESC')->limit(20)->get(),
         ]]);
     }
 

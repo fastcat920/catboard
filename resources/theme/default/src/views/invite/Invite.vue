@@ -70,14 +70,6 @@
         <p>{{ locale === 'en-US' ? 'One-time reward: ' : '一次性奖励：' }}{{ milestoneRewardText }}</p>
       </section>
 
-      <section v-if="referralProgram?.campaign" class="growth-card campaign-card">
-        <div class="growth-card-head">
-          <div><span>{{ locale === 'en-US' ? 'Limited referral campaign' : '限时邀请活动' }}</span><h3>{{ localizedCampaign(referralProgram.campaign, 'name') }}</h3></div>
-          <time>{{ locale === 'en-US' ? 'Ends in ' : '距结束 ' }}{{ campaignCountdown }}</time>
-        </div>
-        <p>{{ localizedCampaign(referralProgram.campaign, 'description') }}</p>
-      </section>
-  
       <!-- 统计卡片组 -->
       <div class="invite-section-title"><IconChartBar :size="18" />{{ $t('invite.statsTitle') }}</div>
       <div class="stats-grid">
@@ -555,12 +547,6 @@ export default {
       return `${currencySymbol.value}${formatAmount(milestone.reward_value)} ${label}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
-    const localizedCampaign = (row, key) => !row ? '' : (locale.value === 'en-US' ? row[`${key}_en`] : row[key]) || row[key] || row[`${key}_en`] || '';
-    const campaignCountdown = computed(() => {
-      const seconds = Math.max(0, Number(referralProgram.value?.campaign?.ends_at || 0) - Math.floor(Date.now() / 1000));
-      const days = Math.floor(seconds / 86400); const hours = Math.floor(seconds % 86400 / 3600);
-      return locale.value === 'en-US' ? `${days}d ${hours}h` : `${days}天 ${hours}小时`;
-    });
     
     // 分页相关
     const currentPage = ref(1);
@@ -877,8 +863,6 @@ export default {
       milestoneProgress,
       milestoneRewardText,
       localizedLevel,
-      localizedCampaign,
-      campaignCountdown,
       locale,
       inviteStats,
       walletBalance,
@@ -944,8 +928,6 @@ export default {
   .growth-progress { height: 8px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
   .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
   .growth-card p { margin: 12px 0 0; color: var(--secondary-text-color); font-size: 13px; }
-  .campaign-card { border-color: rgba(var(--theme-color-rgb), .25); background: rgba(var(--theme-color-rgb), .05); }
-
   @media (max-width: 600px) { .member-summary-card,.growth-card-head { align-items: flex-start; flex-direction: column; } .membership-link { width: 100%; } }
   
   .account-inner {

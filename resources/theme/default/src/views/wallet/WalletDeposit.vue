@@ -109,18 +109,12 @@ import { useToast } from '@/composables/useToast';
 import { IconAlertCircle, IconWallet } from '@tabler/icons-vue';
 import { getUserInfo, updateRemindSettings as updateUserSettings } from '@/api/user';
 import { createOrderDeposit, getUserConfig } from '@/api/wallet';
-import { isXiaoV2board } from '@/utils/baseConfig';
 import { useRouter } from 'vue-router';
 import { WALLET_CONFIG } from '@/utils/baseConfig';
 
 const { t } = useI18n();
 const { showToast } = useToast();
 const router = useRouter();
-
-const isXiaoPanel = isXiaoV2board();
-if (!isXiaoPanel) {
-  router.push('/dashboard');
-}
 
 // 响应式数据
 const userBalance = ref(0);

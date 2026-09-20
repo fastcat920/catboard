@@ -7,12 +7,21 @@
   <meta name="description" content="{{ $description }}">
   <title>{{ $title }}</title>
   <script>
-    window.CATBOARD_THEME = @json($theme_config ?? []);
+    window.CATBOARD_THEME = Object.assign({}, @json($theme_config ?? []), {
+      title: @json($title),
+      title_zh: @json($title_zh ?? $title),
+      title_en: @json($title_en ?? $title),
+      description: @json($description),
+      description_zh: @json($description_zh ?? $description),
+      description_en: @json($description_en ?? $description),
+      logo: @json($logo ?? '')
+    });
     window.EZ_LOADER = { configFileName: '/theme/default/config.js', configTimeout: 3000, maxRetries: 2, configVersion: '{{ $version }}' };
+    if (!window.location.hash) window.location.replace(window.location.pathname + window.location.search + '#/');
   </script>
 
   <script defer src="/theme/default/static/js/756.59100790.js?v={{ $version }}"></script>
-  <script defer src="/theme/default/static/js/index.b0aba811.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/index.cbd3ca0c.js?v={{ $version }}"></script>
 </head>
 <body>
   <div id="app"></div>

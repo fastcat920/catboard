@@ -31,8 +31,17 @@ const blade = ({ css, js }) => `<!doctype html>
   <meta name="description" content="{{ $description }}">
   <title>{{ $title }}</title>
   <script>
-    window.CATBOARD_THEME = @json($theme_config ?? []);
+    window.CATBOARD_THEME = Object.assign({}, @json($theme_config ?? []), {
+      title: @json($title),
+      title_zh: @json($title_zh ?? $title),
+      title_en: @json($title_en ?? $title),
+      description: @json($description),
+      description_zh: @json($description_zh ?? $description),
+      description_en: @json($description_en ?? $description),
+      logo: @json($logo ?? '')
+    });
     window.EZ_LOADER = { configFileName: '/theme/default/config.js', configTimeout: 3000, maxRetries: 2, configVersion: '{{ $version }}' };
+    if (!window.location.hash) window.location.replace(window.location.pathname + window.location.search + '#/');
   </script>
 ${css.map(href => `  <link rel="stylesheet" href="${href.split('?')[0]}?v={{ $version }}">`).join('\n')}
 ${js.map(src => `  <script defer src="${src.split('?')[0]}?v={{ $version }}"></script>`).join('\n')}
@@ -63,10 +72,10 @@ const main = async () => {
     version: '2.0.0',
     images: '/theme/default/images/background.jpg',
     configs: [
-      { label: '主题主色', field_name: 'primary_color', field_type: 'input', default_value: '#4566AE' },
-      { label: '显示标题 Logo', field_name: 'show_logo', field_type: 'select', select_options: { '1': '显示', '0': '隐藏' }, default_value: '1' },
-      { label: '启用落地页', field_name: 'enable_landing_page', field_type: 'select', select_options: { '1': '启用', '0': '关闭' }, default_value: '1' },
-      { label: '自定义页脚 HTML', field_name: 'custom_html', field_type: 'textarea', default_value: '' }
+      { label: '主题主色', placeholder: '例如 #4566AE', field_name: 'primary_color', field_type: 'input', default_value: '#4566AE' },
+      { label: '显示标题 Logo', placeholder: '请选择是否显示', field_name: 'show_logo', field_type: 'select', select_options: { '1': '显示', '0': '隐藏' }, default_value: '1' },
+      { label: '启用落地页', placeholder: '请选择是否启用', field_name: 'enable_landing_page', field_type: 'select', select_options: { '1': '启用', '0': '关闭' }, default_value: '1' },
+      { label: '自定义页脚 HTML', placeholder: '可填写客服、统计等 HTML 或 JavaScript', field_name: 'custom_html', field_type: 'textarea', default_value: '' }
     ]
   }, null, 2) + '\n');
   console.log(`Default theme deployed to ${outputDir}`);

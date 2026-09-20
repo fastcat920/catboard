@@ -92,10 +92,10 @@
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
         </div>
 
-        <div v-if="isXiaoPanel" class="menu-item" @click="$router.push('/wallet/deposit')">
+        <div class="menu-item" @click="$router.push('/wallet/deposit')">
           <div class="menu-icon"><IconWallet :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('common.myWallet') }}</div></div>
-          <div class="menu-right"><span class="balance-text">￥{{ userBalance }}</span></div>
+          <div class="menu-right"><span class="balance-text">{{ currencySymbol }}{{ userBalance }}</span></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
         </div>
 
@@ -116,7 +116,7 @@
           </div>
         </template>
 
-        <div v-if="isXiaoPanel" class="menu-item" @click="$router.push('/gift')">
+        <div class="menu-item" @click="$router.push('/gift')">
           <div class="menu-icon"><IconGift :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('profile.giftCardTitle') }}</div></div>
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
@@ -201,7 +201,7 @@ import {
 import { useToast } from '@/composables/useToast';
 import { getUserInfo, getSubscribe, getUserConfig, startNewTrafficPeriod } from '@/api/dashboard';
 import { createOrderAfterUnpaidCleanup } from '@/utils/orderCleanup';
-import { TRAFFICLOG_CONFIG, isXiaoV2board, MORE_PAGE_CONFIG, DASHBOARD_CONFIG } from '@/utils/baseConfig';
+import { TRAFFICLOG_CONFIG, MORE_PAGE_CONFIG, DASHBOARD_CONFIG } from '@/utils/baseConfig';
 import DomainAuthAlert from '@/components/common/DomainAuthAlert.vue';
 import SubscriptionUsageCard from '@/components/subscription/SubscriptionUsageCard.vue';
 import { applyDomainAuth } from '@/utils/licenseAuth';
@@ -214,7 +214,6 @@ const { showToast } = useToast();
 const isSmallScreen = ref(false);
 const authStatus = ref({ isAuthorized: true, apiDomain: '' });
 const showTrafficLog = ref(false);
-const isXiaoPanel = isXiaoV2board();
 const morePageConfig = MORE_PAGE_CONFIG;
 
 const loading = reactive({ userInfo: true, subscribe: true });
@@ -223,6 +222,7 @@ const userPlan = ref({ name: '', expireDate: null, expiredAt: null, isExpireDate
 const userPlanId = ref(null);
 const allowNewPeriod = ref(false);
 const userBalance = ref('0.00');
+const currencySymbol = ref('¥');
 const hasPlan = ref(true);
 
 const showResetTrafficModal = ref(false);
@@ -308,7 +308,8 @@ const fetchSubscribe = async (force = false) => {
 
 const fetchUserConfig = async () => {
   try {
-    await getUserConfig();
+    const response = await getUserConfig();
+    if (response?.data?.currency_symbol) currencySymbol.value = response.data.currency_symbol;
   } catch (error) {
     console.error('获取用户配置失败:', error);
   }

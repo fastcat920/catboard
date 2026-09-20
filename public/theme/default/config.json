@@ -6,12 +6,14 @@
   "configs": [
     {
       "label": "主题主色",
+      "placeholder": "例如 #4566AE",
       "field_name": "primary_color",
       "field_type": "input",
       "default_value": "#4566AE"
     },
     {
       "label": "显示标题 Logo",
+      "placeholder": "请选择是否显示",
       "field_name": "show_logo",
       "field_type": "select",
       "select_options": {
@@ -22,6 +24,7 @@
     },
     {
       "label": "启用落地页",
+      "placeholder": "请选择是否启用",
       "field_name": "enable_landing_page",
       "field_type": "select",
       "select_options": {
@@ -32,6 +35,7 @@
     },
     {
       "label": "自定义页脚 HTML",
+      "placeholder": "可填写客服、统计等 HTML 或 JavaScript",
       "field_name": "custom_html",
       "field_type": "textarea",
       "default_value": ""

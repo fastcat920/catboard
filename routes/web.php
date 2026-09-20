@@ -38,7 +38,7 @@ Route::get('/', function (Request $request) {
         $themeService->init();
     }
 
-    $renderParams['theme_config'] = config('theme.' . config('v2board.frontend_theme', 'default'));
+    $renderParams['theme_config'] = (new ThemeService($renderParams['theme']))->resolvedConfig();
     return view('theme::' . config('v2board.frontend_theme', 'default') . '.dashboard', $renderParams);
 });
 

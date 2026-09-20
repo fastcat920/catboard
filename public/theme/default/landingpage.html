@@ -1265,20 +1265,10 @@
         }
         
         // 设置客户端下载链接
-        if (config.CLIENT_CONFIG && (config.CLIENT_CONFIG.clientLinks || config.CLIENT_CONFIG.clientLinksI18n)) {
+        if (config.CLIENT_CONFIG && config.CLIENT_CONFIG.clientLinks) {
           try {
             const clientLinks = config.CLIENT_CONFIG.clientLinks || {};
-            const storedLanguage = localStorage.getItem('language');
-            const browserLanguage = navigator.language || navigator.userLanguage || 'en-US';
-            const currentLocale = storedLanguage === 'zh-CN' || storedLanguage === 'en-US'
-              ? storedLanguage
-              : (browserLanguage.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US');
-            const fallbackLocale = currentLocale === 'zh-CN' ? 'en-US' : 'zh-CN';
-            const localizedLinks = config.CLIENT_CONFIG.clientLinksI18n || {};
-            const getClientLink = (platform) => localizedLinks[currentLocale]?.[platform]
-              || localizedLinks[fallbackLocale]?.[platform]
-              || clientLinks[platform]
-              || '';
+            const getClientLink = (platform) => clientLinks[platform] || '';
             
             // 显示/隐藏客户端下载卡片
             if (!config.CLIENT_CONFIG.showIOS) document.getElementById('iosClient').style.display = 'none';

@@ -213,6 +213,7 @@ const DEFAULT_SITE_CONFIG = {
   
   // 是否显示标题中的网站Logo (true=显示, false=隐藏)
   showLogo: true,
+  logo: '',
   
   // Landing页面多语言标语
   landingText: {
@@ -350,12 +351,6 @@ const DEFAULT_CLIENT_CONFIG = {
     openwrt: 'https://github.com/xxx/releases/latest'  // OpenWrt客户端下载链接
   },
 
-  // 可选：按当前界面语言覆盖下载链接；缺失的平台会回退到 clientLinks
-  clientLinksI18n: {
-    'zh-CN': {},
-    'en-US': {}
-  },
-  
   // ===========================================================
 
   // 订阅导入客户端显示控制

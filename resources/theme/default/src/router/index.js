@@ -2,7 +2,7 @@
  * 路由配置
  */
 import { createRouter, createWebHashHistory } from 'vue-router';
-import { SITE_CONFIG, DEFAULT_CONFIG, isBrowserRestricted, TRAFFICLOG_CONFIG, isXiaoV2board, AUTH_LAYOUT_CONFIG } from '@/utils/baseConfig';
+import { SITE_CONFIG, DEFAULT_CONFIG, isBrowserRestricted, TRAFFICLOG_CONFIG, AUTH_LAYOUT_CONFIG } from '@/utils/baseConfig';
 import i18n from '@/i18n';
 import pageCache from '@/utils/pageCache';
 
@@ -284,14 +284,6 @@ const routes = [
           titleKey: 'wallet.deposit.title',
           requiresAuth: true,
           activeNav: 'Mine' // 激活"我的"菜单
-        },
-        beforeEnter: (to, from, next) => {
-          // 如果不是Xiao-V2board面板，则重定向到仪表盘
-          if (!isXiaoV2board()) {
-            next('/dashboard');
-          } else {
-            next();
-          }
         }
       }
     ]

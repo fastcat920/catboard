@@ -814,14 +814,7 @@ export default {
     // 其他函数
     const goToShop = () => router.push('/shop');
     const goToSupport = () => router.push(window.innerWidth < 905 ? '/mobile/tickets' : '/tickets');
-    const getClientDownloadUrl = (platform) => {
-      const currentLocale = locale.value === 'zh-CN' ? 'zh-CN' : 'en-US';
-      const fallbackLocale = currentLocale === 'zh-CN' ? 'en-US' : 'zh-CN';
-      return clientConfig.clientLinksI18n?.[currentLocale]?.[platform]
-        || clientConfig.clientLinksI18n?.[fallbackLocale]?.[platform]
-        || clientConfig.clientLinks?.[platform]
-        || '';
-    };
+    const getClientDownloadUrl = (platform) => clientConfig.clientLinks?.[platform] || '';
     const downloadClient = (platform) => {
       const url = getClientDownloadUrl(platform);
       if (url) window.open(url, '_blank', 'noopener,noreferrer');

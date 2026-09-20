@@ -44,7 +44,8 @@ const applyRuntimeThemeConfig = () => {
     SITE_CONFIG: {
       siteName: theme.title || theme.site_name,
       siteDescription: theme.description,
-      showLogo: normalizeBoolean(theme.show_logo, true)
+      showLogo: normalizeBoolean(theme.show_logo, true),
+      logo: theme.logo || ''
     },
     DEFAULT_CONFIG: {
       primaryColor: theme.primary_color,

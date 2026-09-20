@@ -22,7 +22,7 @@
     <!-- 中央内容区 -->
     <div class="content-container">
       <div class="site-title">
-        <img v-if="siteConfig.showLogo" src="/theme/default/images/logo.png" alt="Logo" class="site-logo-img" />
+        <img v-if="siteConfig.showLogo" :src="siteConfig.logo || '/theme/default/images/logo.png'" alt="Logo" class="site-logo-img" />
         {{ siteConfig.siteName }}
       </div>
       <div class="landing-text">{{ $t('landing.mainText') }}</div>

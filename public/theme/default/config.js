@@ -267,22 +267,6 @@ window.EZ_CONFIG = {
       linux: 'https://github.com/xxx/releases/latest',
       openwrt: 'https://github.com/xxx/releases/latest'
     },
-
-    // 根据主题当前语言打开不同的下载页或文档页
-    clientLinksI18n: {
-      'zh-CN': {
-        ios: '/#/docs/13',
-        android: '/#/docs/2',
-        macos: '/#/docs/5',
-        windows: '/#/docs/3'
-      },
-      'en-US': {
-        ios: '/#/docs/16',
-        android: '/#/docs/14',
-        macos: '/#/docs/18',
-        windows: '/#/docs/17'
-      }
-    },
     
     // 订阅导入客户端显示控制 部分面板不支持SingBox导入请您注意检查
 

@@ -29,6 +29,16 @@
         </div>
       </div>
 
+      <!-- 礼品卡兑换方法 -->
+      <div class="dashboard-card instruction-card">
+        <div class="card-header">
+          <h3>{{ $t('profile.giftCardUseTitle') }}</h3>
+        </div>
+        <div class="settings-content">
+          <div class="instruction-content" v-html="$t('profile.giftCardUsecontent')"></div>
+        </div>
+      </div>
+
       <!-- 兑换记录 -->
       <div class="dashboard-card redemption-card">
         <div class="card-header redemption-header">
@@ -81,15 +91,6 @@
         </div>
       </div>
 
-      <!-- 礼品卡说明卡片（新增） -->
-      <div class="dashboard-card instruction-card">
-        <div class="card-header">
-          <h3>{{ $t('profile.giftCardUseTitle') }}</h3>
-        </div>
-        <div class="settings-content">
-          <div class="instruction-content" v-html="$t('profile.giftCardUsecontent')"></div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

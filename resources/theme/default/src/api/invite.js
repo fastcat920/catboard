@@ -34,14 +34,13 @@ export function getInviteData() {
  * - 获得佣金
  * - 状态
  */
-export function getInviteDetails(current, pageSize, type = '') {
+export function getInviteDetails(current, pageSize) {
   return request({
     url: '/user/invite/details',
     method: 'get',
     params: {
       current,
-      page_size: pageSize,
-      type
+      page_size: pageSize
     }
   });
 }

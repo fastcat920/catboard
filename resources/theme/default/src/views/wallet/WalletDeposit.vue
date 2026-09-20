@@ -142,6 +142,20 @@
               </tbody>
             </table>
           </div>
+          <div class="mobile-balance-records">
+            <article v-for="record in balanceRecords" :key="`mobile-${record.id}`" class="mobile-balance-record">
+              <div class="mobile-record-header">
+                <span class="mobile-record-time">{{ formatRecordTime(record.created_at) }}</span>
+                <span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span>
+              </div>
+              <div class="mobile-record-body">
+                <span class="record-type">{{ recordTypeLabel(record.type) }}</span>
+                <strong class="mobile-record-amount" :class="record.amount >= 0 ? 'income' : 'expense'">
+                  {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
+                </strong>
+              </div>
+            </article>
+          </div>
           <div class="records-pagination">
             <span>{{ $t('wallet.records.total', { total: recordsTotal }) }}</span>
             <div class="pagination-actions">
@@ -781,6 +795,7 @@ onMounted(() => {
     }
 
     .records-table-wrap { overflow-x: auto; }
+    .mobile-balance-records { display: none; }
     .records-table {
       width: 100%;
       table-layout: fixed;
@@ -805,6 +820,27 @@ onMounted(() => {
     .status-badge { color: #15803d; background: rgba(34, 197, 94, .12); }
     .status-badge.reversed, .status-badge.failed { color: #b91c1c; background: rgba(239, 68, 68, .12); }
     .status-badge.pending { color: #b45309; background: rgba(245, 158, 11, .12); }
+
+    .mobile-balance-record {
+      padding: 12px;
+      background: var(--input-background);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-card-compact);
+    }
+    .mobile-record-header,
+    .mobile-record-body {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .mobile-record-header {
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--divider-color);
+    }
+    .mobile-record-body { padding-top: 10px; }
+    .mobile-record-time { color: var(--secondary-text-color); font-size: 12px; }
+    .mobile-record-amount { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
     .records-pagination {
       display: flex;
@@ -875,12 +911,8 @@ onMounted(() => {
     }
 
     .records-card {
-      .records-table thead { display: none; }
-      .records-table, .records-table tbody, .records-table tr, .records-table td { display: block; width: 100%; }
-      .records-table tr { padding: 11px 0; border-bottom: 1px solid var(--card-border); }
-      .records-table tr:last-child { border-bottom: 0; }
-      .records-table td { padding: 3px 0; border: 0; text-align: left; }
-      .records-table .amount-cell { margin-top: 4px; text-align: left; font-size: 15px; }
+      .records-table-wrap { display: none; }
+      .mobile-balance-records { display: grid; gap: 10px; }
       .records-pagination { align-items: flex-start; flex-direction: column; }
       .pagination-actions { width: 100%; justify-content: space-between; }
     }

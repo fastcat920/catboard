@@ -199,19 +199,10 @@
         <div v-if="activeTab === 'records'" class="card-body">
           <div class="tab-content-toolbar">
             <span><IconReceipt :size="16" />{{ $t('invite.records.title') }}</span>
-            <div class="record-toolbar-actions">
-              <select v-model="recordFilter" class="record-filter" @change="fetchInviteDetails(1)">
-                <option value="">{{ $t('invite.records.types.all') }}</option>
-                <option value="income">{{ $t('invite.records.types.filterIncome') }}</option>
-                <option value="transfer">{{ $t('invite.records.types.filterTransfer') }}</option>
-                <option value="withdrawal">{{ $t('invite.records.types.filterWithdrawal') }}</option>
-                <option value="reversal">{{ $t('invite.records.types.filterReversal') }}</option>
-              </select>
-              <button class="btn-action" @click="refreshRecords" :disabled="loading.inviteDetails">
-                <IconRefresh class="action-icon" :class="{ spin: loading.inviteDetails }" />
-                {{ loading.inviteDetails ? $t('invite.records.refreshing') : $t('invite.records.refresh') }}
-              </button>
-            </div>
+            <button class="btn-action" @click="refreshRecords" :disabled="loading.inviteDetails">
+              <IconRefresh class="action-icon" :class="{ spin: loading.inviteDetails }" />
+              {{ loading.inviteDetails ? $t('invite.records.refreshing') : $t('invite.records.refresh') }}
+            </button>
           </div>
           <div v-if="loading.inviteDetails" class="skeleton-loading">
             <div class="skeleton-table">
@@ -537,7 +528,6 @@ export default {
     });
     const currentCommissionRate = computed(() => Number(referralProgram.value?.commission_rate ?? inviteStats.commissionRate ?? 0));
     const inviteRecords = ref([]);
-    const recordFilter = ref('');
     const milestoneProgress = computed(() => referralProgram.value?.next_milestone
       ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
       : 100);
@@ -700,7 +690,7 @@ export default {
       loading.inviteDetails = true;
       currentPage.value = page;
       try {
-        const res = await getInviteDetails(page, pageSize.value, recordFilter.value);
+        const res = await getInviteDetails(page, pageSize.value);
         if (res.data) {
           inviteRecords.value = Array.isArray(res.data) ? res.data.map(record => ({
             id: record.id,
@@ -879,7 +869,6 @@ export default {
       inviteStats,
       walletBalance,
       inviteRecords,
-      recordFilter,
       currencySymbol,
       copyInviteCode,
       copyInviteLink,
@@ -1155,13 +1144,11 @@ export default {
         
         .code-value {
           min-width: 0;
-          flex: 1;
-          overflow: hidden;
+          flex: 0 0 auto;
           font-size: 16px;
           font-weight: 600;
           color: var(--text-color, #1f2937);
           font-family: monospace;
-          text-overflow: ellipsis;
           white-space: nowrap;
         }
         
@@ -1174,11 +1161,13 @@ export default {
       
       .code-actions {
         display: flex;
-        gap: 6px;
+        gap: 4px;
         flex-shrink: 0;
         
         .btn-primary.tiny {
-          padding: 4px 10px;
+          width: auto;
+          min-width: 0;
+          padding: 4px 7px;
           height: 28px;
           font-size: 11px;
           white-space: nowrap;
@@ -1505,8 +1494,6 @@ export default {
   > span svg { color: var(--theme-color); }
   .btn-action { color: #fff !important; background: var(--theme-color) !important; }
 }
-.record-toolbar-actions { display: flex; align-items: center; gap: 8px; }
-.record-filter { min-width: 128px; height: 36px; padding: 0 30px 0 10px; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 9px; background: var(--card-bg-color, #fff); }
 .amount-income { color: #16a34a !important; }
 .amount-expense { color: #dc2626 !important; }
 
@@ -1517,8 +1504,6 @@ export default {
   .combined-card .tab-header .card-actions { margin: 6px 0 0; }
   .combined-card .tab-header .btn-action { width: 100%; justify-content: center; }
   .tab-content-toolbar { align-items: flex-start; flex-direction: column; }
-  .record-toolbar-actions { width: 100%; }
-  .record-filter { flex: 1; min-width: 0; }
 }
 
 /* 暗黑模式修复：卡片背景与页面背景一致（不独立），弹窗背景独立 */

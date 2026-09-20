@@ -923,12 +923,7 @@ export default {
         withdrawal: '提现申请',
         withdrawal_refund: '提现退回',
         commission_reversal: '佣金撤销',
-        admin_adjustment: '后台调整',
-        filterIncome: '收入',
-        filterTransfer: '划转',
-        filterWithdrawal: '提现',
-        filterReversal: '撤销与退回',
-        all: '全部记录'
+        admin_adjustment: '后台调整'
       }
     }
   },

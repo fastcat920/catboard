@@ -876,12 +876,7 @@ export default {
         withdrawal: 'Withdrawal request',
         withdrawal_refund: 'Withdrawal refund',
         commission_reversal: 'Commission reversal',
-        admin_adjustment: 'Admin adjustment',
-        filterIncome: 'Income',
-        filterTransfer: 'Transfers',
-        filterWithdrawal: 'Withdrawals',
-        filterReversal: 'Reversals & refunds',
-        all: 'All records'
+        admin_adjustment: 'Admin adjustment'
       }
     }
   },

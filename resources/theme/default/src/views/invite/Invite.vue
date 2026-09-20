@@ -49,13 +49,15 @@
       </div>
 
       <section v-if="referralProgram" class="member-summary-card">
-        <div class="member-level-info">
-          <span>{{ $t('invite.currentLevel') }}</span>
-          <h2>{{ localizedLevel(referralProgram.level) || $t('invite.defaultMember') }}</h2>
-        </div>
-        <div class="member-commission-rate">
-          <span>{{ $t('invite.commissionRate') }}</span>
-          <strong>{{ currentCommissionRate }}%</strong>
+        <div class="member-overview-row">
+          <div class="member-level-info">
+            <span>{{ $t('invite.currentLevel') }}</span>
+            <h2>{{ localizedLevel(referralProgram.level) || $t('invite.defaultMember') }}</h2>
+          </div>
+          <div class="member-commission-rate">
+            <span>{{ $t('invite.commissionRate') }}</span>
+            <strong>{{ currentCommissionRate }}%</strong>
+          </div>
         </div>
         <button class="membership-link" @click="$router.push('/membership')">{{ $t('invite.viewMembershipBenefits') }}</button>
       </section>
@@ -932,6 +934,7 @@ export default {
 
   .member-summary-card,.growth-card { margin-bottom: 18px; padding: 20px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--card-bg-color, #fff); }
   .member-summary-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+  .member-overview-row { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 18px; }
   .member-summary-card span,.growth-card span { color: var(--secondary-text-color); font-size: 13px; }
   .member-summary-card h2,.growth-card h3 { margin: 5px 0 0; color: var(--text-color); }
   .member-commission-rate { margin-left: auto; text-align: right; }
@@ -942,7 +945,7 @@ export default {
   .growth-progress { height: 8px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
   .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
   .growth-card p { margin: 12px 0 0; color: var(--secondary-text-color); font-size: 13px; }
-  @media (max-width: 600px) { .member-summary-card,.growth-card-head { align-items: flex-start; flex-direction: column; } .member-commission-rate { margin-left: 0; text-align: left; } .membership-link { width: 100%; } }
+  @media (max-width: 600px) { .member-summary-card { align-items: stretch; flex-direction: column; } .member-overview-row,.growth-card-head { width: 100%; align-items: center; flex-direction: row; } .member-commission-rate { margin-left: auto; text-align: right; } .membership-link { width: 100%; } }
   
   .account-inner {
     width: 100%;

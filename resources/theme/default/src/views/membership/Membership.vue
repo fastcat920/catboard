@@ -4,13 +4,15 @@
     <div v-else-if="error" class="state error">{{ error }}</div>
     <template v-else>
       <section class="hero">
-        <div><span>{{ text.membership }}</span><h1>{{ levelName(program.level) || text.normal }}</h1><p>{{ levelDescription(program.level) || text.normalDescription }}</p></div>
+        <div class="membership-overview">
+          <div class="membership-copy"><span>{{ text.membership }}</span><h1>{{ levelName(program.level) || text.normal }}</h1><p>{{ levelDescription(program.level) || text.normalDescription }}</p></div>
+          <div class="membership-validity"><span>{{ text.validity }}：</span><strong>{{ expiry }}</strong></div>
+        </div>
         <div class="benefits">
           <div><small>{{ text.commission }}</small><strong>{{ program.commission_rate ?? program.level?.commission_rate ?? program.setting?.base_commission_rate ?? 0 }}%</strong></div>
           <div><small>{{ text.discount }}</small><strong>{{ program.level?.member_discount ?? 0 }}%</strong></div>
           <div><small>{{ text.effective }}</small><strong>{{ program.effective_invites || 0 }}</strong></div>
           <div><small>{{ text.revenue }}</small><strong>¥{{ revenue }}</strong></div>
-          <div class="validity-benefit"><small>{{ text.validity }}</small><strong>{{ expiry }}</strong></div>
         </div>
       </section>
 
@@ -49,5 +51,37 @@ onMounted(async()=>{try{const result=await getInviteData();program.value=result.
 </script>
 
 <style scoped lang="scss">
-.membership-page{max-width:980px;margin:0 auto;padding:18px 20px 50px;color:var(--text-color)}.hero{display:flex;justify-content:space-between;gap:30px;padding:34px;border-radius:24px;background:linear-gradient(135deg,#263d78,var(--theme-color));color:white;box-shadow:0 18px 45px rgba(38,61,120,.2)}.hero span,.hero small{opacity:.76}.hero h1{font-size:34px;margin:8px 0}.hero p{max-width:480px;margin:0;opacity:.82}.benefits{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;min-width:390px}.benefits div{display:flex;flex-direction:column;justify-content:center;padding:16px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(255,255,255,.1)}.benefits strong{font-size:23px;margin-top:8px}.benefits .validity-benefit{grid-column:1/-1}.benefits .validity-benefit strong{font-size:16px}.progress-card{margin-top:18px;background:var(--card-background);border:1px solid var(--border-color);border-radius:20px;padding:24px}.progress-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.progress-heading>strong{text-align:right}.progress-heading h2{margin:4px 0}.next-benefits{display:flex;gap:10px;margin:18px 0 12px}.next-benefits span{padding:9px 12px;border-radius:10px;color:var(--secondary-text-color);background:rgba(var(--theme-color-rgb),.08)}.next-benefits strong{margin-left:5px;color:var(--theme-color)}.progress{height:10px;background:rgba(var(--theme-color-rgb),.12);border-radius:20px;overflow:hidden}.progress i{display:block;height:100%;background:var(--theme-color);border-radius:inherit}.progress-card p{color:var(--secondary-text-color);margin-bottom:0}@media(max-width:760px){.membership-page{padding:8px 10px 100px}.hero{display:block;padding:24px}.benefits{min-width:0;margin-top:22px}.hero h1{font-size:28px}.progress-heading{align-items:flex-start;flex-direction:column}.progress-heading>strong{text-align:left}.next-benefits{flex-direction:column}}
+.membership-page { max-width: 980px; margin: 0 auto; padding: 18px 20px 50px; color: var(--text-color); }
+.hero { display: flex; justify-content: space-between; gap: 30px; padding: 34px; border-radius: 24px; background: linear-gradient(135deg, #263d78, var(--theme-color)); color: white; box-shadow: 0 18px 45px rgba(38, 61, 120, .2); }
+.hero span, .hero small { opacity: .76; }
+.membership-overview { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.hero h1 { margin: 8px 0; font-size: 34px; }
+.hero p { max-width: 480px; margin: 0; opacity: .82; }
+.membership-validity { margin-top: auto; padding-top: 24px; font-size: 14px; }
+.membership-validity strong { font-size: 15px; }
+.benefits { display: grid; min-width: 390px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.benefits div { display: flex; padding: 16px; flex-direction: column; justify-content: center; border: 1px solid rgba(255, 255, 255, .18); border-radius: 16px; background: rgba(255, 255, 255, .1); }
+.benefits strong { margin-top: 8px; font-size: 23px; }
+.progress-card { margin-top: 18px; padding: 24px; background: var(--card-background); border: 1px solid var(--border-color); border-radius: 20px; }
+.progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.progress-heading > div { min-width: 0; }
+.progress-heading > strong { flex: 0 0 auto; text-align: right; }
+.progress-heading h2 { margin: 4px 0; }
+.next-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 18px 0 12px; }
+.next-benefits span { padding: 9px 12px; color: var(--secondary-text-color); background: rgba(var(--theme-color-rgb), .08); border-radius: 10px; }
+.next-benefits strong { margin-left: 5px; color: var(--theme-color); }
+.progress { height: 10px; overflow: hidden; background: rgba(var(--theme-color-rgb), .12); border-radius: 20px; }
+.progress i { display: block; height: 100%; background: var(--theme-color); border-radius: inherit; }
+.progress-card p { margin-bottom: 0; color: var(--secondary-text-color); }
+@media (max-width: 760px) {
+  .membership-page { padding: 8px 10px 100px; }
+  .hero { display: block; padding: 24px; }
+  .membership-overview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+  .membership-validity { margin: 0; padding: 0; text-align: right; }
+  .membership-validity span, .membership-validity strong { display: block; }
+  .benefits { min-width: 0; margin-top: 22px; }
+  .hero h1 { font-size: 28px; }
+  .progress-heading { align-items: center; }
+  .progress-heading > strong { text-align: right; }
+}
 </style>

@@ -100,14 +100,18 @@ export default {
   position: relative;
   z-index: 3;
   width: 100%;
-  max-width: 940px;
+  max-width: var(--page-max-width);
   min-height: 40px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
+
+  @media (max-width: 767px) {
+    padding-inline: 16px;
+  }
 }
 
 .route-page-title {

@@ -52,8 +52,9 @@ DROP TABLE IF EXISTS `v2_referral_level`;
 CREATE TABLE `v2_referral_level` (
   `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL,
   `description` varchar(255) DEFAULT NULL, `description_en` varchar(255) DEFAULT NULL,
-  `required_invites` int unsigned NOT NULL DEFAULT '0', `commission_rate` tinyint unsigned NOT NULL DEFAULT '10',
-  `valid_days` smallint unsigned NOT NULL DEFAULT '0', `retain_invites` int unsigned NOT NULL DEFAULT '0',
+  `required_invites` int unsigned NOT NULL DEFAULT '0', `required_revenue` bigint unsigned NOT NULL DEFAULT '0',
+  `commission_rate` tinyint unsigned NOT NULL DEFAULT '10', `member_discount` tinyint unsigned NOT NULL DEFAULT '0',
+  `valid_days` smallint unsigned NOT NULL DEFAULT '0', `retain_invites` int unsigned NOT NULL DEFAULT '0', `retain_revenue` bigint unsigned NOT NULL DEFAULT '0',
   `sort` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

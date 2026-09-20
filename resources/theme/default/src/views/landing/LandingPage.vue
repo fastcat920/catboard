@@ -22,7 +22,7 @@
     <!-- 中央内容区 -->
     <div class="content-container">
       <div class="site-title">
-        <img v-if="siteConfig.showLogo" :src="siteConfig.logo || '/theme/default/images/logo.png'" alt="Logo" class="site-logo-img" />
+        <img v-if="siteConfig.showLogo" :src="siteConfig.logo || '/theme/default/images/logo.png'" alt="Logo" class="site-logo-img" @error="useFallbackLogo" />
         {{ siteConfig.siteName }}
       </div>
       <div class="landing-text">{{ $t('landing.mainText') }}</div>
@@ -103,13 +103,19 @@ export default {
       // 应用域名授权验证
       authStatus.value = applyDomainAuth();
     });
+
+    const useFallbackLogo = event => {
+      if (event.target.src.endsWith('/theme/default/images/logo.png')) return;
+      event.target.src = '/theme/default/images/logo.png';
+    };
     
     return {
       siteConfig,
       isDarkTheme,
       isTransitioning,
       navigateToLogin,
-      authStatus
+      authStatus,
+      useFallbackLogo
     };
   }
 };

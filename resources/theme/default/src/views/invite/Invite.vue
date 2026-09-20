@@ -35,12 +35,13 @@
         </div>
         <div class="program-metrics">
           <div><small>{{ locale === 'en-US' ? 'Qualified referrals' : '有效邀请' }}</small><strong>{{ referralProgram.effective_invites || 0 }}</strong></div>
+          <div><small>{{ locale === 'en-US' ? 'Referral revenue' : '邀请成交额' }}</small><strong>{{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }}</strong></div>
           <div><small>{{ locale === 'en-US' ? 'Commission' : '返佣比例' }}</small><strong>{{ referralProgram.level?.commission_rate ?? referralProgram.setting?.base_commission_rate ?? 0 }}%</strong></div>
           <div><small>{{ locale === 'en-US' ? 'Member discount' : '会员优惠' }}</small><strong>{{ referralProgram.level?.member_discount || 0 }}%</strong></div>
         </div>
         <div v-if="referralProgram.next_level" class="program-progress">
           <span>{{ locale === 'en-US' ? 'Next: ' : '下一等级：' }}{{ localizedLevel(referralProgram.next_level) }}</span>
-          <b>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_level.required_invites }}</b>
+          <b>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_level.required_invites }} · {{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }}/{{ currencySymbol }}{{ formatAmount(referralProgram.next_level.required_revenue || 0) }}</b>
           <i><em :style="{width: levelProgress + '%'}"></em></i>
         </div>
         <div v-if="referralProgram.campaign" class="campaign-strip">
@@ -540,7 +541,14 @@ export default {
       availableCommission: 0
     });
     const inviteRecords = ref([]);
-    const levelProgress = computed(() => referralProgram.value?.next_level ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_level.required_invites)) * 100) : 100);
+    const levelProgress = computed(() => {
+      const program = referralProgram.value;
+      if (!program?.next_level) return 100;
+      const inviteProgress = Number(program.effective_invites || 0) / Math.max(1, Number(program.next_level.required_invites || 1)) * 100;
+      const requiredRevenue = Number(program.next_level.required_revenue || 0);
+      const revenueProgress = requiredRevenue ? Number(program.referral_revenue || 0) / requiredRevenue * 100 : 100;
+      return Math.min(100, inviteProgress, revenueProgress);
+    });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     const localizedDescription = row => !row ? '' : (locale.value === 'en-US' ? row.description_en : row.description) || row.description || row.description_en || '';
     const localizedCampaign = (row, key) => !row ? '' : (locale.value === 'en-US' ? row[`${key}_en`] : row[key]) || row[key] || row[`${key}_en`] || '';
@@ -926,7 +934,7 @@ export default {
   .program-level span, .program-level p, .program-metrics small { opacity: .78; }
   .program-level h2 { margin: 6px 0; font-size: 28px; }
   .program-level p { margin: 0 0 18px; }
-  .program-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .program-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .program-metrics div { display: flex; flex-direction: column; padding: 13px; border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(255,255,255,.09); }
   .program-metrics strong { margin-top: 5px; font-size: 20px; }
   .program-progress { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 16px; }

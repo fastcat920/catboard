@@ -180,13 +180,22 @@ class ReferralProgramService
 
     private function upgradeLevel(int $userId, int $effectiveCount, Order $order): void
     {
+        $revenue = (int)Order::where('invite_user_id', $userId)->where('status', 3)->sum('total_amount');
         $level = ReferralLevel::where('enabled', 1)
             ->where('required_invites', '<=', $effectiveCount)
+            ->where('required_revenue', '<=', $revenue)
             ->orderBy('required_invites', 'DESC')
+            ->orderBy('required_revenue', 'DESC')
+            ->orderBy('sort', 'DESC')
             ->first();
         if (!$level) return;
         $user = User::find($userId);
-        if (!$user || (int)$user->commission_rate >= (int)$level->commission_rate) return;
+        if (!$user || (int)$user->referral_level_id === (int)$level->id) return;
+        if ($user->referral_level_id) {
+            $current = ReferralLevel::find($user->referral_level_id);
+            if ($current && (int)$current->required_invites >= (int)$level->required_invites
+                && (int)$current->required_revenue >= (int)$level->required_revenue) return;
+        }
         $user->commission_rate = $level->commission_rate;
         $user->referral_level_id = $level->id;
         $user->referral_level_expires_at = $level->valid_days ? time() + (int)$level->valid_days * 86400 : null;

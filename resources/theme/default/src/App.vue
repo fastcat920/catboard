@@ -4,7 +4,7 @@
     <div class="static-layout" v-if="$route.meta.requiresAuth">
       <!-- 网站名称 -->
       <div class="site-logo">
-        <img v-if="siteConfig.showLogo" :src="siteConfig.logo || '/theme/default/images/logo.png'" alt="Logo" class="site-logo-img" />
+        <img v-if="siteConfig.showLogo" :src="siteConfig.logo || '/theme/default/images/logo.png'" alt="Logo" class="site-logo-img" @error="useFallbackLogo" />
         {{ siteConfig.siteName }}
       </div>
       
@@ -336,6 +336,11 @@ export default {
       window.removeEventListener('languageChanged', onLanguageChanged);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     });
+
+    const useFallbackLogo = event => {
+      if (event.target.src.endsWith('/theme/default/images/logo.png')) return;
+      event.target.src = '/theme/default/images/logo.png';
+    };
     
     return {
       username,
@@ -343,7 +348,8 @@ export default {
       siteConfig,
       PROFILE_CONFIG,
       cachedRoutes,
-      customerServiceConfig
+      customerServiceConfig,
+      useFallbackLogo
     };
   }
 };

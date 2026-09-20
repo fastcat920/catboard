@@ -552,6 +552,9 @@ export default {
   shop: {
     title: 'Store',
     description: 'View and purchase available plans',
+    limited_offer: 'Limited offer',
+    ends_in: 'Ends in',
+    sale_countdown: '{days}d {hours}h {minutes}m',
     loading: 'Loading plans...',
     filter: {
       all: 'All',

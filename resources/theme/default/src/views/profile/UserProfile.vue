@@ -1338,6 +1338,7 @@ onUnmounted(() => {
 
 .account-actions-card {
   display: flex;
+  align-items: center;
   justify-content: center;
   padding: 16px;
 }
@@ -1362,6 +1363,8 @@ onUnmounted(() => {
 }
 .logout-button {
   min-width: 220px;
+  margin-left: auto;
+  margin-right: auto;
   color: #475569;
   background: #f1f5f9;
   border-color: #dbe3ed;

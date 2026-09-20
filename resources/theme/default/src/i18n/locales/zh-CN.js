@@ -597,6 +597,9 @@ export default {
   shop: {
     title: '商店',
     description: '查看并购买可用的套餐',
+    limited_offer: '限时优惠',
+    ends_in: '距结束',
+    sale_countdown: '{days}天 {hours}小时 {minutes}分',
     loading: '正在加载套餐...',
     filter: {
       all: '全部',

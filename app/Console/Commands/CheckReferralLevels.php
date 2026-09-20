@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ReferralLevel;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -34,13 +35,19 @@ class CheckReferralLevels extends Command
             $periodStart = time() - max(1, (int)$level->valid_days) * 86400;
             $recent = ReferralReward::where('user_id', $user->id)->where('reward_type', 'effective_invite')
                 ->where('status', 'granted')->where('created_at', '>=', $periodStart)->count();
-            if ($level->valid_days && $recent >= (int)$level->retain_invites) {
+            $recentRevenue = (int)Order::where('invite_user_id', $user->id)->where('status', 3)
+                ->where('created_at', '>=', $periodStart)->sum('total_amount');
+            if ($level->valid_days && $recent >= (int)$level->retain_invites && $recentRevenue >= (int)$level->retain_revenue) {
                 $user->referral_level_expires_at = time() + (int)$level->valid_days * 86400;
                 $user->save();
                 return;
             }
-            $lower = ReferralLevel::where('enabled', 1)->where('required_invites', '<', $level->required_invites)
-                ->orderBy('required_invites', 'DESC')->first();
+            $lower = ReferralLevel::where('enabled', 1)->where('id', '!=', $level->id)
+                ->where('required_invites', '<=', $recent)->where('required_revenue', '<=', $recentRevenue)
+                ->where(function ($query) use ($level) {
+                    $query->where('required_invites', '<', $level->required_invites)
+                        ->orWhere('required_revenue', '<', $level->required_revenue);
+                })->orderBy('required_invites', 'DESC')->orderBy('required_revenue', 'DESC')->first();
             $setting = ReferralSetting::current();
             $user->referral_level_id = $lower ? $lower->id : null;
             $user->referral_level_expires_at = $lower && $lower->valid_days ? time() + (int)$lower->valid_days * 86400 : null;

@@ -32,7 +32,7 @@
         <div class="plan-card" v-else v-for="plan in filteredPlans" :key="plan.id">
           <div class="card-header">
             <h2 class="card-title">{{ plan.name }}</h2>
-            <span v-if="getLowestPriceInfo(plan).sale" class="sale-badge">{{ locale === 'en-US' ? 'Limited offer' : '限时优惠' }}</span>
+            <span v-if="getLowestPriceInfo(plan).sale" class="sale-badge">{{ $t('shop.limited_offer') }}</span>
           </div>
           <div class="card-body">
             <div class="price-display">
@@ -41,7 +41,7 @@
               <del v-if="getLowestPriceInfo(plan).original">{{ currencySymbol }}{{ getLowestPriceInfo(plan).original }}</del>
               <span class="period">/ {{ $t(`shop.plan.price_options.${getPriceTypeKey(getLowestPriceInfo(plan).type)}`) }}</span>
             </div>
-            <div v-if="getLowestPriceInfo(plan).sale" class="sale-countdown">{{ locale === 'en-US' ? 'Ends in ' : '距结束 ' }}{{ saleCountdown(getLowestPriceInfo(plan).sale.ends_at) }}</div>
+            <div v-if="getLowestPriceInfo(plan).sale" class="sale-countdown">{{ $t('shop.ends_in') }} {{ saleCountdown(getLowestPriceInfo(plan).sale.ends_at) }}</div>
 
             <div class="plan-metrics">
               <div class="plan-metric">
@@ -237,7 +237,7 @@ export default {
     const saleCountdown = endsAt => {
       const seconds = Math.max(0, Number(endsAt || 0) - Math.floor(Date.now() / 1000));
       const days = Math.floor(seconds / 86400); const hours = Math.floor(seconds % 86400 / 3600); const minutes = Math.floor(seconds % 3600 / 60);
-      return locale.value === 'en-US' ? `${days}d ${hours}h ${minutes}m` : `${days}天 ${hours}小时 ${minutes}分`;
+      return t('shop.sale_countdown', { days, hours, minutes });
     };
 
     const formatSpeedLimit = (limit) => {

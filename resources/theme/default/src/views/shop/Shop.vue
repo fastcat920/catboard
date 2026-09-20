@@ -35,38 +35,40 @@
             <span v-if="getLowestPriceInfo(plan).sale" class="sale-badge">{{ $t('shop.limited_offer') }}</span>
           </div>
           <div class="card-body">
-            <div class="price-display">
-              <span class="currency">{{ currencySymbol }}</span>
-              <span class="amount">{{ getLowestPriceInfo(plan).price }}</span>
-              <del v-if="getLowestPriceInfo(plan).original">{{ currencySymbol }}{{ getLowestPriceInfo(plan).original }}</del>
-              <span class="period">/ {{ $t(`shop.plan.price_options.${getPriceTypeKey(getLowestPriceInfo(plan).type)}`) }}</span>
-            </div>
-            <div v-if="getLowestPriceInfo(plan).sale" class="sale-countdown">{{ $t('shop.ends_in') }} {{ saleCountdown(getLowestPriceInfo(plan).sale.ends_at) }}</div>
+            <div class="plan-content">
+              <div class="price-display">
+                <span class="currency">{{ currencySymbol }}</span>
+                <span class="amount">{{ getLowestPriceInfo(plan).price }}</span>
+                <del v-if="getLowestPriceInfo(plan).original">{{ currencySymbol }}{{ getLowestPriceInfo(plan).original }}</del>
+                <span class="period">/ {{ $t(`shop.plan.price_options.${getPriceTypeKey(getLowestPriceInfo(plan).type)}`) }}</span>
+              </div>
+              <div v-if="getLowestPriceInfo(plan).sale" class="sale-countdown">{{ $t('shop.ends_in') }} {{ saleCountdown(getLowestPriceInfo(plan).sale.ends_at) }}</div>
 
-            <div class="plan-metrics">
-              <div class="plan-metric">
-                <IconCloud :size="20" />
-                <strong>{{ formatTraffic(plan.transfer_enable) }}</strong>
-              </div>
-              <div class="plan-metric">
-                <IconGauge :size="20" />
-                <strong>{{ formatSpeedLimit(plan.speed_limit) }}</strong>
-              </div>
-              <div class="plan-metric">
-                <IconDevices :size="20" />
-                <strong>{{ formatDeviceLimit(plan.device_limit) }}</strong>
-              </div>
-            </div>
-
-            <div v-if="plan.content" class="plan-description">
-              <div v-if="isJsonContent(plan.content)" class="feature-list">
-                <div v-for="(feature, index) in parseJsonContent(plan.content)" :key="index" class="feature-item">
-                  <IconCheck v-if="feature.support" class="feature-icon enabled" />
-                  <IconX v-else class="feature-icon disabled" />
-                  <span :class="{ 'disabled-text': !feature.support }">{{ feature.feature }}</span>
+              <div class="plan-metrics">
+                <div class="plan-metric">
+                  <IconCloud :size="20" />
+                  <strong>{{ formatTraffic(plan.transfer_enable) }}</strong>
+                </div>
+                <div class="plan-metric">
+                  <IconGauge :size="20" />
+                  <strong>{{ formatSpeedLimit(plan.speed_limit) }}</strong>
+                </div>
+                <div class="plan-metric">
+                  <IconDevices :size="20" />
+                  <strong>{{ formatDeviceLimit(plan.device_limit) }}</strong>
                 </div>
               </div>
-              <div v-else class="html-content" v-html="sanitizeHtml(plan.content)"></div>
+
+              <div v-if="plan.content" class="plan-description">
+                <div v-if="isJsonContent(plan.content)" class="feature-list">
+                  <div v-for="(feature, index) in parseJsonContent(plan.content)" :key="index" class="feature-item">
+                    <IconCheck v-if="feature.support" class="feature-icon enabled" />
+                    <IconX v-else class="feature-icon disabled" />
+                    <span :class="{ 'disabled-text': !feature.support }">{{ feature.feature }}</span>
+                  </div>
+                </div>
+                <div v-else class="html-content" v-html="sanitizeHtml(plan.content)"></div>
+              </div>
             </div>
 
             <!-- 购买按钮 -->

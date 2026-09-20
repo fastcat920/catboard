@@ -447,6 +447,12 @@ body #app .shop-container .plan-card .card-body {
   flex-direction: column;
 }
 
+body #app .shop-container .plan-card .plan-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
 body #app .shop-container .price-display {
   min-height: 42px;
   flex-wrap: wrap;
@@ -482,7 +488,7 @@ body #app .shop-container .plan-metric {
 
 body #app .shop-container .btn-purchase {
   width: 100%;
-  margin-top: auto;
+  margin-top: 20px;
 }
 
 /* Checkout and payment: two balanced columns on desktop, one clear flow on mobile. */
@@ -671,10 +677,6 @@ body #app :is(.profile-container, .more-container) :is(.setting-item, .password-
 }
 
 @media (min-width: map.get($breakpoints, xl)) {
-  body #app .shop-container .plans-wrapper {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   body #app .shop-container .plan-card:only-child {
     max-width: 420px;
     grid-column: 1 / -1;

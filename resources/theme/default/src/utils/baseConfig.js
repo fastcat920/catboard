@@ -62,7 +62,7 @@ export const isXboard = () => {
 
 // 获取API基础URL的函数
 export const getApiBaseUrl = () => {
-  // 完全依赖config.js中的配置
+  // 使用主题运行时配置；未设置时请求当前站点的相对 API 地址。
   if (typeof window !== 'undefined' && window.EZ_CONFIG) {
     // 首先检查是否启用中间件代理
     if (window.EZ_CONFIG.API_MIDDLEWARE_ENABLED === true && window.EZ_CONFIG.API_MIDDLEWARE_URL) {
@@ -136,7 +136,7 @@ export const getApiBaseUrl = () => {
     }
   }
   
-  // 如果config.js中没有任何API相关配置，返回空字符串
+  // 如果没有任何 API 相关配置，返回空字符串
   return '';
 };
 
@@ -233,7 +233,7 @@ const DEFAULT_BASE_CONFIG = {
   defaultLanguage: 'zh-CN',
   
   // 默认主题 ('light' 或 'dark') TODO
-  defaultTheme: 'dark',
+  defaultTheme: 'light',
 
   // 主题色 (16进制颜色值) TODO
   primaryColor: '#4566AE',
@@ -331,22 +331,22 @@ export const TRAFFICLOG_CONFIG = mergeDeep(DEFAULT_TRAFFICLOG_CONFIG, getConfig(
  */
 const DEFAULT_CLIENT_CONFIG = {
   // 整个下载卡片显示控制 TODO
-  showDownloadCard: false,  // 设置为false将隐藏整个客户端下载卡片
+  showDownloadCard: true,  // 设置为false将隐藏整个客户端下载卡片
 
   // 平台显示控制 (true=显示, false=隐藏)
-  showIOS: false,         // iOS客户端显示控制
-  showAndroid: false,     // Android客户端显示控制
-  showMacOS: false,       // MacOS客户端显示控制
-  showWindows: false,     // Windows客户端显示控制
+  showIOS: true,         // iOS客户端显示控制
+  showAndroid: true,     // Android客户端显示控制
+  showMacOS: true,       // MacOS客户端显示控制
+  showWindows: true,     // Windows客户端显示控制
   showLinux: false,       // Linux客户端显示控制
   showOpenWrt: false,     // OpenWrt客户端显示控制
 
   // 客户端下载链接
   clientLinks: {
-    ios: 'https://apps.apple.com/app/xxx',         // iOS客户端下载链接
-    android: 'https://play.google.com/store/apps/xxx', // Android客户端下载链接
-    macos: 'https://github.com/xxx/releases/latest',     // MacOS客户端下载链接
-    windows: 'https://github.com/xxx/releases/latest', // Windows客户端下载链接
+    ios: '/#/docs/13',
+    android: '/#/docs/2',
+    macos: '/#/docs/5',
+    windows: '/#/docs/3',
     linux: 'https://github.com/xxx/releases/latest',     // Linux客户端下载链接
     openwrt: 'https://github.com/xxx/releases/latest'  // OpenWrt客户端下载链接
   },

@@ -1,6 +1,6 @@
 /**
  * API可用性检测器
- * 检测config.js中配置的多个API地址，使用第一个可用的地址
+ * 检测主题内置配置中的多个 API 地址，使用第一个可用的地址
  */
 // 注意：此模块在应用启动早期会被 baseConfig 引用，
 // 如果在此处直接静态导入 router 会导致循环依赖，
@@ -118,4 +118,4 @@ export {
   getAvailableApiUrl, 
   initApiAvailabilityChecker,
   shouldCheckApiAvailability
-}; 
+};

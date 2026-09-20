@@ -16,12 +16,11 @@
       description_en: @json($description_en ?? $description),
       logo: @json($logo ?? '')
     });
-    window.EZ_LOADER = { configFileName: '/theme/default/config.js', configTimeout: 3000, maxRetries: 2, configVersion: '{{ $version }}' };
     if (!window.location.hash) window.location.replace(window.location.pathname + window.location.search + '#/');
   </script>
 
-  <script defer src="/theme/default/static/js/571.007cd57f.js?v={{ $version }}"></script>
-  <script defer src="/theme/default/static/js/index.b3ffb1ce.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/64.00271f2b.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/index.a083fff9.js?v={{ $version }}"></script>
 </head>
 <body>
   <div id="app"></div>

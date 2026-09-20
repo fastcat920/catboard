@@ -517,13 +517,14 @@ const hexToRgb = (hex) => {
  * @returns {object} 主题色相关的颜色对象
  */
 const calculateThemeColors = (primaryColor) => {
-  const rgb = hexToRgb(primaryColor);
+  const safePrimaryColor = hexToRgb(primaryColor) ? primaryColor : '#4566AE';
+  const rgb = hexToRgb(safePrimaryColor);
   return {
-    primaryColor: primaryColor,
+    primaryColor: safePrimaryColor,
     primaryColorRgb: rgb.join(', '),
     // 计算衍生颜色
     primaryColorLight: `rgba(${rgb.join(', ')}, 0.1)`,
-    primaryColorDark: primaryColor,
+    primaryColorDark: safePrimaryColor,
     primaryColorHover: `rgba(${rgb.join(', ')}, 0.9)`,
     primaryColorActive: `rgba(${rgb.join(', ')}, 0.8)`,
     primaryColorFocus: `rgba(${rgb.join(', ')}, 0.25)`

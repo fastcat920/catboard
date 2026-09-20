@@ -32,7 +32,8 @@ const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
     if (['1', 'true', 'on', 'yes'].includes(normalized)) return true;
-    if (['0', 'false', 'off', 'no', ''].includes(normalized)) return false;
+    if (normalized === '') return fallback;
+    if (['0', 'false', 'off', 'no'].includes(normalized)) return false;
   }
   return fallback;
 };
@@ -40,6 +41,9 @@ const normalizeBoolean = (value, fallback = false) => {
 const applyRuntimeThemeConfig = () => {
   // CatBoard 在 dashboard.blade.php 中注入后台主题设置，优先级应高于静态 config.js。
   const theme = window.CATBOARD_THEME || {};
+  const primaryColor = typeof theme.primary_color === 'string' && /^#[0-9a-f]{6}$/i.test(theme.primary_color.trim())
+    ? theme.primary_color.trim()
+    : undefined;
   const runtime = {
     SITE_CONFIG: {
       siteName: theme.title || theme.site_name,
@@ -48,7 +52,7 @@ const applyRuntimeThemeConfig = () => {
       logo: theme.logo || ''
     },
     DEFAULT_CONFIG: {
-      primaryColor: theme.primary_color,
+      primaryColor,
       enableLandingPage: normalizeBoolean(theme.enable_landing_page, true)
     }
   };

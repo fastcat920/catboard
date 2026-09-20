@@ -56,6 +56,13 @@ class ThemeService
     public function resolvedConfig(): array
     {
         // 主题升级新增字段时使用新主题默认值，已有字段仍以管理员保存值为准。
-        return array_merge($this->defaults(), (array) config("theme.{$this->theme}", []));
+        $defaults = $this->defaults();
+        $saved = (array) config("theme.{$this->theme}", []);
+        foreach ($defaults as $field => $defaultValue) {
+            if (!array_key_exists($field, $saved) || ($saved[$field] === '' && $defaultValue !== '')) {
+                $saved[$field] = $defaultValue;
+            }
+        }
+        return array_merge($defaults, $saved);
     }
 }

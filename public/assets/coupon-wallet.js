@@ -61,6 +61,9 @@
             ? text(labels[source][0], labels[source][1])
             : source;
     }
+    function isCouponRoute() {
+        return location.hash === "#/coupon" || location.pathname === "/coupon";
+    }
     function open() {
         if (!root || !root.isConnected) {
             root = document.createElement("div");
@@ -70,10 +73,16 @@
             ).appendChild(root);
         }
         root.hidden = false;
+        document.querySelectorAll(".coupon-wallet-menu .nav-main-link").forEach(function (link) {
+            link.classList.add("active");
+        });
         load();
     }
     function close() {
         if (root) root.hidden = true;
+        document.querySelectorAll(".coupon-wallet-menu .nav-main-link").forEach(function (link) {
+            link.classList.remove("active");
+        });
     }
     function load() {
         root.innerHTML =
@@ -189,12 +198,20 @@
             target ? nav.insertBefore(item, target) : nav.appendChild(item);
             item.querySelector("a").onclick = function (e) {
                 e.preventDefault();
-                open();
+                if (!isCouponRoute() && window.g_history)
+                    window.g_history.push("/coupon");
+                setTimeout(open, 0);
             };
         }
     }
     function start() {
         mount();
+        if (isCouponRoute()) setTimeout(open, 0);
+        if (window.g_history)
+            window.g_history.listen(function (location) {
+                if (location.pathname === "/coupon") setTimeout(open, 0);
+                else close();
+            });
         document.addEventListener("click", function (e) {
             var a = e.target.closest && e.target.closest(".nav-main-link");
             if (a && !a.closest(".coupon-wallet-menu")) close();

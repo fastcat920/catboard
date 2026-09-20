@@ -58,7 +58,8 @@ const main = async () => {
   const tags = assetTags(html);
   if (!tags.js.length) throw new Error('No compiled JavaScript assets found');
 
-  await fs.rm(outputDir, { recursive: true, force: true });
+  // 保留历史哈希资源，避免发布过程中浏览器/CDN 缓存的旧入口请求到已删除分包而白屏。
+  // 新入口会引用新哈希文件；历史资源可在确认缓存完全失效后单独清理。
   await fs.mkdir(outputDir, { recursive: true });
   await copyDir(path.join(distDir, 'static'), path.join(outputDir, 'static'));
   for (const name of ['config.js', 'landingpage.html']) {

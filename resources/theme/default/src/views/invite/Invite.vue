@@ -167,16 +167,18 @@
               >
                 <IconLink class="invite-code-icon" :size="18" />
                 <div class="code-info">
-                  <div class="code-value">{{ code.code }}</div>
+                  <div class="code-main-row">
+                    <div class="code-value">{{ code.code }}</div>
+                    <div class="code-actions">
+                      <button class="btn-primary tiny" @click="copyInviteCode(code.code)">
+                        {{ $t('invite.inviteLink.copyCode') }}
+                      </button>
+                      <button class="btn-primary tiny" @click="copyInviteLink(code.code)">
+                        {{ $t('invite.inviteLink.copyLink') }}
+                      </button>
+                    </div>
+                  </div>
                   <div class="code-date"><IconClock :size="11" />{{ formatCodeDate(code.created_at) }}</div>
-                </div>
-                <div class="code-actions">
-                  <button class="btn-primary tiny" @click="copyInviteCode(code.code)">
-                    {{ $t('invite.inviteLink.copyCode') }}
-                  </button>
-                  <button class="btn-primary tiny" @click="copyInviteLink(code.code)">
-                    {{ $t('invite.inviteLink.copyLink') }}
-                  </button>
                 </div>
               </div>
             </div>
@@ -1132,12 +1134,18 @@ export default {
       background-color: rgba(var(--theme-color-rgb, 59, 130, 246), 0.05);
       border-radius: 10px;
       border: 1px solid var(--border-color, #e5e7eb);
-      container-type: inline-size;
       flex-wrap: nowrap;
       
       .code-info {
         min-width: 0;
         flex: 1;
+
+        .code-main-row {
+          display: flex;
+          min-width: 0;
+          align-items: center;
+          gap: 8px;
+        }
         
         .code-label {
           font-size: 12px;
@@ -1146,17 +1154,19 @@ export default {
         }
         
         .code-value {
+          min-width: 0;
+          flex: 1;
           overflow: hidden;
           font-size: 16px;
           font-weight: 600;
           color: var(--text-color, #1f2937);
           font-family: monospace;
-          margin-bottom: 4px;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
         
         .code-date {
+          margin-top: 4px;
           font-size: 11px;
           color: var(--secondary-text-color, #6b7280);
         }
@@ -1175,11 +1185,6 @@ export default {
         }
       }
 
-      @container (max-width: 420px) {
-        .code-actions {
-          flex-direction: column;
-        }
-      }
     }
   }
   

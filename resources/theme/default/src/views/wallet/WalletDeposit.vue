@@ -4,6 +4,11 @@
 
       <!-- FastCatAPP 钱包摘要：余额 + 自动续费 -->
       <div class="wallet-summary-card">
+        <div class="wallet-balance-column">
+          <div class="wallet-summary-title"><span class="wallet-icon"><IconWallet :size="14" /></span>{{ $t('wallet.balance.title') }}</div>
+          <div v-if="!loading.balance" class="wallet-summary-value">{{ currencySymbol }}{{ formatAmount(userBalance) }}</div>
+          <div v-else class="skeleton-balance-value"></div>
+        </div>
         <div class="wallet-renewal-column">
           <label class="renewal-heading">
             <span>{{ $t('wallet.autoRenewal.title') }}</span>
@@ -13,11 +18,6 @@
             </span>
           </label>
           <p>{{ hasPlan ? $t('wallet.autoRenewal.description') : $t('wallet.autoRenewal.noPlan') }}</p>
-        </div>
-        <div class="wallet-balance-column">
-          <div class="wallet-summary-title"><span class="wallet-icon"><IconWallet :size="14" /></span>{{ $t('wallet.balance.title') }}</div>
-          <div v-if="!loading.balance" class="wallet-summary-value">{{ currencySymbol }}{{ formatAmount(userBalance) }}</div>
-          <div v-else class="skeleton-balance-value"></div>
         </div>
       </div>
 
@@ -402,17 +402,17 @@ onMounted(() => {
     box-shadow: 0 6px 16px rgba(var(--theme-color-rgb), .12);
   }
 
-  .wallet-balance-column { width: 100%; min-width: 0; text-align: right; }
-  .wallet-summary-title { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 14px; opacity: .88; }
+  .wallet-balance-column { width: 100%; min-width: 0; text-align: left; }
+  .wallet-summary-title { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; opacity: .88; }
   .wallet-icon { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; background: rgba(var(--theme-color-rgb), .18); border-radius: 8px; }
   .wallet-summary-value { margin-top: 8px; font-size: 28px; font-weight: 700; }
 
   .wallet-renewal-column {
     width: 100%;
     color: inherit;
-    text-align: left;
+    text-align: right;
 
-    .renewal-heading { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 14px; font-weight: 600; }
+    .renewal-heading { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 14px; font-weight: 600; }
     p { margin: 4px 0 0; color: inherit; font-size: 12px; line-height: 1.4; }
   }
 

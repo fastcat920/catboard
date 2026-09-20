@@ -445,7 +445,7 @@ body #app .dashboard-container .download-option:hover {
 /* Shop: equal-height products with a stable price and CTA hierarchy. */
 body #app .shop-container .plans-wrapper {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: var(--section-gap);
   align-items: stretch;
 }
@@ -692,12 +692,6 @@ body #app .more-container .dashboard-card + .dashboard-card {
 
 body #app :is(.profile-container, .more-container) :is(.setting-item, .password-row, .menu-item) {
   padding-block: 12px;
-}
-
-@media (min-width: map.get($breakpoints, lg)) {
-  body #app .shop-container .plans-wrapper {
-    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-  }
 }
 
 @media (min-width: map.get($breakpoints, xl)) {

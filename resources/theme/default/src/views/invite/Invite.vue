@@ -39,15 +39,10 @@
         </div>
       </div>
 
-      <div class="invite-primary-actions" :class="{ 'withdraw-enabled': withdrawClose === 0 }">
-        <div v-if="withdrawClose === 0" class="invite-left-actions">
-          <button class="btn-primary" @click="toggleWithdrawCard">
-            <IconBuildingBank :size="18" />{{ $t('invite.balance.withdraw') }}
-          </button>
-          <button class="btn-primary ticket-action" @click="goToTicket">
-            <IconTicket :size="18" />{{ $t('invite.ticketAction') }}
-          </button>
-        </div>
+      <div class="invite-primary-actions" :class="{ 'single-action': withdrawClose !== 0 }">
+        <button v-if="withdrawClose === 0" class="btn-primary" @click="toggleWithdrawCard">
+          <IconBuildingBank :size="18" />{{ $t('invite.balance.withdraw') }}
+        </button>
         <button class="btn-primary transfer-action" @click="toggleTransferCard">
           <IconArrowsExchange :size="18" />{{ $t('invite.balance.transferToBalance') }}
         </button>
@@ -67,7 +62,7 @@
 
       <section v-if="referralProgram?.next_milestone" class="growth-card milestone-card">
         <div class="growth-card-head">
-          <div><span>{{ locale === 'en-US' ? 'Next milestone' : '下一里程碑' }}</span><h3>{{ referralProgram.next_milestone.name }}</h3></div>
+          <div><span>{{ locale === 'en-US' ? 'Milestone reward' : '里程碑奖励' }}</span><h3>{{ localizedMilestone(referralProgram.next_milestone) }}</h3></div>
           <strong>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_milestone.required_invites }}</strong>
         </div>
         <div class="growth-progress"><i :style="{ width: milestoneProgress + '%' }"></i></div>
@@ -235,9 +230,7 @@
                     <tr>
                       <th>{{ $t('invite.records.date') }}</th>
                       <th>{{ $t('invite.records.type') }}</th>
-                      <th>{{ $t('invite.records.details') }}</th>
                       <th>{{ $t('invite.records.change') }}</th>
-                      <th>{{ $t('invite.records.balance') }}</th>
                       <th>{{ $t('invite.records.status.title') }}</th>
                     </tr>
                   </thead>
@@ -245,9 +238,7 @@
                     <tr v-for="record in inviteRecords" :key="record.id">
                       <td data-label="时间">{{ formatDate(record.created_at) }}</td>
                       <td>{{ recordTypeText(record.type) }}</td>
-                      <td>{{ record.description || record.trade_no || '—' }}</td>
                       <td><strong :class="record.amount >= 0 ? 'amount-income' : 'amount-expense'">{{ signedAmount(record.amount) }}</strong></td>
-                      <td>{{ record.balance_after === null ? '—' : currencySymbol + formatAmount(record.balance_after) }}</td>
                       <td data-label="状态">
                         <span class="status-badge" :class="record.status === 'completed' ? 'confirmed' : 'pending'">
                           {{ recordStatusText(record.status) }}
@@ -274,10 +265,6 @@
                       <div class="record-row">
                         <span class="record-label">{{ recordTypeText(record.type) }}</span>
                         <span class="record-value" :class="record.amount >= 0 ? 'amount-income' : 'amount-expense'">{{ signedAmount(record.amount) }}</span>
-                      </div>
-                      <div class="record-row">
-                        <span class="record-label">{{ record.description || record.trade_no || '—' }}</span>
-                        <span class="record-value">{{ $t('invite.records.balance') }}: {{ record.balance_after === null ? '—' : currencySymbol + formatAmount(record.balance_after) }}</span>
                       </div>
                     </div>
                   </div>
@@ -474,7 +461,6 @@
 
 <script>
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
 import { ref, computed, onMounted, reactive } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { INVITE_CONFIG } from '@/utils/baseConfig';
@@ -492,7 +478,6 @@ import {
   IconReceipt,
   IconLink,
   IconClock,
-  IconTicket,
   IconPigMoney,
   IconHourglassHigh,
   IconCurrencyDollar,
@@ -514,7 +499,6 @@ export default {
     IconReceipt,
     IconLink,
     IconClock,
-    IconTicket,
     IconPigMoney,
     IconHourglassHigh,
     IconCurrencyDollar,
@@ -524,7 +508,6 @@ export default {
   setup() {
     const { showToast } = useToast();
     const { t, locale } = useI18n();
-    const router = useRouter();
     
     // ============ 响应式数据 ============
     const activeTab = ref('invite');
@@ -565,6 +548,7 @@ export default {
       return `${currencySymbol.value}${formatAmount(milestone.reward_value)} ${label}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
+    const localizedMilestone = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     
     // 分页相关
     const currentPage = ref(1);
@@ -757,10 +741,6 @@ export default {
       fetchInviteDetails(1);
     };
 
-    const goToTicket = () => {
-      router.push(window.innerWidth < 905 ? '/mobile/tickets' : '/tickets');
-    };
-    
     const handlePageChange = (page) => {
       if (page < 1 || page > totalPages.value) return;
       currentPage.value = page;
@@ -889,6 +869,7 @@ export default {
       milestoneProgress,
       milestoneRewardText,
       localizedLevel,
+      localizedMilestone,
       currentCommissionRate,
       locale,
       inviteStats,
@@ -900,7 +881,6 @@ export default {
       copyInviteLink,
       createInviteCode,
       refreshRecords,
-      goToTicket,
       formatDate,
       formatCodeDate,
       formatAmount,
@@ -1460,25 +1440,14 @@ export default {
 }
 
 .invite-primary-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 20px;
 
   .btn-primary { display: inline-flex; min-width: 0; flex: 1; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
-
-  &.withdraw-enabled {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .invite-left-actions {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .invite-left-actions .btn-primary { width: 100%; padding-right: 8px; padding-left: 8px; }
+  &.single-action { grid-template-columns: 1fr; }
+  .btn-primary { width: 100%; padding-right: 8px; padding-left: 8px; }
   .transfer-action { width: 100%; }
 }
 

@@ -157,6 +157,7 @@ class ReferralController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:100',
+            'name_en' => 'nullable|string|max:100',
             'required_invites' => 'required|integer|min:1',
             'reward_type' => 'required|in:balance,commission_balance,traffic,duration',
             'reward_value' => 'required|integer|min:1',

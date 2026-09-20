@@ -75,7 +75,7 @@ INSERT INTO `v2_referral_level` (`name`,`required_invites`,`commission_rate`,`so
 
 DROP TABLE IF EXISTS `v2_referral_milestone`;
 CREATE TABLE `v2_referral_milestone` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL,
+  `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL,
   `required_invites` int unsigned NOT NULL, `reward_type` enum('balance','commission_balance','traffic','duration') NOT NULL DEFAULT 'balance',
   `reward_value` int unsigned NOT NULL, `enabled` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,

@@ -159,8 +159,9 @@ class ReferralController extends Controller
         $period = $request->input('period', 'month');
         $metric = $request->input('metric', 'invites');
         $from = $period === 'week' ? strtotime('monday this week') : ($period === 'total' ? 0 : strtotime(date('Y-m-01')));
-        $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))->where('reward_type', 'effective_invite')->where('status', 'granted');
-        if ($from) $effective->where('created_at', '>=', $from);
+        $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))->where('reward_type', 'effective_invite')->where('status', 'granted')
+            ->whereIn('user_id', User::select('id'));
+        if ($from) $effective->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
         $effective->groupBy('user_id');
         $rows = User::query()->joinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
             ->leftJoin('v2_order as o', function ($join) use ($from) { $join->on('o.invite_user_id', '=', 'v2_user.id')->where('o.status', 3); if ($from) $join->where('o.created_at', '>=', $from); })

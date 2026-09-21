@@ -131,8 +131,9 @@ class InviteController extends Controller
             return response(['data' => [], 'enabled' => true, 'period' => $period, 'reward_rules' => $rules]);
         }
 
-        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted');
-        if ($from) $leaders->where('created_at', '>=', $from);
+        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')
+            ->whereIn('user_id', User::select('id'));
+        if ($from) $leaders->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
         $leaders = $leaders->select('user_id', DB::raw('COUNT(*) as value'))
             ->groupBy('user_id')->orderBy('value', 'DESC')->orderBy('user_id')->limit(100)->get();
         $emails = User::whereIn('id', $leaders->pluck('user_id'))->pluck('email', 'id');
@@ -243,7 +244,8 @@ class InviteController extends Controller
                 $leaderboardSetting = ReferralLeaderboardSetting::current();
                 if ($leaderboardSetting->enabled) {
                     $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')
-                        ->where('created_at', '>=', strtotime(date('Y-m-01')))->select('user_id', DB::raw('COUNT(*) as value'))
+                        ->whereIn('user_id', User::select('id'))
+                        ->whereRaw('COALESCE(granted_at, created_at) >= ?', [strtotime(date('Y-m-01'))])->select('user_id', DB::raw('COUNT(*) as value'))
                         ->groupBy('user_id')->orderBy('value', 'DESC')->limit(10)->get();
                     $emails = User::whereIn('id', $leaders->pluck('user_id'))->pluck('email', 'id');
                     $program['leaderboard'] = $leaders->values()->map(function ($row, $index) use ($emails, $leaderboardSetting, $user) {

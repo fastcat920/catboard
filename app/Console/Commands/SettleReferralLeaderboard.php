@@ -28,7 +28,9 @@ class SettleReferralLeaderboard extends Command
     private function settle(string $type, int $from, int $to, string $key, array $rules): void
     {
         if (!$rules) return;
-        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')->whereBetween('created_at', [$from, $to])
+        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')
+            ->whereIn('user_id', User::select('id'))
+            ->whereRaw('COALESCE(granted_at, created_at) BETWEEN ? AND ?', [$from, $to])
             ->select('user_id', DB::raw('COUNT(*) as value'))->groupBy('user_id')->orderBy('value', 'DESC')->limit(100)->get();
         foreach ($leaders as $index => $leader) {
             $rank = $index + 1;

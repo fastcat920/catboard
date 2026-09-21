@@ -156,23 +156,41 @@ class ReferralController extends Controller
 
     public function leaderboard(Request $request)
     {
-        $period = $request->input('period', 'month');
-        $metric = $request->input('metric', 'invites');
+        $period = in_array($request->input('period'), ['week', 'month', 'total'], true) ? $request->input('period') : 'month';
+        $setting = ReferralLeaderboardSetting::current();
+        $configured = $setting->boardConfig($period);
+        $metric = in_array($request->input('metric'), ['invites', 'revenue', 'income'], true) ? $request->input('metric') : $configured['metric'];
         $from = $period === 'week' ? strtotime('monday this week') : ($period === 'total' ? 0 : strtotime(date('Y-m-01')));
         $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))->where('reward_type', 'effective_invite')->where('status', 'granted')
             ->whereIn('user_id', User::select('id'));
         if ($from) $effective->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
         $effective->groupBy('user_id');
-        $rows = User::query()->joinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
+        $rows = User::query()->leftJoinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
             ->leftJoin('v2_order as o', function ($join) use ($from) { $join->on('o.invite_user_id', '=', 'v2_user.id')->where('o.status', 3); if ($from) $join->where('o.created_at', '>=', $from); })
-            ->select('v2_user.id', 'v2_user.email', DB::raw('MAX(r.invite_count) as invite_count'), DB::raw('COALESCE(SUM(o.total_amount),0) as revenue'), DB::raw('COALESCE(SUM(o.commission_balance),0) as income'))
-            ->groupBy('v2_user.id', 'v2_user.email')->orderBy($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), 'DESC')->limit(100)->get();
-        return response(['data' => $rows, 'setting' => ReferralLeaderboardSetting::current()]);
+            ->select('v2_user.id', 'v2_user.email', DB::raw('COALESCE(MAX(r.invite_count),0) as invite_count'), DB::raw('COALESCE(SUM(o.total_amount),0) as revenue'), DB::raw('COALESCE(SUM(o.commission_balance),0) as income'))
+            ->groupBy('v2_user.id', 'v2_user.email')
+            ->having($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), '>', 0)
+            ->orderBy($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), 'DESC')->limit(100)->get();
+        return response(['data' => $rows, 'setting' => $setting, 'boards' => $setting->boards(), 'metric' => $metric]);
     }
 
     public function saveLeaderboardSetting(Request $request)
     {
         $data = $request->validate(['enabled' => 'required|boolean', 'mask_email' => 'required|boolean', 'reward_rules' => 'nullable|array']);
+        $rewardRules = (array)($data['reward_rules'] ?? []);
+        $boards = (array)($rewardRules['boards'] ?? []);
+        foreach (['week', 'month', 'total'] as $period) {
+            $config = (array)($boards[$period] ?? []);
+            $boards[$period] = [
+                'enabled' => array_key_exists('enabled', $config) ? !empty($config['enabled']) : true,
+                'metric' => in_array($config['metric'] ?? '', ['invites', 'revenue', 'income'], true) ? $config['metric'] : 'invites',
+            ];
+            $rewardRules[$period] = array_values(array_filter((array)($rewardRules[$period] ?? []), function ($rule) {
+                return is_array($rule) && (int)($rule['reward_value'] ?? 0) > 0;
+            }));
+        }
+        $rewardRules['boards'] = $boards;
+        $data['reward_rules'] = $rewardRules;
         $setting = ReferralLeaderboardSetting::current();
         $setting->fill($data)->save();
         return response(['data' => $setting]);

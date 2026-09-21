@@ -123,25 +123,37 @@ class InviteController extends Controller
         $setting = ReferralLeaderboardSetting::current();
         $period = in_array($request->input('period'), ['week', 'month', 'total'], true) ? $request->input('period') : 'month';
         $from = $period === 'week' ? strtotime('monday this week') : ($period === 'month' ? strtotime(date('Y-m-01')) : 0);
-        $rules = $period === 'total' ? [] : (array)($setting->reward_rules[$period] ?? []);
-        if (!$setting->enabled) {
-            return response(['data' => [], 'enabled' => false, 'period' => $period, 'reward_rules' => $rules]);
-        }
+        $config = $setting->boardConfig($period);
+        $boards = $setting->boards();
+        $rules = $setting->periodRules($period);
         if ($request->boolean('summary')) {
-            return response(['data' => [], 'enabled' => true, 'period' => $period, 'reward_rules' => $rules]);
+            $anyBoardEnabled = collect($boards)->contains(function ($board) { return !empty($board['enabled']); });
+            return response(['data' => [], 'enabled' => (bool)$setting->enabled && $anyBoardEnabled, 'global_enabled' => (bool)$setting->enabled, 'boards' => $boards]);
+        }
+        if (!$setting->enabled || !$config['enabled']) {
+            return response(['data' => [], 'enabled' => false, 'global_enabled' => (bool)$setting->enabled, 'period' => $period, 'metric' => $config['metric'], 'reward_rules' => $rules, 'boards' => $boards]);
         }
 
-        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')
-            ->whereIn('user_id', User::select('id'));
-        if ($from) $leaders->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
-        $leaders = $leaders->select('user_id', DB::raw('COUNT(*) as value'))
-            ->groupBy('user_id')->orderBy('value', 'DESC')->orderBy('user_id')->limit(100)->get();
-        $emails = User::whereIn('id', $leaders->pluck('user_id'))->pluck('email', 'id');
+        $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))
+            ->where('reward_type', 'effective_invite')->where('status', 'granted')->whereIn('user_id', User::select('id'));
+        if ($from) $effective->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
+        $effective->groupBy('user_id');
+        $metric = $config['metric'];
+        $leaders = User::query()->leftJoinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
+            ->leftJoin('v2_order as o', function ($join) use ($from) {
+                $join->on('o.invite_user_id', '=', 'v2_user.id')->where('o.status', 3);
+                if ($from) $join->where('o.created_at', '>=', $from);
+            })
+            ->select('v2_user.id', 'v2_user.email', DB::raw('COALESCE(MAX(r.invite_count),0) as invite_count'), DB::raw('COALESCE(SUM(o.total_amount),0) as revenue'), DB::raw('COALESCE(SUM(o.commission_balance),0) as income'))
+            ->groupBy('v2_user.id', 'v2_user.email')
+            ->having($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), '>', 0)
+            ->orderBy($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), 'DESC')
+            ->orderBy('v2_user.id')->limit(100)->get();
         $userId = (int)$request->user['id'];
 
-        $rows = $leaders->values()->map(function ($row, $index) use ($emails, $setting, $rules, $userId) {
+        $rows = $leaders->values()->map(function ($row, $index) use ($setting, $rules, $userId, $metric) {
             $rank = $index + 1;
-            $value = (int)$row->value;
+            $value = (int)($metric === 'revenue' ? $row->revenue : ($metric === 'income' ? $row->income : $row->invite_count));
             $reward = 0;
             foreach ($rules as $rule) {
                 $rankFrom = max(1, (int)($rule['rank_from'] ?? 1));
@@ -150,22 +162,25 @@ class InviteController extends Controller
                     $reward += max(0, (int)($rule['reward_value'] ?? 0));
                 }
             }
-            $email = (string)$emails->get($row->user_id, '');
+            $email = (string)$row->email;
             if ($setting->mask_email) $email = $this->maskEmail($email);
             return [
                 'rank' => $rank,
                 'email' => $email,
                 'value' => $value,
                 'reward_value' => $reward,
-                'is_me' => (int)$row->user_id === $userId,
+                'is_me' => (int)$row->id === $userId,
             ];
         });
 
         return response([
             'data' => $rows,
             'enabled' => true,
+            'global_enabled' => true,
             'period' => $period,
+            'metric' => $metric,
             'reward_rules' => $rules,
+            'boards' => $boards,
         ]);
     }
 

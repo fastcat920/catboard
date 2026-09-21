@@ -778,9 +778,11 @@ export default {
       reward: 'Estimated reward',
       me: 'Me',
       periods: { week: 'Weekly', month: 'Monthly', total: 'All time' },
+      metrics: { invites: 'Qualified invites', revenue: 'Revenue', income: 'Referral income' },
       ruleRank: 'Rank {rank}',
       ruleRange: 'Ranks {from}-{to}',
-      ruleThreshold: ' with {count}+ invites'
+      ruleThreshold: ' with {count}+ invites',
+      ruleAmountThreshold: ' with ¥{amount}+'
     },
     rules: {
       title: 'Commission Rules',

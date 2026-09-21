@@ -15,13 +15,13 @@
             <span v-for="(rule, index) in rules" :key="index">{{ ruleText(rule) }}</span>
           </div>
         </div>
-        <div v-else-if="period !== 'total'" class="reward-panel muted">{{ $t('invite.leaderboard.noRewards') }}</div>
+        <div v-else class="reward-panel muted">{{ $t('invite.leaderboard.noRewards') }}</div>
 
         <div v-if="rows.length" class="ranking-list">
           <article v-for="row in rows" :key="row.rank" :class="{ me: row.is_me, podium: row.rank <= 3 }">
             <div class="rank" :class="`rank-${row.rank}`">{{ row.rank }}</div>
             <div class="identity"><strong>{{ row.email }}</strong><small v-if="row.is_me">{{ $t('invite.leaderboard.me') }}</small></div>
-            <div class="metric"><strong>{{ row.value }}</strong><small>{{ $t('invite.leaderboard.effectiveInvites') }}</small></div>
+            <div class="metric"><strong>{{ metricValue(row.value) }}</strong><small>{{ metricLabel }}</small></div>
             <div class="reward"><strong>{{ row.reward_value > 0 ? `¥${money(row.reward_value)}` : '—' }}</strong><small>{{ $t('invite.leaderboard.reward') }}</small></div>
           </article>
         </div>
@@ -39,17 +39,22 @@ import { getInviteLeaderboard } from '@/api/invite';
 
 const { t } = useI18n();
 const period = ref('month');
+const metric = ref('invites');
+const boards = ref({});
 const rows = ref([]);
 const rules = ref([]);
 const enabled = ref(true);
 const loading = ref(true);
 const error = ref('');
-const periods = computed(() => [
+const allPeriods = computed(() => [
   { value: 'week', label: t('invite.leaderboard.periods.week') },
   { value: 'month', label: t('invite.leaderboard.periods.month') },
   { value: 'total', label: t('invite.leaderboard.periods.total') }
 ]);
+const periods = computed(() => allPeriods.value.filter(option => boards.value[option.value]?.enabled !== false));
 const money = cents => (Number(cents || 0) / 100).toFixed(2);
+const metricLabel = computed(() => t(`invite.leaderboard.metrics.${metric.value}`));
+const metricValue = value => metric.value === 'invites' ? Number(value || 0) : `¥${money(value)}`;
 const ruleText = rule => {
   const from = Number(rule.rank_from || 1);
   const to = Number(rule.rank_to || from);
@@ -57,7 +62,11 @@ const ruleText = rule => {
   const rank = from === to
     ? t('invite.leaderboard.ruleRank', { rank: from })
     : t('invite.leaderboard.ruleRange', { from, to });
-  const threshold = min > 0 ? t('invite.leaderboard.ruleThreshold', { count: min }) : '';
+  const threshold = min > 0
+    ? (metric.value === 'invites'
+      ? t('invite.leaderboard.ruleThreshold', { count: min })
+      : t('invite.leaderboard.ruleAmountThreshold', { amount: money(min) }))
+    : '';
   return `${rank}${threshold} · ¥${money(rule.reward_value)}`;
 };
 const load = async () => {
@@ -67,7 +76,15 @@ const load = async () => {
     const response = await getInviteLeaderboard(period.value);
     rows.value = Array.isArray(response?.data) ? response.data : [];
     rules.value = Array.isArray(response?.reward_rules) ? response.reward_rules : [];
+    boards.value = response?.boards || {};
+    const firstEnabled = periods.value[0]?.value;
+    if (response?.global_enabled !== false && response?.enabled === false && firstEnabled && firstEnabled !== period.value) {
+      period.value = firstEnabled;
+      await load();
+      return;
+    }
     enabled.value = response?.enabled !== false;
+    metric.value = response?.metric || 'invites';
   } catch (requestError) {
     error.value = requestError?.response?.data?.message || requestError?.message || t('invite.leaderboard.loadFailed');
   } finally {
@@ -81,7 +98,7 @@ onMounted(load);
 <style scoped lang="scss">
 .leaderboard-page { width: 100%; max-width: var(--page-max-width); margin: 0 auto; padding: 18px 0 60px; color: var(--text-color); }
 .leaderboard-card { overflow: hidden; border: 1px solid var(--border-color); border-radius: 20px; background: var(--card-background); }
-.period-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-bottom: 1px solid var(--border-color); background: rgba(var(--theme-color-rgb), .04); }
+.period-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; padding: 8px; border-bottom: 1px solid var(--border-color); background: rgba(var(--theme-color-rgb), .04); }
 .period-tabs button { min-height: 42px; color: var(--secondary-text-color); border: 0; border-radius: 12px; background: transparent; font-weight: 600; cursor: pointer; }
 .period-tabs button.active { color: #fff; background: var(--theme-color); box-shadow: 0 5px 14px rgba(var(--theme-color-rgb), .22); }
 .state { display: flex; min-height: 280px; align-items: center; justify-content: center; gap: 12px; color: var(--secondary-text-color); }

@@ -825,9 +825,11 @@ export default {
       reward: '预计奖励',
       me: '我',
       periods: { week: '周榜', month: '月榜', total: '总榜' },
+      metrics: { invites: '有效邀请', revenue: '成交金额', income: '推广收入' },
       ruleRank: '第 {rank} 名',
       ruleRange: '第 {from}-{to} 名',
-      ruleThreshold: '且达到 {count} 人'
+      ruleThreshold: '且达到 {count} 人',
+      ruleAmountThreshold: '且达到 ¥{amount}'
     },
     rules: {
       title: '返佣规则',

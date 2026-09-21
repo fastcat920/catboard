@@ -134,7 +134,14 @@ class InviteController extends Controller
     {
         if (strpos($email, '@') === false) return $email ? substr($email, 0, 1) . '***' : '-';
         [$prefix, $domain] = explode('@', $email, 2);
-        return substr($prefix, 0, 1) . '***@' . $domain;
+        $length = strlen($prefix);
+        if ($length === 0) return '***@' . $domain;
+
+        $head = substr($prefix, 0, min(2, $length));
+        $tailLength = min(2, max(0, $length - 2));
+        $tail = $tailLength > 0 ? substr($prefix, -$tailLength) : '';
+
+        return $head . '***' . $tail . '@' . $domain;
     }
 
     public function fetch(Request $request)

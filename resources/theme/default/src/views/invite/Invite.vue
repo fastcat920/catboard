@@ -52,7 +52,7 @@
         <div class="member-overview-row">
           <div class="member-level-info">
             <span>{{ $t('invite.currentLevel') }}</span>
-            <h2>{{ localizedLevel(referralProgram.level) || $t('invite.defaultMember') }}</h2>
+            <h2>{{ localizedLevel(referralProgram.level) || '—' }}</h2>
           </div>
           <div class="member-commission-rate">
             <span>{{ $t('invite.commissionRate') }}</span>

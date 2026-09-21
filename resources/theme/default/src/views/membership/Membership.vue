@@ -5,7 +5,7 @@
     <template v-else>
       <section class="hero">
         <div class="membership-overview">
-          <div class="membership-copy"><span>{{ text.membership }}</span><h1>{{ levelName(program.level) || text.normal }}</h1><p>{{ levelDescription(program.level) || text.normalDescription }}</p></div>
+          <div class="membership-copy"><span>{{ text.membership }}</span><h1>{{ levelName(program.level) || '—' }}</h1><p v-if="levelDescription(program.level)">{{ levelDescription(program.level) }}</p></div>
           <div class="membership-validity"><span>{{ text.validity }}：</span><strong>{{ expiry }}</strong></div>
         </div>
         <div class="benefits">
@@ -35,7 +35,7 @@ import { useI18n } from 'vue-i18n';
 import { getInviteData } from '@/api/invite';
 const { locale } = useI18n(); const loading = ref(true); const error = ref(''); const program = ref({});
 const en = computed(() => locale.value === 'en-US');
-const text = computed(() => en.value ? { loading:'Loading…',membership:'Membership level',normal:'Member',normalDescription:'Invite friends to unlock more benefits.',commission:'Commission rate',discount:'Plan discount',effective:'Qualified referrals',revenue:'Referral revenue',next:'Next level',nextCommission:'Commission rate',nextDiscount:'Plan discount',remaining:'Complete {count} more qualified referrals and ¥{amount} more revenue to upgrade.',validity:'Level validity',permanent:'Permanent' } : { loading:'加载中…',membership:'会员等级',normal:'普通会员',normalDescription:'邀请好友并完成有效首购，即可解锁更多权益。',commission:'返佣比例',discount:'套餐优惠',effective:'有效邀请',revenue:'邀请成交额',next:'下一等级',nextCommission:'佣金比例',nextDiscount:'套餐优惠',remaining:'还需 {count} 个有效邀请和 ¥{amount} 成交额即可升级。',validity:'等级有效期',permanent:'永久有效' });
+const text = computed(() => en.value ? { loading:'Loading…',membership:'Membership level',commission:'Commission rate',discount:'Plan discount',effective:'Qualified referrals',revenue:'Referral revenue',next:'Next level',nextCommission:'Commission rate',nextDiscount:'Plan discount',remaining:'Complete {count} more qualified referrals and ¥{amount} more revenue to upgrade.',validity:'Level validity',permanent:'Permanent' } : { loading:'加载中…',membership:'会员等级',commission:'返佣比例',discount:'套餐优惠',effective:'有效邀请',revenue:'邀请成交额',next:'下一等级',nextCommission:'佣金比例',nextDiscount:'套餐优惠',remaining:'还需 {count} 个有效邀请和 ¥{amount} 成交额即可升级。',validity:'等级有效期',permanent:'永久有效' });
 const current = computed(() => Number(program.value.effective_invites || 0));
 const revenueCents = computed(() => Number(program.value.referral_revenue || 0));
 const revenue = computed(() => (revenueCents.value / 100).toFixed(2));

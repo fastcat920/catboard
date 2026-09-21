@@ -16,9 +16,29 @@ use Illuminate\Support\Facades\Schema;
 
 class ReferralProgramService
 {
+    public function assignInitialLevel(User $user): ?ReferralLevel
+    {
+        if ($user->referral_level_id || !Schema::hasTable('v2_referral_level')
+            || !Schema::hasColumn('v2_referral_level', 'required_revenue')
+            || !Schema::hasColumn('v2_user', 'referral_level_id')) return null;
+
+        $level = ReferralLevel::where('enabled', 1)
+            ->where('required_invites', 0)
+            ->where('required_revenue', 0)
+            ->orderBy('sort', 'DESC')->orderBy('id', 'DESC')->first();
+        if (!$level) return null;
+
+        $user->referral_level_id = $level->id;
+        $user->referral_level_expires_at = null;
+        $user->commission_rate = $level->commission_rate;
+        $user->save();
+        return $level;
+    }
+
     public function memberDiscountRate(User $user): int
     {
         $manual = max(0, min(100, (int)$user->discount));
+        if (!$user->referral_level_id) $this->assignInitialLevel($user);
         if (!$user->referral_level_id) return $manual;
         if ($user->referral_level_expires_at && $user->referral_level_expires_at <= time()) return $manual;
         $level = ReferralLevel::where('id', $user->referral_level_id)->where('enabled', 1)->first();
@@ -131,6 +151,7 @@ class ReferralProgramService
     {
         $setting = $this->setting();
         if ($setting && $setting->enabled) {
+            if (!$inviter->referral_level_id) $this->assignInitialLevel($inviter);
             if ($inviter->referral_level_id && (!$inviter->referral_level_expires_at || $inviter->referral_level_expires_at > time())) {
                 $level = ReferralLevel::where('id', $inviter->referral_level_id)->where('enabled', 1)->first();
                 if ($level) return (int)$level->commission_rate;
@@ -210,17 +231,15 @@ class ReferralProgramService
         $level = ReferralLevel::where('enabled', 1)
             ->where('required_invites', '<=', $effectiveCount)
             ->where('required_revenue', '<=', $revenue)
-            ->orderBy('required_invites', 'DESC')
-            ->orderBy('required_revenue', 'DESC')
             ->orderBy('sort', 'DESC')
+            ->orderBy('id', 'DESC')
             ->first();
         if (!$level) return;
         $user = User::find($userId);
         if (!$user || (int)$user->referral_level_id === (int)$level->id) return;
         if ($user->referral_level_id) {
             $current = ReferralLevel::find($user->referral_level_id);
-            if ($current && (int)$current->required_invites >= (int)$level->required_invites
-                && (int)$current->required_revenue >= (int)$level->required_revenue) return;
+            if ($current && (int)$current->sort >= (int)$level->sort) return;
         }
         $user->commission_rate = $level->commission_rate;
         $user->referral_level_id = $level->id;

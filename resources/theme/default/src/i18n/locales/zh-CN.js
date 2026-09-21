@@ -788,7 +788,6 @@ export default {
   invite: {
     ticketAction: '工单',
     currentLevel: '当前等级',
-    defaultMember: '普通会员',
     commissionRate: '佣金比例',
     viewMembershipBenefits: '查看会员等级权益',
     milestoneReward: '里程碑奖励',

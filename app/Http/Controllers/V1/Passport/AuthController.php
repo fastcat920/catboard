@@ -125,6 +125,7 @@ class AuthController extends Controller
             if (!$user->save()) {
                 abort(500, __('Register failed'));
             }
+            app(ReferralProgramService::class)->assignInitialLevel($user);
             if ($trialGranted) {
                 $trialClaims->claim($user->email, (int)$user->id);
             }

@@ -121,14 +121,19 @@ class InviteController extends Controller
                 ->where('reward_type', 'effective_invite')->where('status', 'granted')->count();
             $referralRevenue = (int)Order::where('invite_user_id', $user->id)->where('status', 3)->sum('total_amount');
             $assignedLevelValid = $user->referral_level_id && (!$user->referral_level_expires_at || $user->referral_level_expires_at > time());
-            $level = $assignedLevelValid ? ReferralLevel::where('id', $user->referral_level_id)->where('enabled', 1)->first() : ReferralLevel::where('enabled', 1)
-                ->where('required_invites', '<=', $effectiveCount)->where('required_revenue', '<=', $referralRevenue)
-                ->orderBy('required_invites', 'DESC')->orderBy('required_revenue', 'DESC')->first();
+            $level = $assignedLevelValid
+                ? ReferralLevel::where('id', $user->referral_level_id)->where('enabled', 1)->first()
+                : null;
+            if (!$level) {
+                $level = ReferralLevel::where('enabled', 1)
+                    ->where('required_invites', '<=', $effectiveCount)
+                    ->where('required_revenue', '<=', $referralRevenue)
+                    ->orderBy('sort', 'DESC')->orderBy('id', 'DESC')->first();
+            }
+            $currentLevelSort = $level ? (int)$level->sort : 0;
             $nextLevel = ReferralLevel::where('enabled', 1)
-                ->where(function ($query) use ($effectiveCount, $referralRevenue) {
-                    $query->where('required_invites', '>', $effectiveCount)
-                        ->orWhere('required_revenue', '>', $referralRevenue);
-                })->orderBy('required_invites')->orderBy('required_revenue')->first();
+                ->where('sort', '>', $currentLevelSort)
+                ->orderBy('sort')->orderBy('id')->first();
             $nextMilestone = ReferralMilestone::where('enabled', 1)->where('required_invites', '>', $effectiveCount)
                 ->orderBy('required_invites')->first();
             $program = [

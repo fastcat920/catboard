@@ -60,7 +60,7 @@ class ReferralController extends Controller
 
     public function levels()
     {
-        return response(['data' => ReferralLevel::orderBy('required_invites')->get()]);
+        return response(['data' => ReferralLevel::orderBy('sort')->orderBy('id')->get()]);
     }
 
     public function saveLevel(Request $request)
@@ -70,8 +70,9 @@ class ReferralController extends Controller
             'name_en' => 'nullable|string|max:100',
             'description' => 'nullable|string|max:255',
             'description_en' => 'nullable|string|max:255',
+            'sort' => 'required|integer|min:1|max:4294967295',
             'required_invites' => 'required|integer|min:0',
-            'required_revenue' => 'sometimes|integer|min:0',
+            'required_revenue' => 'required|integer|min:0',
             'commission_rate' => 'required|integer|min:0|max:100',
             'member_discount' => 'required|integer|min:0|max:100',
             'valid_days' => 'required|integer|min:0|max:3650',
@@ -79,7 +80,57 @@ class ReferralController extends Controller
             'retain_revenue' => 'sometimes|integer|min:0',
             'enabled' => 'required|boolean',
         ]);
-        $level = $request->input('id') ? ReferralLevel::findOrFail($request->input('id')) : new ReferralLevel();
+
+        $levelId = $request->input('id');
+        $existingLevel = $levelId ? ReferralLevel::findOrFail($levelId) : null;
+        $isInitialLevel = (int)$data['required_invites'] === 0 && (int)$data['required_revenue'] === 0;
+        $wasInitialLevel = $existingLevel
+            && (int)$existingLevel->required_invites === 0
+            && (int)$existingLevel->required_revenue === 0;
+        if ($wasInitialLevel && !$isInitialLevel) {
+            abort(422, '初始等级的升级条件必须保持为 0 邀请、0 成交额');
+        }
+        if ($isInitialLevel && !$data['enabled']) {
+            abort(422, '0 邀请初始等级必须保持启用');
+        }
+        if ($isInitialLevel && (int)$data['valid_days'] !== 0) {
+            abort(422, '0 邀请初始等级必须永久有效，请将等级有效期设置为 0');
+        }
+
+        $sameRequirementLevel = ReferralLevel::where('id', '!=', $levelId ?: 0)
+            ->where('required_invites', $data['required_invites'])
+            ->where('required_revenue', $data['required_revenue'])
+            ->first();
+        if ($sameRequirementLevel) {
+            abort(422, '升级条件不能重复，已存在相同条件的等级“' . $sameRequirementLevel->name . '”');
+        }
+
+        $sameOrderLevel = ReferralLevel::where('id', '!=', $levelId ?: 0)->where('sort', $data['sort'])->first();
+        if ($sameOrderLevel) {
+            abort(422, '等级顺序不能重复，当前顺序已被“' . $sameOrderLevel->name . '”使用');
+        }
+
+        $lowerConflict = ReferralLevel::where('id', '!=', $levelId ?: 0)
+            ->where('sort', '<', $data['sort'])
+            ->where(function ($query) use ($data) {
+                $query->where('required_invites', '>', $data['required_invites'])
+                    ->orWhere('required_revenue', '>', $data['required_revenue']);
+            })->first();
+        if ($lowerConflict) {
+            abort(422, '等级顺序与升级条件冲突：较低等级“' . $lowerConflict->name . '”的升级要求不能高于当前等级');
+        }
+
+        $higherConflict = ReferralLevel::where('id', '!=', $levelId ?: 0)
+            ->where('sort', '>', $data['sort'])
+            ->where(function ($query) use ($data) {
+                $query->where('required_invites', '<', $data['required_invites'])
+                    ->orWhere('required_revenue', '<', $data['required_revenue']);
+            })->first();
+        if ($higherConflict) {
+            abort(422, '等级顺序与升级条件冲突：较高等级“' . $higherConflict->name . '”的升级要求不能低于当前等级');
+        }
+
+        $level = $existingLevel ?: new ReferralLevel();
         $level->fill($data)->save();
         return response(['data' => $level]);
     }
@@ -87,6 +138,12 @@ class ReferralController extends Controller
     public function dropLevel(Request $request)
     {
         $level = ReferralLevel::findOrFail($request->input('id'));
+        if ((int)$level->required_invites === 0 && (int)$level->required_revenue === 0) {
+            $initialLevelCount = ReferralLevel::where('required_invites', 0)->where('required_revenue', 0)->count();
+            if ($initialLevelCount <= 1) {
+                abort(422, '初始等级不能删除，您可以编辑它的名称、描述和权益');
+            }
+        }
         $result = (bool)$level->delete();
         return response(['data' => $result]);
     }

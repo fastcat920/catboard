@@ -741,7 +741,6 @@ export default {
   invite: {
     ticketAction: 'Tickets',
     currentLevel: 'Current level',
-    defaultMember: 'Member',
     commissionRate: 'Commission rate',
     viewMembershipBenefits: 'View membership benefits',
     milestoneReward: 'Milestone reward',

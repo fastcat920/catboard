@@ -42,12 +42,10 @@ class CheckReferralLevels extends Command
                 $user->save();
                 return;
             }
-            $lower = ReferralLevel::where('enabled', 1)->where('id', '!=', $level->id)
+            $lower = ReferralLevel::where('enabled', 1)
+                ->where('sort', '<', $level->sort)
                 ->where('required_invites', '<=', $recent)->where('required_revenue', '<=', $recentRevenue)
-                ->where(function ($query) use ($level) {
-                    $query->where('required_invites', '<', $level->required_invites)
-                        ->orWhere('required_revenue', '<', $level->required_revenue);
-                })->orderBy('required_invites', 'DESC')->orderBy('required_revenue', 'DESC')->first();
+                ->orderBy('sort', 'DESC')->orderBy('id', 'DESC')->first();
             $setting = ReferralSetting::current();
             $user->referral_level_id = $lower ? $lower->id : null;
             $user->referral_level_expires_at = $lower && $lower->valid_days ? time() + (int)$lower->valid_days * 86400 : null;

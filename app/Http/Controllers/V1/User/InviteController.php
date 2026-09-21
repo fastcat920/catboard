@@ -13,7 +13,6 @@ use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\UserCoupon;
-use App\Models\ReferralLeaderboardSetting;
 use App\Services\ReferralProgramService;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
@@ -114,76 +113,6 @@ class InviteController extends Controller
         ]);
     }
 
-    public function leaderboard(Request $request)
-    {
-        if (!Schema::hasTable('v2_referral_leaderboard_setting') || !Schema::hasTable('v2_referral_reward')) {
-            return response(['data' => [], 'enabled' => false, 'reward_rules' => []]);
-        }
-
-        $setting = ReferralLeaderboardSetting::current();
-        $period = in_array($request->input('period'), ['week', 'month', 'total'], true) ? $request->input('period') : 'month';
-        $from = $period === 'week' ? strtotime('monday this week') : ($period === 'month' ? strtotime(date('Y-m-01')) : 0);
-        $config = $setting->boardConfig($period);
-        $boards = $setting->boards();
-        $rules = $setting->periodRules($period);
-        if ($request->boolean('summary')) {
-            $anyBoardEnabled = collect($boards)->contains(function ($board) { return !empty($board['enabled']); });
-            return response(['data' => [], 'enabled' => (bool)$setting->enabled && $anyBoardEnabled, 'global_enabled' => (bool)$setting->enabled, 'boards' => $boards]);
-        }
-        if (!$setting->enabled || !$config['enabled']) {
-            return response(['data' => [], 'enabled' => false, 'global_enabled' => (bool)$setting->enabled, 'period' => $period, 'metric' => $config['metric'], 'reward_rules' => $rules, 'boards' => $boards]);
-        }
-
-        $effective = ReferralReward::select('user_id', DB::raw('COUNT(*) as invite_count'))
-            ->where('reward_type', 'effective_invite')->where('status', 'granted')->whereIn('user_id', User::select('id'));
-        if ($from) $effective->whereRaw('COALESCE(granted_at, created_at) >= ?', [$from]);
-        $effective->groupBy('user_id');
-        $metric = $config['metric'];
-        $leaders = User::query()->leftJoinSub($effective, 'r', 'r.user_id', '=', 'v2_user.id')
-            ->leftJoin('v2_order as o', function ($join) use ($from) {
-                $join->on('o.invite_user_id', '=', 'v2_user.id')->where('o.status', 3);
-                if ($from) $join->where('o.created_at', '>=', $from);
-            })
-            ->select('v2_user.id', 'v2_user.email', DB::raw('COALESCE(MAX(r.invite_count),0) as invite_count'), DB::raw('COALESCE(SUM(o.total_amount),0) as revenue'), DB::raw('COALESCE(SUM(o.commission_balance),0) as income'))
-            ->groupBy('v2_user.id', 'v2_user.email')
-            ->having($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), '>', 0)
-            ->orderBy($metric === 'revenue' ? 'revenue' : ($metric === 'income' ? 'income' : 'invite_count'), 'DESC')
-            ->orderBy('v2_user.id')->limit(100)->get();
-        $userId = (int)$request->user['id'];
-
-        $rows = $leaders->values()->map(function ($row, $index) use ($setting, $rules, $userId, $metric) {
-            $rank = $index + 1;
-            $value = (int)($metric === 'revenue' ? $row->revenue : ($metric === 'income' ? $row->income : $row->invite_count));
-            $reward = 0;
-            foreach ($rules as $rule) {
-                $rankFrom = max(1, (int)($rule['rank_from'] ?? 1));
-                $rankTo = max($rankFrom, (int)($rule['rank_to'] ?? $rankFrom));
-                if ($rank >= $rankFrom && $rank <= $rankTo && $value >= (int)($rule['min_value'] ?? 0)) {
-                    $reward += max(0, (int)($rule['reward_value'] ?? 0));
-                }
-            }
-            $email = (string)$row->email;
-            if ($setting->mask_email) $email = $this->maskEmail($email);
-            return [
-                'rank' => $rank,
-                'email' => $email,
-                'value' => $value,
-                'reward_value' => $reward,
-                'is_me' => (int)$row->id === $userId,
-            ];
-        });
-
-        return response([
-            'data' => $rows,
-            'enabled' => true,
-            'global_enabled' => true,
-            'period' => $period,
-            'metric' => $metric,
-            'reward_rules' => $rules,
-            'boards' => $boards,
-        ]);
-    }
-
     private function maskEmail(string $email): string
     {
         if (strpos($email, '@') === false) return $email ? substr($email, 0, 1) . '***' : '-';
@@ -255,23 +184,6 @@ class InviteController extends Controller
                 'recent_rewards' => ReferralReward::where('user_id', $user->id)->where('reward_type', '!=', 'effective_invite')
                     ->orderBy('id', 'DESC')->limit(10)->get(),
             ];
-            if (Schema::hasTable('v2_referral_leaderboard_setting')) {
-                $leaderboardSetting = ReferralLeaderboardSetting::current();
-                if ($leaderboardSetting->enabled) {
-                    $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted')
-                        ->whereIn('user_id', User::select('id'))
-                        ->whereRaw('COALESCE(granted_at, created_at) >= ?', [strtotime(date('Y-m-01'))])->select('user_id', DB::raw('COUNT(*) as value'))
-                        ->groupBy('user_id')->orderBy('value', 'DESC')->limit(10)->get();
-                    $emails = User::whereIn('id', $leaders->pluck('user_id'))->pluck('email', 'id');
-                    $program['leaderboard'] = $leaders->values()->map(function ($row, $index) use ($emails, $leaderboardSetting, $user) {
-                        $email = (string)$emails->get($row->user_id, '');
-                        if ($leaderboardSetting->mask_email && strpos($email, '@') !== false) {
-                            [$prefix, $domain] = explode('@', $email, 2); $email = substr($prefix, 0, 1) . '***@' . $domain;
-                        }
-                        return ['rank' => $index + 1, 'email' => $email, 'value' => (int)$row->value, 'is_me' => (int)$row->user_id === (int)$user->id];
-                    });
-                }
-            }
             if (Schema::hasTable('v2_user_coupon')) {
                 $grant = UserCoupon::with('template')->where('user_id', $user->id)->where('source', 'referral_newcomer')->orderBy('id', 'DESC')->first();
                 if ($grant) $program['newcomer_reward'] = ['status'=>$grant->status,'expires_at'=>$grant->expires_at,'coupon_name'=>$grant->template?$grant->template->name:null];

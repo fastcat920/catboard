@@ -18,7 +18,6 @@
       <article v-for="coupon in filtered" :key="coupon.id" class="coupon-card" :class="coupon.status">
         <div class="coupon-value">
           <strong>{{ discount(coupon.template) }}</strong>
-          <span>{{ minimum(coupon.template) }}</span>
         </div>
         <div class="coupon-content">
           <div class="coupon-heading"><h2>{{ localized(coupon.template, 'name') }}</h2><span>{{ statusText(coupon.status) }}</span></div>
@@ -61,7 +60,6 @@ const localized = (row, key) => !row ? '' : (en.value ? row[`${key}_en`] : row[k
 const discount = item => {
   return formatCouponValue(item, { percentSuffix: en.value ? '% OFF' : '%' });
 };
-const minimum = item => Number(item?.minimum_amount || 0) > 0 ? (en.value ? `Min. ¥${(item.minimum_amount / 100).toFixed(2)}` : `满 ¥${(item.minimum_amount / 100).toFixed(2)} 可用`) : (en.value ? 'No minimum' : '无门槛');
 const date = value => value ? new Date(Number(value) * 1000).toLocaleDateString(en.value ? 'en-US' : 'zh-CN') : '—';
 const statusText = status => ({ available: en.value ? 'Available' : '可用', locked: en.value ? 'Reserved' : '已锁定', pending: en.value ? 'Upcoming' : '待生效', used: en.value ? 'Used' : '已使用', expired: en.value ? 'Expired' : '已过期', revoked: en.value ? 'Revoked' : '已撤销' }[status] || status);
 const sourceText = source => ({ manual: en.value ? 'Manual grant' : '后台手动发放', newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', referral_newcomer: en.value ? 'Newcomer reward' : '新人邀请奖励', distribution_task: en.value ? 'Platform distribution' : '平台批量发放' }[source] || source || '—');

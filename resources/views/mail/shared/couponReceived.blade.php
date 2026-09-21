@@ -17,7 +17,6 @@
                     {{ $discountType === 'fixed' ? '¥'.number_format($discountValue / 100, 2) : $discountValue.'% OFF' }}
                 </div>
                 <div style="font-size:14px;line-height:1.8;color:#59636e">
-                    最低消费 / Minimum spend：¥{{ number_format($minimumAmount / 100, 2) }}<br>
                     生效时间 / Valid from：{{ date('Y-m-d H:i', $startsAt) }}<br>
                     到期时间 / Expires：{{ date('Y-m-d H:i', $expiresAt) }}
                 </div>

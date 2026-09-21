@@ -102,14 +102,9 @@
             : Number(template.discount_value || 0) + "% OFF";
     }
     function unavailableReason(reason, coupon) {
-        var minimum = coupon.template && coupon.template.minimum_amount;
         return (
             {
                 template_disabled: text("优惠券已停用", "Coupon is disabled"),
-                minimum_amount: text(
-                    "订单金额未满 ¥" + money(minimum),
-                    "Minimum order ¥" + money(minimum),
-                ),
                 plan_not_supported: text(
                     "不适用于当前套餐",
                     "Not valid for this plan",
@@ -119,8 +114,8 @@
                     "Not valid for this billing period",
                 ),
                 first_order_only: text(
-                    "仅限首笔订单或新用户",
-                    "First order or new users only",
+                    "仅限首笔订单",
+                    "First order only",
                 ),
                 renewal_not_supported: text(
                     "不适用于续费订单",

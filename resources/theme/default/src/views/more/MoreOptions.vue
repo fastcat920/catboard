@@ -74,12 +74,6 @@
           <div class="menu-arrow"><IconChevronRight :size="18" /></div>
         </button>
 
-        <button v-if="leaderboardEnabled" type="button" class="menu-item" @click="$router.push('/invite/leaderboard')">
-          <div class="menu-icon"><IconTrophy :size="24" /></div>
-          <div class="menu-info"><div class="menu-title">{{ $t('invite.leaderboard.title') }}</div></div>
-          <div class="menu-arrow"><IconChevronRight :size="18" /></div>
-        </button>
-
         <button v-if="showTrafficLog" type="button" class="menu-item" @click="$router.push('/traffic')">
           <div class="menu-icon"><IconChartDonut :size="24" /></div>
           <div class="menu-info"><div class="menu-title">{{ $t('trafficLog.title') }}</div></div>
@@ -189,8 +183,7 @@ import {
   IconGift,
   IconReceipt,
   IconChartDonut,
-  IconBook,
-  IconTrophy
+  IconBook
 } from '@tabler/icons-vue';
 import { useToast } from '@/composables/useToast';
 import { getUserInfo, getSubscribe, getUserConfig, startNewTrafficPeriod } from '@/api/dashboard';
@@ -200,7 +193,6 @@ import DomainAuthAlert from '@/components/common/DomainAuthAlert.vue';
 import SubscriptionUsageCard from '@/components/subscription/SubscriptionUsageCard.vue';
 import { applyDomainAuth } from '@/utils/licenseAuth';
 import { calculateRemainingDays, formatExpiryDate, isExpiryDateExpired } from '@/utils/subscriptionExpiry';
-import { getInviteLeaderboard } from '@/api/invite';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -209,7 +201,6 @@ const { showToast } = useToast();
 const isSmallScreen = ref(false);
 const authStatus = ref({ isAuthorized: true, apiDomain: '' });
 const showTrafficLog = ref(false);
-const leaderboardEnabled = ref(false);
 const morePageConfig = MORE_PAGE_CONFIG;
 
 const loading = reactive({ userInfo: true, subscribe: true });
@@ -308,15 +299,6 @@ const fetchUserConfig = async () => {
     if (response?.data?.currency_symbol) currencySymbol.value = response.data.currency_symbol;
   } catch (error) {
     console.error('获取用户配置失败:', error);
-  }
-};
-
-const fetchLeaderboardStatus = async () => {
-  try {
-    const response = await getInviteLeaderboard('month', true);
-    leaderboardEnabled.value = response?.enabled === true;
-  } catch (error) {
-    leaderboardEnabled.value = false;
   }
 };
 
@@ -541,8 +523,7 @@ onMounted(() => {
   Promise.allSettled([
     fetchUserConfig(),
     fetchUserInfo(),
-    fetchSubscribe(),
-    fetchLeaderboardStatus()
+    fetchSubscribe()
   ]);
 });
 

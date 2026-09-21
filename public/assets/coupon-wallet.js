@@ -143,11 +143,6 @@
                                               : t.name,
                                       ) +
                                       "</strong><span>" +
-                                      text("满 ¥", "Min ¥") +
-                                      (
-                                          Number(t.minimum_amount || 0) / 100
-                                      ).toFixed(2) +
-                                      " · " +
                                       text("有效期至 ", "Expires ") +
                                       dt(x.expires_at) +
                                       "</span><small>" +

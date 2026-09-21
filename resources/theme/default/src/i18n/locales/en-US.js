@@ -652,8 +652,6 @@ export default {
     coupon_loading: 'Finding eligible coupons…',
     best_coupon: 'Best coupon',
     coupon_save: 'Save {amount}',
-    coupon_minimum: 'Min. {amount}',
-    coupon_no_minimum: 'No minimum',
     coupon_no_description: 'No description',
     no_coupon: 'Do not use a coupon',
     no_eligible_coupon: 'No eligible coupons for this order'
@@ -765,24 +763,6 @@ export default {
       status: 'Status',
       total: '{total} invited users',
       statuses: { effective: 'Qualified invite', pending: 'Awaiting first purchase' }
-    },
-    leaderboard: {
-      title: 'Invite leaderboard',
-      loading: 'Loading leaderboard…',
-      loadFailed: 'Failed to load leaderboard',
-      disabled: 'The invite leaderboard is not enabled',
-      empty: 'No ranking data for this period',
-      rewards: 'Rewards for this period',
-      noRewards: 'No leaderboard rewards are configured for this period',
-      effectiveInvites: 'Qualified invites',
-      reward: 'Estimated reward',
-      me: 'Me',
-      periods: { week: 'Weekly', month: 'Monthly', total: 'All time' },
-      metrics: { invites: 'Qualified invites', revenue: 'Revenue', income: 'Referral income' },
-      ruleRank: 'Rank {rank}',
-      ruleRange: 'Ranks {from}-{to}',
-      ruleThreshold: ' with {count}+ invites',
-      ruleAmountThreshold: ' with ¥{amount}+'
     },
     rules: {
       title: 'Commission Rules',

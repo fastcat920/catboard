@@ -114,7 +114,6 @@ GET /api/v1/user/invite/fetch
   "next_milestone": {},
   "recent_rewards": [],
   "campaign": {},
-  "leaderboard": [],
   "newcomer_reward": {}
 }
 ```
@@ -263,29 +262,7 @@ POST /api/v1/passport/comm/pv
 
 同一邀请码、同一访客每天只计一次访问。注册时仍需提交原有 `invite_code`，后端会把最近访问链路关联到新用户。
 
-### 2.8 排行榜
-
-当排行榜关闭时，`program.leaderboard` 不返回。开启后当前实际返回：
-
-- 本自然月榜
-- 指标为有效邀请人数
-- 最多 10 人
-- 邮箱是否脱敏由后台控制
-
-```json
-{
-  "rank": 1,
-  "email": "f***@example.com",
-  "value": 8,
-  "is_me": false
-}
-```
-
-客户端必须直接使用后端返回的 `email`，不要二次自行脱敏；使用 `is_me` 高亮当前用户。
-
-注意：周榜、总榜、成交金额榜、推广收入榜目前没有独立用户端 API，不应在客户端构造虚假入口。
-
-### 2.9 新人优惠券状态
+### 2.8 新人优惠券状态
 
 如果当前用户通过邀请注册且获得新人优惠券，`program.newcomer_reward` 返回：
 
@@ -299,7 +276,7 @@ POST /api/v1/passport/comm/pv
 
 它只用于邀请页的简要提示。完整详情应跳转优惠券钱包并读取 `/coupon/wallet`。
 
-### 2.10 其他邀请接口
+### 2.9 其他邀请接口
 
 创建邀请码：
 
@@ -347,11 +324,9 @@ GET /api/v1/user/coupon/wallet
 | `description/description_en` | 中英文描述 |
 | `discount_type` | `fixed` 或 `percent` |
 | `discount_value` | 固定金额时为最小货币单位；百分比时为整数百分比 |
-| `minimum_amount` | 最低订单金额 |
-| `maximum_discount` | 百分比券最高优惠金额，可空 |
 | `plan_ids` | 限定套餐 ID 数组，空表示不限 |
 | `periods` | 限定购买周期数组，空表示不限 |
-| `first_order_only/new_user_only` | 首单/新用户限制 |
+| `first_order_only` | 是否仅限用户首笔有效套餐订单 |
 | `allow_renewal` | 是否可用于续费 |
 | `stackable` | 是否可与会员折扣叠加 |
 
@@ -404,7 +379,6 @@ GET /api/v1/user/coupon/available?plan_id=1&period=month_price
 | 值 | 建议文案 |
 |---|---|
 | `template_disabled` | 优惠券已停用 |
-| `minimum_amount` | 未达到最低使用金额 |
 | `plan_not_supported` | 不适用于当前套餐 |
 | `period_not_supported` | 不适用于当前购买周期 |
 | `first_order_only` | 仅限首单用户使用 |
@@ -536,7 +510,6 @@ POST /api/v1/user/order/save
 - 活动卡片：中英文说明、倒计时、奖励和适用条件。
 - 分享区域：复制邀请链接、邀请码和渠道分享按钮。
 - 新人奖励状态。
-- 本月排行榜。
 - 最近奖励流水。
 
 ### 4.2 优惠券中心
@@ -556,7 +529,6 @@ POST /api/v1/user/order/save
 - [ ] 注册人数和有效邀请人数没有混淆。
 - [ ] 活动倒计时按服务端时间戳计算并在到期后刷新。
 - [ ] 分享链接传递邀请码和 `utm_source`。
-- [ ] 排行榜邮箱直接使用服务端脱敏结果。
 - [ ] 优惠券钱包正确区分六种状态和四类来源。
 - [ ] 周期页不再出现优惠码输入框。
 - [ ] 默认自动选择推荐券，用户可以换券或明确不使用。
@@ -568,8 +540,7 @@ POST /api/v1/user/order/save
 
 ## 6. 当前能力边界
 
-- 用户端邀请增强数据集中在 `/invite/fetch`，暂无活动、排行榜和奖励流水的独立分页接口。
-- 用户端排行榜当前仅实现本月有效邀请人数 Top 10。
+- 用户端邀请增强数据集中在 `/invite/fetch`，暂无活动和奖励流水的独立分页接口。
 - 账户优惠券已经替代旧优惠码，但兑换码属于另一套能力，不应复用优惠券 UI。
 - 邀请活动当前奖励类型为余额、佣金、流量或套餐时长；活动奖励暂未直接发放优惠券。
 - 等级与活动规则以服务端判定为准，客户端只负责展示，不应自行判断最终奖励资格。

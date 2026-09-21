@@ -14,11 +14,8 @@ class CreateCouponCenter extends Migration
             $table->text('description')->nullable(); $table->text('description_en')->nullable();
             $table->enum('discount_type', ['fixed', 'percent']);
             $table->unsignedInteger('discount_value');
-            $table->unsignedInteger('minimum_amount')->default(0);
-            $table->unsignedInteger('maximum_discount')->nullable();
             $table->text('plan_ids')->nullable(); $table->text('periods')->nullable();
             $table->boolean('first_order_only')->default(false);
-            $table->boolean('new_user_only')->default(false);
             $table->boolean('allow_renewal')->default(true);
             $table->boolean('stackable')->default(false);
             $table->unsignedInteger('per_user_limit')->default(1);

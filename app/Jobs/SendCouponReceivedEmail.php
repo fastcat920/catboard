@@ -55,7 +55,6 @@ class SendCouponReceivedEmail implements ShouldQueue
             'descriptionEn' => $coupon->template->description_en,
             'discountType' => $coupon->template->discount_type,
             'discountValue' => $coupon->template->discount_value,
-            'minimumAmount' => $coupon->template->minimum_amount,
             'startsAt' => $coupon->starts_at,
             'expiresAt' => $coupon->expires_at,
             'walletUrl' => $siteUrl . '/#/coupon',

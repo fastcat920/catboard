@@ -29,32 +29,10 @@ class CreateReferralGrowthTools extends Migration
             $table->unsignedInteger('created_at');
             $table->unsignedInteger('updated_at');
         });
-        Schema::create('v2_referral_leaderboard_setting', function (Blueprint $table) {
-            $table->increments('id');
-            $table->boolean('enabled')->default(false);
-            $table->boolean('mask_email')->default(true);
-            $table->text('reward_rules')->nullable();
-            $table->unsignedInteger('created_at');
-            $table->unsignedInteger('updated_at');
-        });
-        Schema::create('v2_referral_leaderboard_award', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('period_key', 32);
-            $table->enum('period_type', ['week', 'month'])->index();
-            $table->unsignedInteger('user_id')->index();
-            $table->unsignedInteger('rank');
-            $table->unsignedInteger('reward_value')->default(0);
-            $table->enum('status', ['granted', 'skipped', 'reversed'])->default('granted');
-            $table->unsignedInteger('created_at');
-            $table->unsignedInteger('updated_at');
-            $table->unique(['period_key', 'period_type', 'user_id'], 'referral_leaderboard_award_unique');
-        });
     }
 
     public function down()
     {
-        Schema::dropIfExists('v2_referral_leaderboard_award');
-        Schema::dropIfExists('v2_referral_leaderboard_setting');
         Schema::dropIfExists('v2_referral_material');
         Schema::dropIfExists('v2_referral_visit');
     }

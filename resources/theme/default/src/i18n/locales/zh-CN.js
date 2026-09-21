@@ -698,8 +698,6 @@ export default {
     coupon_loading: '正在匹配可用优惠券…',
     best_coupon: '最优优惠券',
     coupon_save: '预计优惠 {amount}',
-    coupon_minimum: '满 {amount} 可用',
-    coupon_no_minimum: '无门槛',
     coupon_no_description: '暂无说明',
     no_coupon: '本次不使用优惠券',
     no_eligible_coupon: '当前订单暂无可用优惠券'
@@ -812,24 +810,6 @@ export default {
       status: '状态',
       total: '共 {total} 位邀请用户',
       statuses: { effective: '有效邀请', pending: '待首购' }
-    },
-    leaderboard: {
-      title: '邀请排行',
-      loading: '正在加载排行榜…',
-      loadFailed: '排行榜加载失败',
-      disabled: '邀请排行榜暂未开启',
-      empty: '本期暂无排行数据',
-      rewards: '本期排行榜奖励',
-      noRewards: '本期暂未设置排行榜奖励',
-      effectiveInvites: '有效邀请',
-      reward: '预计奖励',
-      me: '我',
-      periods: { week: '周榜', month: '月榜', total: '总榜' },
-      metrics: { invites: '有效邀请', revenue: '成交金额', income: '推广收入' },
-      ruleRank: '第 {rank} 名',
-      ruleRange: '第 {from}-{to} 名',
-      ruleThreshold: '且达到 {count} 人',
-      ruleAmountThreshold: '且达到 ¥{amount}'
     },
     rules: {
       title: '返佣规则',

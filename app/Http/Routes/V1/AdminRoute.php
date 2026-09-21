@@ -126,8 +126,6 @@ class AdminRoute
             $router->get ('/referral/milestones', 'V1\\Admin\\ReferralController@milestones');
             $router->post('/referral/milestone/save', 'V1\\Admin\\ReferralController@saveMilestone');
             $router->post('/referral/milestone/drop', 'V1\\Admin\\ReferralController@dropMilestone');
-            $router->get ('/referral/leaderboard', 'V1\\Admin\\ReferralController@leaderboard');
-            $router->post('/referral/leaderboard/setting', 'V1\\Admin\\ReferralController@saveLeaderboardSetting');
             $router->get ('/referral/funnel', 'V1\\Admin\\ReferralController@funnel');
             $router->get ('/referral/rewards', 'V1\\Admin\\ReferralController@rewards');
             $router->post('/referral/reward/reverse', 'V1\\Admin\\ReferralController@reverseReward');

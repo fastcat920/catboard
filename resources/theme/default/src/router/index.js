@@ -161,12 +161,6 @@ const routes = [
         meta: { titleKey: 'invite.users.title', requiresAuth: true, activeNav: 'Invite' }
       },
       {
-        path: 'invite/leaderboard',
-        name: 'InviteLeaderboard',
-        component: () => import('@/views/invite/InviteLeaderboard.vue'),
-        meta: { titleKey: 'invite.leaderboard.title', requiresAuth: true, activeNav: 'Mine' }
-      },
-      {
         path: 'coupons',
         alias: 'coupon',
         name: 'Coupons',

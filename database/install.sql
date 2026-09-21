@@ -109,26 +109,11 @@ CREATE TABLE `v2_referral_material` (
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `v2_referral_leaderboard_setting`;
-CREATE TABLE `v2_referral_leaderboard_setting` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT, `enabled` tinyint(1) NOT NULL DEFAULT '0', `mask_email` tinyint(1) NOT NULL DEFAULT '1',
-  `reward_rules` text, `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `v2_referral_leaderboard_award`;
-CREATE TABLE `v2_referral_leaderboard_award` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT, `period_key` varchar(32) NOT NULL, `period_type` enum('week','month') NOT NULL,
-  `user_id` int unsigned NOT NULL, `rank` int unsigned NOT NULL, `reward_value` int unsigned NOT NULL DEFAULT '0',
-  `status` enum('granted','skipped','reversed') NOT NULL DEFAULT 'granted', `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `referral_leaderboard_award_unique` (`period_key`,`period_type`,`user_id`), KEY `period_type` (`period_type`), KEY `user_id` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
 DROP TABLE IF EXISTS `v2_coupon_template`;
 CREATE TABLE `v2_coupon_template` (
   `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL, `description` text, `description_en` text,
-  `discount_type` enum('fixed','percent') NOT NULL, `discount_value` int unsigned NOT NULL, `minimum_amount` int unsigned NOT NULL DEFAULT '0', `maximum_discount` int unsigned DEFAULT NULL,
-  `plan_ids` text, `periods` text, `first_order_only` tinyint(1) NOT NULL DEFAULT '0', `new_user_only` tinyint(1) NOT NULL DEFAULT '0', `allow_renewal` tinyint(1) NOT NULL DEFAULT '1', `stackable` tinyint(1) NOT NULL DEFAULT '0',
+  `discount_type` enum('fixed','percent') NOT NULL, `discount_value` int unsigned NOT NULL,
+  `plan_ids` text, `periods` text, `first_order_only` tinyint(1) NOT NULL DEFAULT '0', `allow_renewal` tinyint(1) NOT NULL DEFAULT '1', `stackable` tinyint(1) NOT NULL DEFAULT '0',
   `per_user_limit` int unsigned NOT NULL DEFAULT '1', `total_limit` int unsigned DEFAULT NULL, `daily_limit` int unsigned DEFAULT NULL, `valid_days` smallint unsigned DEFAULT NULL,
   `starts_at` int unsigned DEFAULT NULL, `ends_at` int unsigned DEFAULT NULL, `issued_count` int unsigned NOT NULL DEFAULT '0', `used_count` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `enabled` (`enabled`)

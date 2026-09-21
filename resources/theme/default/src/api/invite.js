@@ -53,14 +53,6 @@ export function getInvitedUsers(current = 1, pageSize = 10) {
   });
 }
 
-export function getInviteLeaderboard(period = 'month', summary = false) {
-  return request({
-    url: '/user/invite/leaderboard',
-    method: 'get',
-    params: { period, summary: summary ? 1 : 0 }
-  });
-}
-
 /**
  * getCommissionConfig - 获取佣金配置
  * @Board @url GET /user/comm/config

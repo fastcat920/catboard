@@ -106,7 +106,7 @@
                   <span class="coupon-trigger-value">{{ couponValue(selectedCoupon) }}</span>
                   <span class="coupon-trigger-copy">
                     <strong>{{ couponName(selectedCoupon) }}</strong>
-                    <small>{{ couponMinimum(selectedCoupon) }} · {{ $t('order.coupon_save', { amount: couponSavings(selectedCoupon) }) }}</small>
+                    <small>{{ $t('order.coupon_save', { amount: couponSavings(selectedCoupon) }) }}</small>
                   </span>
                   <span v-if="selectedCoupon.id === bestCouponId" class="best-coupon-badge">{{ $t('order.best_coupon') }}</span>
                 </span>
@@ -128,7 +128,6 @@
                 >
                   <span class="coupon-option-value">
                     <strong>{{ couponValue(coupon) }}</strong>
-                    <small>{{ couponMinimum(coupon) }}</small>
                   </span>
                   <span class="coupon-option-content">
                     <span class="coupon-option-heading">
@@ -399,11 +398,6 @@ export default {
       currency: currencySymbol.value,
       percentSuffix: locale.value === 'en-US' ? '% OFF' : '%'
     });
-    const couponMinimum = coupon => {
-      const amount = Number(couponTemplate(coupon).minimum_amount || 0);
-      if (!amount) return t('order.coupon_no_minimum');
-      return t('order.coupon_minimum', { amount: `${currencySymbol.value}${(amount / 100).toFixed(2)}` });
-    };
     const couponDescription = coupon => {
       const template = couponTemplate(coupon);
       return (locale.value === 'en-US' ? template.description_en : template.description) || template.description || template.description_en || '';
@@ -601,7 +595,6 @@ export default {
       refreshPreview,
       couponName,
       couponValue,
-      couponMinimum,
       couponDescription,
       couponSavings,
       toggleCouponDropdown,

@@ -3,7 +3,8 @@
     var root,
         tab = "overview",
         cache = {},
-        taskTimer;
+        taskTimer,
+        planPickerOutsideHandler;
     function api(path, opt) {
         opt = opt || {};
         var h = {
@@ -138,7 +139,13 @@
             clearTimeout(taskTimer);
             taskTimer = null;
         }
+        clearPlanPickerOutsideHandler();
         if (root) root.hidden = true;
+    }
+    function clearPlanPickerOutsideHandler() {
+        if (!planPickerOutsideHandler) return;
+        document.removeEventListener("pointerdown", planPickerOutsideHandler, true);
+        planPickerOutsideHandler = null;
     }
     function isCouponRoute() {
         return !!(
@@ -148,6 +155,7 @@
         );
     }
     function render() {
+        clearPlanPickerOutsideHandler();
         root.innerHTML =
             '<div class="p-0 p-lg-4"><div class="block"><nav class="nav nav-tabs nav-tabs-block">' +
             [
@@ -234,7 +242,6 @@
                             [
                                 "名称",
                                 "优惠",
-                                "门槛",
                                 "有效期",
                                 "已发放/已使用",
                                 "到账邮件",
@@ -247,7 +254,6 @@
                                     x.discount_type === "fixed"
                                         ? "¥" + money(x.discount_value)
                                         : x.discount_value + "%",
-                                    "¥" + money(x.minimum_amount),
                                     x.valid_days
                                         ? x.valid_days + " 天"
                                         : dt(x.ends_at),
@@ -296,6 +302,13 @@
             .catch(fail);
     }
     function editTemplate(x, plans) {
+        var isPercent = x.discount_type === "percent";
+        var discountValue =
+            x.discount_value == null || x.discount_value === ""
+                ? ""
+                : isPercent
+                  ? x.discount_value
+                  : money(x.discount_value);
         var m = document.createElement("div");
         m.className = "coupon-modal";
         m.innerHTML =
@@ -312,20 +325,8 @@
             '</textarea></div></div></div><div class="row"><div class="col-md-6"><div class="form-group"><label>优惠类型</label><select class="form-control" name="discount_type"><option value="fixed">固定金额</option><option value="percent">百分比</option></select></div></div><div class="col-md-6">' +
             field(
                 "discount_value",
-                "优惠值（金额填分，比例填整数）",
-                x.discount_value || "",
-            ) +
-            '</div></div><div class="row"><div class="col-md-6">' +
-            field(
-                "minimum_amount",
-                "最低订单金额（分）",
-                x.minimum_amount || 0,
-            ) +
-            '</div><div class="col-md-6">' +
-            field(
-                "maximum_discount",
-                "最高优惠金额（分）",
-                x.maximum_discount || "",
+                isPercent ? "优惠比例（%）" : "优惠金额（元）",
+                discountValue,
             ) +
             '</div></div><div class="form-group"><label>适用套餐（不选为全部）</label>' +
             plans
@@ -346,23 +347,25 @@
                 .join("") +
             '</div><div class="form-group"><label>适用周期</label>' +
             [
-                "month_price",
-                "quarter_price",
-                "half_year_price",
-                "year_price",
-                "two_year_price",
-                "three_year_price",
-                "onetime_price",
-                "reset_price",
+                ["month_price", "月付"],
+                ["quarter_price", "季付"],
+                ["half_year_price", "半年付"],
+                ["year_price", "年付"],
+                ["two_year_price", "两年付"],
+                ["three_year_price", "三年付"],
+                ["onetime_price", "一次性"],
+                ["reset_price", "流量重置包"],
             ]
-                .map(function (v) {
+                .map(function (period) {
                     return (
                         '<label class="mr-3"><input type="checkbox" name="periods" value="' +
-                        v +
+                        period[0] +
                         '" ' +
-                        ((x.periods || []).indexOf(v) >= 0 ? "checked" : "") +
+                        ((x.periods || []).indexOf(period[0]) >= 0
+                            ? "checked"
+                            : "") +
                         "> " +
-                        v +
+                        period[1] +
                         "</label>"
                     );
                 })
@@ -382,7 +385,6 @@
             "</div></div>" +
             [
                 ["first_order_only", "仅限首单"],
-                ["new_user_only", "仅限新用户"],
                 ["allow_renewal", "允许续费"],
                 ["stackable", "允许叠加会员折扣"],
                 ["email_notify_enabled", "优惠券到账后发送邮件"],
@@ -408,6 +410,20 @@
         root.appendChild(m);
         m.querySelector("[name=discount_type]").value =
             x.discount_type || "fixed";
+        var discountType = m.querySelector("[name=discount_type]");
+        var discountInput = m.querySelector("[name=discount_value]");
+        var discountLabel = discountInput.closest(".form-group").querySelector("label");
+        var syncDiscountField = function (resetValue) {
+            var percent = discountType.value === "percent";
+            discountLabel.textContent = percent ? "优惠比例（%）" : "优惠金额（元）";
+            discountInput.step = percent ? "1" : "0.01";
+            discountInput.min = percent ? "1" : "0.01";
+            if (percent) discountInput.max = "100";
+            else discountInput.removeAttribute("max");
+            if (resetValue) discountInput.value = "";
+        };
+        discountType.onchange = function () { syncDiscountField(true); };
+        syncDiscountField(false);
         m.querySelectorAll("[data-close]").forEach(function (b) {
             b.onclick = function () {
                 m.remove();
@@ -425,9 +441,10 @@
                     description: f.description.value || null,
                     description_en: f.description_en.value || null,
                     discount_type: f.discount_type.value,
-                    discount_value: Number(f.discount_value.value),
-                    minimum_amount: Number(f.minimum_amount.value || 0),
-                    maximum_discount: n("maximum_discount"),
+                    discount_value:
+                        f.discount_type.value === "percent"
+                            ? Math.round(Number(f.discount_value.value))
+                            : Math.round(Number(f.discount_value.value) * 100),
                     plan_ids: Array.from(
                         f.querySelectorAll("[name=plan_ids]:checked"),
                     ).map(function (i) {
@@ -439,7 +456,6 @@
                         return i.value;
                     }),
                     first_order_only: f.first_order_only.checked ? 1 : 0,
-                    new_user_only: f.new_user_only.checked ? 1 : 0,
                     allow_renewal: f.allow_renewal.checked ? 1 : 0,
                     stackable: f.stackable.checked ? 1 : 0,
                     email_notify_enabled: f.email_notify_enabled.checked ? 1 : 0,
@@ -513,11 +529,63 @@
             "</div>"
         );
     }
+    function openTaskDetail(task) {
+        var statusLabels = {
+            pending: "等待队列",
+            running: "执行中",
+            completed: "已完成",
+            partial: "部分失败",
+            failed: "执行失败",
+            cancelled: "已取消",
+        };
+        var filters = task.filters || {};
+        var planNames = (filters.plan_ids || []).map(function (id) {
+            var plan = (cache.plans || []).find(function (item) {
+                return String(item.id) === String(id);
+            });
+            return plan ? plan.name : "ID " + id;
+        });
+        var scope = [];
+        if ((filters.user_ids || []).length)
+            scope.push("指定用户 " + filters.user_ids.length + " 人");
+        if ((filters.emails || []).length)
+            scope.push("指定邮箱 " + filters.emails.length + " 个");
+        if (planNames.length) scope.push("指定订阅：" + planNames.join("、"));
+        if (filters.subscription_status)
+            scope.push(
+                "订阅状态：" +
+                    (filters.subscription_status === "active" ? "有效" : "已过期"),
+            );
+        if (filters.never_purchased) scope.push("从未购买用户");
+        var modal = document.createElement("div");
+        modal.className = "coupon-modal";
+        modal.innerHTML =
+            '<div class="coupon-dialog coupon-task-dialog"><div class="coupon-head"><h3>发放任务详情</h3><button type="button" data-close>×</button></div><div class="coupon-body"><dl class="coupon-task-detail">' +
+            "<div><dt>任务名称</dt><dd>" + esc(task.name) + "</dd></div>" +
+            "<div><dt>状态</dt><dd>" + esc(statusLabels[task.status] || task.status) + "</dd></div>" +
+            "<div><dt>执行进度</dt><dd>" + Number(task.processed_count || 0) + " / " + Number(task.estimated_count || 0) + "</dd></div>" +
+            "<div><dt>成功 / 跳过 / 失败</dt><dd>" + Number(task.success_count || 0) + " / " + Number(task.skipped_count || 0) + " / " + Number(task.failed_count || 0) + "</dd></div>" +
+            "<div><dt>发放范围</dt><dd>" + esc(scope.join("；") || "全部符合条件的用户") + "</dd></div>" +
+            "<div><dt>创建时间</dt><dd>" + esc(dt(task.created_at)) + "</dd></div>" +
+            "<div><dt>最后更新</dt><dd>" + esc(dt(task.heartbeat_at || task.updated_at)) + "</dd></div>" +
+            (task.last_error ? "<div><dt>错误信息</dt><dd class=\"text-danger\">" + esc(task.last_error) + "</dd></div>" : "") +
+            '</dl></div><div class="coupon-foot"><button type="button" class="btn btn-primary" data-close>关闭</button></div></div>';
+        root.appendChild(modal);
+        var closeModal = function () { modal.remove(); };
+        modal.querySelectorAll("[data-close]").forEach(function (button) {
+            button.onclick = closeModal;
+        });
+        modal.onclick = function (event) {
+            if (event.target === modal) closeModal();
+        };
+    }
     function bindTaskActions(rows) {
         root.querySelectorAll("[data-task-list] tbody tr").forEach(function (tr, i) {
             var task = rows[i];
             if (!task) return;
-            var actions = [];
+            var actions = [
+                '<button class="btn btn-sm btn-light" data-detail>查看</button>',
+            ];
             if (task.status === "pending" || task.status === "running")
                 actions.push(
                     '<button class="btn btn-sm btn-light text-danger" data-cancel>取消</button>',
@@ -536,6 +604,9 @@
                     '<button class="btn btn-sm btn-light" data-error>错误详情</button>',
                 );
             tr.lastElementChild.innerHTML = actions.join(" ") || "-";
+            tr.querySelector("[data-detail]").onclick = function () {
+                openTaskDetail(task);
+            };
             var cancel = tr.querySelector("[data-cancel]");
             if (cancel)
                 cancel.onclick = function () {
@@ -655,6 +726,21 @@
                     else summary.textContent = "已选择 " + checked.length + " 个订阅";
                 };
                 form.querySelectorAll('[name="plan_ids"]').forEach(function (item) { item.onchange = updatePlanSummary; });
+                var planPicker = form.querySelector(".coupon-plan-picker");
+                clearPlanPickerOutsideHandler();
+                planPickerOutsideHandler = function (event) {
+                    if (
+                        planPicker &&
+                        planPicker.open &&
+                        !planPicker.contains(event.target)
+                    )
+                        planPicker.removeAttribute("open");
+                };
+                document.addEventListener(
+                    "pointerdown",
+                    planPickerOutsideHandler,
+                    true,
+                );
                 root.querySelector("[data-estimate]").onclick = function () {
                     api("/distribution/estimate", {
                         method: "POST",

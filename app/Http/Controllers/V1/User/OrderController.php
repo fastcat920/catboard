@@ -25,27 +25,70 @@ class OrderController extends Controller
 {
     public function preview(Request $request, CouponWalletService $couponService, FlashSaleService $flashSaleService)
     {
-        $data=$request->validate(['plan_id'=>'required|integer','period'=>'required|string','user_coupon_id'=>'nullable|integer','disable_auto_coupon'=>'nullable|boolean']);
-        $plan=Plan::findOrFail($data['plan_id']);if(!array_key_exists($data['period'],$plan->getAttributes())||$plan[$data['period']]===null)abort(422,'当前付款周期不可购买');
-        $user=User::findOrFail($request->user['id']);$order=new Order(['user_id'=>$user->id,'plan_id'=>$plan->id,'period'=>$data['period'],'total_amount'=>$plan[$data['period']]]);(new OrderService($order))->setOrderType($user);$original=(int)$order->total_amount;
-        $flashSale=$flashSaleService->apply($order,$user);$activityDiscount=(int)$order->flash_sale_discount_amount;$couponBase=(int)$order->total_amount;
-        $available=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->available($user,$plan->id,$data['period'],$couponBase,(int)$order->type);$selected=$request->boolean('disable_auto_coupon')?null:($request->input('user_coupon_id')?$available->firstWhere('id',(int)$request->input('user_coupon_id')):$available->first());
-        if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$couponBase-$couponDiscount;$memberDiscountRate=app(\App\Services\ReferralProgramService::class)->memberDiscountRate($user);$vipDiscount=(!$selected||$selected->template->stackable)&&$memberDiscountRate?(int)round($afterCoupon*$memberDiscountRate/100):0;
-        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) abort(422, '当前限时特价不可叠加优惠券');
-        $unavailable=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->unavailable($user,$plan->id,$data['period'],$couponBase,(int)$order->type);
-        $finalAmount=max(0,$afterCoupon-$vipDiscount);
-        $balanceAmount=min((int)$user->balance,$finalAmount);
+        $data = $request->validate([
+            'plan_id' => 'required|integer',
+            'period' => 'required|string',
+            'user_coupon_id' => 'nullable|integer',
+            'disable_auto_coupon' => 'nullable|boolean',
+        ]);
+        $plan = Plan::findOrFail($data['plan_id']);
+        if (!array_key_exists($data['period'], $plan->getAttributes()) || $plan[$data['period']] === null) {
+            abort(422, '当前付款周期不可购买');
+        }
+
+        $user = User::findOrFail($request->user['id']);
+        $planAmount = (int)$plan[$data['period']];
+        $order = new Order([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'period' => $data['period'],
+            'total_amount' => $planAmount,
+        ]);
+        (new OrderService($order))->setOrderType($user);
+        $surplusAmount = (int)$order->surplus_amount;
+        $refundAmount = (int)$order->refund_amount;
+
+        $flashSale = $flashSaleService->apply($order, $user);
+        $activityDiscount = (int)$order->flash_sale_discount_amount;
+        $couponBase = (int)$order->total_amount;
+        $available = $flashSale && !$flashSale->allow_coupon
+            ? collect()
+            : $couponService->available($user, $plan->id, $data['period'], $couponBase, (int)$order->type);
+        $selected = $request->boolean('disable_auto_coupon')
+            ? null
+            : ($request->input('user_coupon_id')
+                ? $available->firstWhere('id', (int)$request->input('user_coupon_id'))
+                : $available->first());
+        if ($request->input('user_coupon_id') && !$selected) abort(422, '所选优惠券不满足使用条件');
+
+        $couponDiscount = $selected ? (int)$selected->calculated_discount : 0;
+        $afterCoupon = $couponBase - $couponDiscount;
+        $memberDiscountRate = app(\App\Services\ReferralProgramService::class)->memberDiscountRate($user);
+        $memberDiscount = (!$selected || $selected->template->stackable) && $memberDiscountRate
+            ? (int)round($afterCoupon * $memberDiscountRate / 100)
+            : 0;
+        if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) {
+            abort(422, '当前限时特价不可叠加优惠券');
+        }
+        $unavailable = $flashSale && !$flashSale->allow_coupon
+            ? collect()
+            : $couponService->unavailable($user, $plan->id, $data['period'], $couponBase, (int)$order->type);
+        $orderAmount = max(0, $afterCoupon - $memberDiscount);
+        $balanceAmount = min((int)$user->balance, $orderAmount);
         return response(['data'=>[
-            'original_amount'=>$original,
+            'original_amount'=>$planAmount,
+            'surplus_amount'=>$surplusAmount,
+            'refund_amount'=>$refundAmount,
             'activity_discount'=>$activityDiscount,
             'flash_sale'=>$flashSale,
             'allow_coupon'=>!$flashSale||(bool)$flashSale->allow_coupon,
             'coupon_discount'=>$couponDiscount,
             'member_discount_rate'=>$memberDiscountRate,
-            'vip_discount'=>$vipDiscount,
-            'final_amount'=>$finalAmount,
+            'member_discount'=>$memberDiscount,
+            'vip_discount'=>$memberDiscount,
+            'final_amount'=>$orderAmount,
             'balance_amount'=>$balanceAmount,
-            'payable_amount'=>max(0,$finalAmount-$balanceAmount),
+            'payable_amount'=>max(0,$orderAmount-$balanceAmount),
             'selected_coupon'=>$selected,
             'available_coupons'=>$available,
             'unavailable_coupons'=>$unavailable,

@@ -55,30 +55,42 @@
               </div>
               <div v-else class="info-row">
                 <div class="info-label">{{ $t('payment.total_price') }}</div>
-                <div class="info-value amount">{{ formatAmount(getPlanPrice()) }}</div>
+                <div class="info-value amount">{{ formatAmount(lockedPlanAmount) }}</div>
               </div>
-              <div class="info-row discount-row" v-if="orderDetail.discount_amount > 0">
-                <div class="info-label">{{ $t('payment.discount_amount') }}</div>
-                <div class="info-value discount">-{{ formatAmount(orderDetail.discount_amount) }}</div>
+              <div class="info-row discount-row" v-if="flashSaleDiscountAmount > 0">
+                <div class="info-label">{{ $t('payment.activity_discount') }}</div>
+                <div class="info-value discount">-{{ formatAmount(flashSaleDiscountAmount) }}</div>
+              </div>
+              <div class="info-row discount-row" v-if="couponDiscountAmount > 0">
+                <div class="info-label">{{ $t('payment.coupon_discount') }}</div>
+                <div class="info-value discount">-{{ formatAmount(couponDiscountAmount) }}</div>
+              </div>
+              <div class="info-row discount-row" v-if="memberDiscountAmount > 0">
+                <div class="info-label">{{ $t('payment.member_discount') }}</div>
+                <div class="info-value discount">-{{ formatAmount(memberDiscountAmount) }}</div>
               </div>
               <div class="info-row discount-row" v-if="orderDetail.surplus_amount > 0">
                 <div class="info-label">{{ $t('payment.trade_off_amount') }}</div>
                 <div class="info-value discount">-{{ formatAmount(orderDetail.surplus_amount) }}</div>
               </div>
+              <div class="info-row" v-if="orderDetail.refund_amount !== null && orderDetail.refund_amount !== undefined && orderDetail.refund_amount > 0">
+                <div class="info-label">{{ $t('payment.refund_amount') }}</div>
+                <div class="info-value refund">+{{ formatAmount(orderDetail.refund_amount) }}</div>
+              </div>
+              <div class="info-row subtotal-row" v-if="orderDetail.period !== 'deposit'">
+                <div class="info-label">{{ $t('payment.order_amount') }}</div>
+                <div class="info-value">{{ formatAmount(orderAmountBeforeBalance) }}</div>
+              </div>
               <div class="info-row" v-if="orderDetail.balance_amount !== null && orderDetail.balance_amount !== undefined && orderDetail.balance_amount > 0">
                 <div class="info-label">{{ $t('payment.use_credit') }}</div>
                 <div class="info-value discount">-{{ formatAmount(orderDetail.balance_amount) }}</div>
-              </div>
-              <div class="info-row" v-if="orderDetail.refund_amount !== null && orderDetail.refund_amount !== undefined && orderDetail.refund_amount > 0">
-                <div class="info-label">{{ $t('payment.refund_amount') }}</div>
-                <div class="info-value">{{ formatAmount(orderDetail.refund_amount) }}</div>
               </div>
               <div class="info-row" v-if="selectedMethod && handleFeeAmount > 0">
                 <div class="info-label">{{ $t('payment.handling_fee') }}</div>
                 <div class="info-value fee">{{ formatAmount(handleFeeAmount) }}</div>
               </div>
               <div class="info-row final-row">
-                <div class="info-label">{{ $t('payment.total_with_fee') }}</div>
+                <div class="info-label">{{ $t('payment.payable_amount') }}</div>
                 <div class="info-value final">{{ formatAmount(totalWithFee) }}</div>
               </div>
             </div>
@@ -452,6 +464,23 @@ export default {
     });
     
     const totalWithFee = computed(() => (orderDetail.value.total_amount || 0) + handleFeeAmount.value);
+    const flashSaleDiscountAmount = computed(() => Number(orderDetail.value.flash_sale_discount_amount || 0));
+    const couponDiscountAmount = computed(() => Number(orderDetail.value.coupon_discount_amount || 0));
+    const memberDiscountAmount = computed(() => Math.max(
+      0,
+      Number(orderDetail.value.discount_amount || 0) - flashSaleDiscountAmount.value - couponDiscountAmount.value
+    ));
+    const orderAmountBeforeBalance = computed(() =>
+      Number(orderDetail.value.total_amount || 0) + Number(orderDetail.value.balance_amount || 0));
+    const lockedPlanAmount = computed(() => {
+      if (orderDetail.value.period === 'deposit') return orderAmountBeforeBalance.value;
+      return Math.max(0,
+        orderAmountBeforeBalance.value
+        + Number(orderDetail.value.discount_amount || 0)
+        + Number(orderDetail.value.surplus_amount || 0)
+        - Number(orderDetail.value.refund_amount || 0)
+      );
+    });
     
     const fetchOrderDetail = async () => {
       loading.order = true;
@@ -542,7 +571,6 @@ export default {
       }
       return text ? `${t('payment.fee')}: ${text}` : '';
     };
-    const getPlanPrice = () => orderDetail.value?.plan?.[orderDetail.value.period] || 0;
     
     const checkPayment = async () => {
       if (orderDetail.value.total_amount > 0 && !selectedMethod.value) {
@@ -827,10 +855,12 @@ export default {
       showSuccessAnimation, showConfettiAnimation, fromOrderList,
       formatDate, formatAmount, formatPeriod, formatTraffic, formatFee,
       selectMethod, checkPayment, cancelCurrentOrder, goToDashboard,
-      getPlanPrice, showCancelConfirm, confirmCancel, closeModal,
+      showCancelConfirm, confirmCancel, closeModal,
       showPaymentModal, paymentQRCode, paymentLink, PAYMENT_CONFIG,
       getSelectedMethodName, processPayment, openPaymentLink, closePaymentModal,
-      handleFeeAmount, totalWithFee, window, checkPaymentStatus,
+      handleFeeAmount, totalWithFee, flashSaleDiscountAmount, couponDiscountAmount,
+      memberDiscountAmount, orderAmountBeforeBalance, lockedPlanAmount,
+      window, checkPaymentStatus,
       detectBrowser, getStatusText, getStatusClass, goBack
     };
   }
@@ -905,6 +935,8 @@ export default {
       .info-label { width: 120px; color: var(--secondary-text-color); font-size: 14px; }
       .info-value { flex: 1; color: var(--text-color); font-weight: 500; font-size: 14px; }
       .trade-no-value { font-size: 10px; }
+      .refund { color: var(--success-color); font-weight: 600; }
+      &.subtotal-row { border-top: 1px dashed var(--border-color); padding-top: 15px; }
       &.final-row { border-top: 1px dashed var(--border-color); padding-top: 15px; .final { font-size: 24px; font-weight: 700; color: var(--theme-color); } }
       &.discount-row .discount { color: #f44336; }
     }

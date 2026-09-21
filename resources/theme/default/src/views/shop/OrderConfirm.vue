@@ -176,27 +176,50 @@
               
               <!-- 实际内容 -->
               <div v-else>
-                <div class="summary-row" v-if="tradeOffAmount > 0">
-                  <div class="summary-label">{{ $t('order.subtotal') }}</div>
+                <div class="summary-row">
+                  <div class="summary-label">{{ $t('order.plan_amount') }}</div>
                   <div class="summary-value">{{ currencySymbol }}{{ (originalPrice / 100).toFixed(2) }}</div>
                 </div>
-                
+
+                <div class="summary-row" v-if="activityDiscount > 0">
+                  <div class="summary-label">{{ $t('order.activity_discount') }}</div>
+                  <div class="summary-value discount">-{{ currencySymbol }}{{ (activityDiscount / 100).toFixed(2) }}</div>
+                </div>
+                <div class="summary-row" v-if="surplusAmount > 0">
+                  <div class="summary-label">{{ $t('order.trade_off_amount') }}</div>
+                  <div class="summary-value discount">-{{ currencySymbol }}{{ (surplusAmount / 100).toFixed(2) }}</div>
+                </div>
                 <div class="summary-row" v-if="discountAmount > 0">
                   <div class="summary-label">{{ $t('order.discount') }} 
                     <span v-if="couponInfo" class="coupon-name">({{ couponName(couponInfo) }})</span>
                   </div>
                   <div class="summary-value discount">-{{ currencySymbol }}{{ (discountAmount / 100).toFixed(2) }}</div>
                 </div>
-                <div class="summary-row" v-if="tradeOffAmount > 0">
-                  <div class="summary-label">{{ $t('order.trade_off_amount') }}</div>
-                  <div class="summary-value discount">-{{ currencySymbol }}{{ (tradeOffAmount / 100).toFixed(2) }}</div>
+                <div class="summary-row" v-if="memberDiscount > 0">
+                  <div class="summary-label">{{ $t('order.member_discount', { rate: memberDiscountRate }) }}</div>
+                  <div class="summary-value discount">-{{ currencySymbol }}{{ (memberDiscount / 100).toFixed(2) }}</div>
                 </div>
-                
+                <div class="summary-row" v-if="refundAmount > 0">
+                  <div class="summary-label">{{ $t('order.refund_amount') }}</div>
+                  <div class="summary-value refund">+{{ currencySymbol }}{{ (refundAmount / 100).toFixed(2) }}</div>
+                </div>
+
                 <div class="summary-divider"></div>
-                
+
+                <div class="summary-row">
+                  <div class="summary-label">{{ $t('order.order_amount') }}</div>
+                  <div class="summary-value">{{ currencySymbol }}{{ (orderAmount / 100).toFixed(2) }}</div>
+                </div>
+                <div class="summary-row" v-if="balanceAmount > 0">
+                  <div class="summary-label">{{ $t('order.balance_amount') }}</div>
+                  <div class="summary-value discount">-{{ currencySymbol }}{{ (balanceAmount / 100).toFixed(2) }}</div>
+                </div>
+
+                <div class="summary-divider"></div>
+
                 <div class="summary-row total">
-                  <div class="summary-label">{{ $t('order.total') }}</div>
-                  <div class="summary-value">{{ currencySymbol }}{{ (finalPrice / 100).toFixed(2) }}</div>
+                  <div class="summary-label">{{ $t('order.payable_amount') }}</div>
+                  <div class="summary-value">{{ currencySymbol }}{{ (payableAmount / 100).toFixed(2) }}</div>
                 </div>
               </div>
             </div>
@@ -281,8 +304,14 @@ export default {
     const couponInfo = ref(null);
     const couponDropdownOpen = ref(false);
     const couponSelectorRef = ref(null);
-    const tradeOffAmount = ref(0);
-    const previewTotal = ref(null);
+    const activityDiscount = ref(0);
+    const surplusAmount = ref(0);
+    const refundAmount = ref(0);
+    const memberDiscount = ref(0);
+    const memberDiscountRate = ref(0);
+    const previewOrderAmount = ref(null);
+    const balanceAmount = ref(0);
+    const previewPayableAmount = ref(null);
     
     // 计算原始价格
     const originalPrice = computed(() => {
@@ -295,10 +324,12 @@ export default {
       return Number(couponInfo.value?.calculated_discount || 0);
     });
     
-    // 计算最终价格
-    const finalPrice = computed(() => {
-      return previewTotal.value === null ? Math.max(0, originalPrice.value - discountAmount.value - tradeOffAmount.value) : previewTotal.value;
-    });
+    const orderAmount = computed(() => previewOrderAmount.value === null
+      ? Math.max(0, originalPrice.value - surplusAmount.value + refundAmount.value - activityDiscount.value - discountAmount.value - memberDiscount.value)
+      : previewOrderAmount.value);
+    const payableAmount = computed(() => previewPayableAmount.value === null
+      ? Math.max(0, orderAmount.value - balanceAmount.value)
+      : previewPayableAmount.value);
     
     // 获取用户是否有有效套餐
     const userHasActivePlan = computed(() => {
@@ -430,8 +461,14 @@ export default {
         availableCoupons.value = data.available_coupons || [];
         couponInfo.value = data.selected_coupon || null;
         selectedCouponId.value = couponInfo.value?.id || null;
-        tradeOffAmount.value = Number(data.activity_discount || 0) + Number(data.vip_discount || 0);
-        previewTotal.value = Number(data.final_amount ?? originalPrice.value);
+        activityDiscount.value = Number(data.activity_discount || 0);
+        surplusAmount.value = Number(data.surplus_amount || 0);
+        refundAmount.value = Number(data.refund_amount || 0);
+        memberDiscount.value = Number(data.member_discount ?? data.vip_discount ?? 0);
+        memberDiscountRate.value = Number(data.member_discount_rate || 0);
+        previewOrderAmount.value = Number(data.final_amount ?? originalPrice.value);
+        balanceAmount.value = Number(data.balance_amount || 0);
+        previewPayableAmount.value = Number(data.payable_amount ?? previewOrderAmount.value);
       } catch (error) {
         showToast(error.response?.message || error.message, 'error');
       } finally {
@@ -585,8 +622,14 @@ export default {
       locale,
       originalPrice,
       discountAmount,
-      finalPrice,
-      tradeOffAmount,
+      activityDiscount,
+      surplusAmount,
+      refundAmount,
+      memberDiscount,
+      memberDiscountRate,
+      orderAmount,
+      balanceAmount,
+      payableAmount,
       userHasActivePlan,
       availablePrices,
       bestValuePeriod,
@@ -1043,6 +1086,11 @@ export default {
         
         &.discount {
           color: #f44336;
+          font-weight: 600;
+        }
+
+        &.refund {
+          color: var(--success-color);
           font-weight: 600;
         }
       }

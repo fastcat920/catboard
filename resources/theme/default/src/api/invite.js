@@ -22,6 +22,16 @@ export function getInviteData() {
 }
 
 /**
+ * getReferralProgram - 获取推广等级和里程碑数据
+ */
+export function getReferralProgram() {
+  return request({
+    url: '/user/invite/program',
+    method: 'get'
+  });
+}
+
+/**
  * getInviteDetails - 获取邀请明细
  * @Board @url GET /user/invite/details
  * @param {number} current - 当前页码（从1开始）
@@ -36,7 +46,7 @@ export function getInviteData() {
  */
 export function getInviteDetails(current, pageSize) {
   return request({
-    url: '/user/invite/details',
+    url: '/user/invite/ledger',
     method: 'get',
     params: {
       current,

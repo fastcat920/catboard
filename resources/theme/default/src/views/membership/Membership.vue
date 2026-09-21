@@ -32,7 +32,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { getInviteData } from '@/api/invite';
+import { getReferralProgram } from '@/api/invite';
 const { locale } = useI18n(); const loading = ref(true); const error = ref(''); const program = ref({});
 const en = computed(() => locale.value === 'en-US');
 const text = computed(() => en.value ? { loading:'Loading…',membership:'Membership level',commission:'Commission rate',discount:'Plan discount',effective:'Qualified referrals',revenue:'Referral revenue',next:'Next level',nextCommission:'Commission rate',nextDiscount:'Plan discount',remaining:'Complete {count} more qualified referrals and ¥{amount} more revenue to upgrade.',validity:'Level validity',permanent:'Permanent' } : { loading:'加载中…',membership:'会员等级',commission:'返佣比例',discount:'套餐优惠',effective:'有效邀请',revenue:'邀请成交额',next:'下一等级',nextCommission:'佣金比例',nextDiscount:'套餐优惠',remaining:'还需 {count} 个有效邀请和 ¥{amount} 成交额即可升级。',validity:'等级有效期',permanent:'永久有效' });
@@ -47,7 +47,7 @@ const progress = computed(() => Math.min(100, current.value / Math.max(1, Number
 const levelName = row => !row ? '' : (en.value ? row.name_en : row.name) || row.name || row.name_en;
 const levelDescription = row => !row ? '' : (en.value ? row.description_en : row.description) || row.description || row.description_en;
 const expiry = computed(() => program.value.level_expires_at ? new Date(Number(program.value.level_expires_at) * 1000).toLocaleString(en.value ? 'en-US' : 'zh-CN') : text.value.permanent);
-onMounted(async()=>{try{const result=await getInviteData();program.value=result.data?.program||{};}catch(e){error.value=e.response?.message||e.message;}finally{loading.value=false;}});
+onMounted(async()=>{try{const result=await getReferralProgram();program.value=result.data?.program||{};}catch(e){error.value=e.response?.message||e.message;}finally{loading.value=false;}});
 </script>
 
 <style scoped lang="scss">

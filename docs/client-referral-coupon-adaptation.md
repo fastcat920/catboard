@@ -53,20 +53,21 @@ const localized = locale === 'en-US'
 
 ## 2. 邀请中心
 
-### 2.1 获取邀请中心全部数据
+### 2.1 获取旧版邀请基础数据
 
 ```http
 GET /api/v1/user/invite/fetch
 ```
 
-该接口是邀请中心主接口。基础结构：
+该接口是旧客户端兼容接口，只返回 `codes` 和固定顺序的 `stat` 数组。推广等级、里程碑等增强数据请使用 `/api/v1/user/invite/program`，不要继续扩展本接口的响应结构。
+
+基础结构：
 
 ```json
 {
   "data": {
     "codes": [],
-    "stat": [0, 0, 0, 10, 0],
-    "program": {}
+    "stat": [0, 0, 0, 10, 0]
   }
 }
 ```
@@ -98,6 +99,22 @@ GET /api/v1/user/invite/fetch
 | `4` | 可用佣金 | 最小货币单位 |
 
 建议客户端先转换为具名对象，避免页面中直接使用数组下标。
+
+推广计划使用独立接口：
+
+```http
+GET /api/v1/user/invite/program
+```
+
+响应结构：
+
+```json
+{
+  "data": {
+    "program": {}
+  }
+}
+```
 
 #### `program`
 
@@ -232,7 +249,7 @@ const remaining = target ? Math.max(0, target - current) : 0;
 | `per_user_limit` | 单用户奖励次数上限，可空 |
 | `grant_limit` | 总发放次数上限，可空 |
 
-倒计时以服务端 `ends_at` 为准，到期后重新请求 `/invite/fetch`，不要只依赖本地倒计时决定活动资格。
+倒计时以服务端 `ends_at` 为准，到期后重新请求 `/invite/program`，不要只依赖本地倒计时决定活动资格。
 
 ### 2.7 渠道追踪
 
@@ -288,6 +305,18 @@ GET /api/v1/user/invite/save
 
 ```http
 GET /api/v1/user/invite/details?current=1&page_size=20
+```
+
+该接口保留旧版订单佣金记录结构。新版完整佣金流水使用：
+
+```http
+GET /api/v1/user/invite/ledger?current=1&page_size=20
+```
+
+推广计划使用：
+
+```http
+GET /api/v1/user/invite/program
 ```
 
 响应包含 `data` 和 `total`。
@@ -540,7 +569,7 @@ POST /api/v1/user/order/save
 
 ## 6. 当前能力边界
 
-- 用户端邀请增强数据集中在 `/invite/fetch`，暂无活动和奖励流水的独立分页接口。
+- 旧版邀请统计和邀请码保留在 `/invite/fetch`；推广计划使用 `/invite/program`，完整佣金流水使用 `/invite/ledger`。
 - 账户优惠券已经替代旧优惠码，但兑换码属于另一套能力，不应复用优惠券 UI。
 - 邀请活动当前奖励类型为余额、佣金、流量或套餐时长；活动奖励暂未直接发放优惠券。
 - 等级与活动规则以服务端判定为准，客户端只负责展示，不应自行判断最终奖励资格。

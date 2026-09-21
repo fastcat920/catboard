@@ -14,7 +14,7 @@
         loading = true;
         var headers = { Accept: "application/json" }, auth = localStorage.getItem("authorization");
         if (auth) headers.authorization = auth;
-        fetch("/api/v1/user/invite/fetch", { credentials: "include", headers: headers }).then(function (r) { return r.json(); }).then(function (payload) {
+        fetch("/api/v1/user/invite/program", { credentials: "include", headers: headers }).then(function (r) { return r.json(); }).then(function (payload) {
             var p = payload.data && payload.data.program;
             if (!p) return;
             var codes=(payload.data&&payload.data.codes)||[],inviteCode=codes[0]&&codes[0].code,inviteUrl=location.origin+location.pathname+'#/register?code='+(inviteCode||''),count = Number(p.effective_invites || 0), next = p.next_milestone, level = p.level, newcomer = p.newcomer_reward, campaign = p.campaign;
@@ -39,7 +39,7 @@
         if(!host)return;
         loading=true;
         var headers={Accept:'application/json'},auth=localStorage.getItem('authorization');if(auth)headers.authorization=auth;
-        fetch('/api/v1/user/invite/fetch',{credentials:'include',headers:headers}).then(function(r){return r.json();}).then(function(payload){
+        fetch('/api/v1/user/invite/program',{credentials:'include',headers:headers}).then(function(r){return r.json();}).then(function(payload){
             var p=payload.data&&payload.data.program;if(!p)return;
             var level=p.level,next=p.next_level,count=Number(p.effective_invites||0),name=level?(localStorage.getItem('umi_locale')==='en-US'&&level.name_en?level.name_en:level.name):'-',description=level?(localStorage.getItem('umi_locale')==='en-US'&&level.description_en?level.description_en:(level.description||'')):'',progress=next?Math.min(100,Math.round(count*100/Number(next.required_invites))):100,card=document.createElement('div');
             card.className='block block-rounded member-level-card';

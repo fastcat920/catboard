@@ -460,7 +460,7 @@ import { useI18n } from 'vue-i18n';
 import { ref, computed, onMounted, reactive } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { INVITE_CONFIG } from '@/utils/baseConfig';
-import { getInviteData, getInviteDetails, getCommissionConfig, generateInviteCode, transferCommission, withdrawCommission } from '@/api/invite';
+import { getInviteData, getReferralProgram, getInviteDetails, getCommissionConfig, generateInviteCode, transferCommission, withdrawCommission } from '@/api/invite';
 import { getUserInfo } from '@/api/user';
 import {
   IconUsers,
@@ -660,8 +660,6 @@ export default {
         const res = await getInviteData();
         if (res.data) {
           inviteCodes.value = res.data.codes || [];
-          referralProgram.value = res.data.program || null;
-          inviteStats.effectiveInvites = Number(res.data.program?.effective_invites || 0);
           if (res.data.stat) {
             inviteStats.registeredUsers = res.data.stat[0] || 0;
             inviteStats.totalCommission = ((res.data.stat[1] || 0) / 100);
@@ -669,6 +667,14 @@ export default {
             inviteStats.commissionRate = res.data.stat[3] || 0;
             inviteStats.availableCommission = ((res.data.stat[4] || 0) / 100);
           }
+        }
+        try {
+          const programRes = await getReferralProgram();
+          referralProgram.value = programRes.data?.program || null;
+          inviteStats.effectiveInvites = Number(referralProgram.value?.effective_invites || 0);
+        } catch (programError) {
+          console.error('获取推广计划失败:', programError);
+          referralProgram.value = null;
         }
       } catch (err) {
         console.error('获取邀请数据失败:', err);

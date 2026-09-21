@@ -84,7 +84,7 @@
           </div>
         </template>
         <template v-else>
-          <div class="stats-card">
+          <button type="button" class="stats-card stats-card-link" @click="$router.push('/invite/users')">
             <div class="stats-icon">
               <IconUsers :size="24" />
             </div>
@@ -92,7 +92,8 @@
               <div class="stats-label">{{ $t('invite.stats.registeredUsers') }}</div>
               <div class="stats-value">{{ inviteStats.registeredUsers }}</div>
             </div>
-          </div>
+            <IconChevronRight class="stats-arrow" :size="18" />
+          </button>
           <div class="stats-card">
             <div class="stats-icon">
               <IconUsers :size="24" />
@@ -1073,6 +1074,27 @@ export default {
           color: var(--secondary-text-color, #6b7280);
         }
       }
+    }
+  }
+
+  .stats-card-link {
+    width: 100%;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+
+    .stats-arrow {
+      flex: none;
+      margin-left: 6px;
+      color: var(--secondary-text-color);
+    }
+
+    &:hover {
+      border-color: rgba(var(--theme-color-rgb), .35);
+      box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), .1);
+      transform: translateY(-1px);
     }
   }
   

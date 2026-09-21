@@ -84,6 +84,97 @@ class InviteController extends Controller
         ]);
     }
 
+    public function users(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = min(max((int)$request->input('page_size', 10), 10), 100);
+        $builder = User::where('invite_user_id', $request->user['id'])->orderBy('created_at', 'DESC')->orderBy('id', 'DESC');
+        $total = $builder->count();
+        $rows = $builder->forPage($current, $pageSize)->get(['id', 'email', 'created_at']);
+
+        if (Schema::hasTable('v2_referral_reward')) {
+            $effectiveIds = ReferralReward::whereIn('invited_user_id', $rows->pluck('id'))
+                ->where('reward_type', 'effective_invite')->where('status', 'granted')
+                ->pluck('invited_user_id')->mapWithKeys(function ($id) { return [(int)$id => true]; });
+        } else {
+            $effectiveIds = Order::whereIn('user_id', $rows->pluck('id'))->where('invite_user_id', $request->user['id'])
+                ->where('status', 3)->pluck('user_id')->mapWithKeys(function ($id) { return [(int)$id => true]; });
+        }
+
+        return response([
+            'data' => $rows->map(function ($row) use ($effectiveIds) {
+                return [
+                    'id' => $row->id,
+                    'email' => $this->maskEmail((string)$row->email),
+                    'created_at' => $row->created_at,
+                    'status' => $effectiveIds->has((int)$row->id) ? 'effective' : 'pending',
+                ];
+            })->values(),
+            'total' => $total,
+        ]);
+    }
+
+    public function leaderboard(Request $request)
+    {
+        if (!Schema::hasTable('v2_referral_leaderboard_setting') || !Schema::hasTable('v2_referral_reward')) {
+            return response(['data' => [], 'enabled' => false, 'reward_rules' => []]);
+        }
+
+        $setting = ReferralLeaderboardSetting::current();
+        $period = in_array($request->input('period'), ['week', 'month', 'total'], true) ? $request->input('period') : 'month';
+        $from = $period === 'week' ? strtotime('monday this week') : ($period === 'month' ? strtotime(date('Y-m-01')) : 0);
+        $rules = $period === 'total' ? [] : (array)($setting->reward_rules[$period] ?? []);
+        if (!$setting->enabled) {
+            return response(['data' => [], 'enabled' => false, 'period' => $period, 'reward_rules' => $rules]);
+        }
+        if ($request->boolean('summary')) {
+            return response(['data' => [], 'enabled' => true, 'period' => $period, 'reward_rules' => $rules]);
+        }
+
+        $leaders = ReferralReward::where('reward_type', 'effective_invite')->where('status', 'granted');
+        if ($from) $leaders->where('created_at', '>=', $from);
+        $leaders = $leaders->select('user_id', DB::raw('COUNT(*) as value'))
+            ->groupBy('user_id')->orderBy('value', 'DESC')->orderBy('user_id')->limit(100)->get();
+        $emails = User::whereIn('id', $leaders->pluck('user_id'))->pluck('email', 'id');
+        $userId = (int)$request->user['id'];
+
+        $rows = $leaders->values()->map(function ($row, $index) use ($emails, $setting, $rules, $userId) {
+            $rank = $index + 1;
+            $value = (int)$row->value;
+            $reward = 0;
+            foreach ($rules as $rule) {
+                $rankFrom = max(1, (int)($rule['rank_from'] ?? 1));
+                $rankTo = max($rankFrom, (int)($rule['rank_to'] ?? $rankFrom));
+                if ($rank >= $rankFrom && $rank <= $rankTo && $value >= (int)($rule['min_value'] ?? 0)) {
+                    $reward += max(0, (int)($rule['reward_value'] ?? 0));
+                }
+            }
+            $email = (string)$emails->get($row->user_id, '');
+            if ($setting->mask_email) $email = $this->maskEmail($email);
+            return [
+                'rank' => $rank,
+                'email' => $email,
+                'value' => $value,
+                'reward_value' => $reward,
+                'is_me' => (int)$row->user_id === $userId,
+            ];
+        });
+
+        return response([
+            'data' => $rows,
+            'enabled' => true,
+            'period' => $period,
+            'reward_rules' => $rules,
+        ]);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        if (strpos($email, '@') === false) return $email ? substr($email, 0, 1) . '***' : '-';
+        [$prefix, $domain] = explode('@', $email, 2);
+        return substr($prefix, 0, 1) . '***@' . $domain;
+    }
+
     public function fetch(Request $request)
     {
         $codes = InviteCode::where('user_id', $request->user['id'])

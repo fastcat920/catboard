@@ -47,6 +47,8 @@ class UserRoute
             $router->get ('/invite/save', 'V1\\User\\InviteController@save');
             $router->get ('/invite/fetch', 'V1\\User\\InviteController@fetch');
             $router->get ('/invite/details', 'V1\\User\\InviteController@details');
+            $router->get ('/invite/users', 'V1\\User\\InviteController@users');
+            $router->get ('/invite/leaderboard', 'V1\\User\\InviteController@leaderboard');
             // Notice
             $router->get ('/notice/fetch', 'V1\\User\\NoticeController@fetch');
             // Ticket

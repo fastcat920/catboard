@@ -755,6 +755,33 @@ export default {
       availableCommission: 'Earnings',
       commissionRate: 'Rate'
     },
+    users: {
+      title: 'Invited users',
+      loading: 'Loading invited users…',
+      loadFailed: 'Failed to load invited users',
+      empty: 'No invited users yet',
+      email: 'Email',
+      registeredAt: 'Registered at',
+      status: 'Status',
+      total: '{total} invited users',
+      statuses: { effective: 'Qualified invite', pending: 'Awaiting first purchase' }
+    },
+    leaderboard: {
+      title: 'Invite leaderboard',
+      loading: 'Loading leaderboard…',
+      loadFailed: 'Failed to load leaderboard',
+      disabled: 'The invite leaderboard is not enabled',
+      empty: 'No ranking data for this period',
+      rewards: 'Rewards for this period',
+      noRewards: 'No leaderboard rewards are configured for this period',
+      effectiveInvites: 'Qualified invites',
+      reward: 'Estimated reward',
+      me: 'Me',
+      periods: { week: 'Weekly', month: 'Monthly', total: 'All time' },
+      ruleRank: 'Rank {rank}',
+      ruleRange: 'Ranks {from}-{to}',
+      ruleThreshold: ' with {count}+ invites'
+    },
     rules: {
       title: 'Commission Rules',
       share: {

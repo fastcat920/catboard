@@ -802,6 +802,33 @@ export default {
       availableCommission: '累计佣金',
       commissionRate: '佣金比例'
     },
+    users: {
+      title: '邀请用户',
+      loading: '正在加载邀请用户…',
+      loadFailed: '邀请用户加载失败',
+      empty: '暂无邀请用户',
+      email: '用户邮箱',
+      registeredAt: '注册时间',
+      status: '状态',
+      total: '共 {total} 位邀请用户',
+      statuses: { effective: '有效邀请', pending: '待首购' }
+    },
+    leaderboard: {
+      title: '邀请排行',
+      loading: '正在加载排行榜…',
+      loadFailed: '排行榜加载失败',
+      disabled: '邀请排行榜暂未开启',
+      empty: '本期暂无排行数据',
+      rewards: '本期排行榜奖励',
+      noRewards: '本期暂未设置排行榜奖励',
+      effectiveInvites: '有效邀请',
+      reward: '预计奖励',
+      me: '我',
+      periods: { week: '周榜', month: '月榜', total: '总榜' },
+      ruleRank: '第 {rank} 名',
+      ruleRange: '第 {from}-{to} 名',
+      ruleThreshold: '且达到 {count} 人'
+    },
     rules: {
       title: '返佣规则',
       share: {

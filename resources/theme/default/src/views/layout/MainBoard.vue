@@ -49,6 +49,7 @@ export default {
     const getFallbackRoute = () => {
       if (route.name === 'Plan') return '/shop';
       if (route.name === 'DocDetail') return '/docs';
+      if (route.name === 'InviteUsers') return '/invite';
       if (route.name === 'Payment') {
         return route.query.from === 'orders' ? '/orders' : '/shop';
       }

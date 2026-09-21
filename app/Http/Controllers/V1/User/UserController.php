@@ -48,7 +48,8 @@ class UserController extends Controller
             ->orderBy('id', 'DESC');
         $total = $builder->count();
         $data = $builder->forPage($current, $pageSize)->get([
-            'id', 'type', 'amount', 'status', 'trade_no', 'description', 'created_at'
+            'id', 'type', 'amount', 'balance_before', 'balance_after', 'status',
+            'trade_no', 'description', 'meta', 'created_at'
         ]);
 
         return response([

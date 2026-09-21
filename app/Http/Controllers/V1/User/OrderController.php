@@ -33,7 +33,23 @@ class OrderController extends Controller
         if($request->input('user_coupon_id')&&!$selected)abort(422,'所选优惠券不满足使用条件');$couponDiscount=$selected?(int)$selected->calculated_discount:0;$afterCoupon=$couponBase-$couponDiscount;$memberDiscountRate=app(\App\Services\ReferralProgramService::class)->memberDiscountRate($user);$vipDiscount=(!$selected||$selected->template->stackable)&&$memberDiscountRate?(int)round($afterCoupon*$memberDiscountRate/100):0;
         if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) abort(422, '当前限时特价不可叠加优惠券');
         $unavailable=$flashSale&&!$flashSale->allow_coupon?collect():$couponService->unavailable($user,$plan->id,$data['period'],$couponBase,(int)$order->type);
-        return response(['data'=>['original_amount'=>$original,'activity_discount'=>$activityDiscount,'flash_sale'=>$flashSale,'coupon_discount'=>$couponDiscount,'member_discount_rate'=>$memberDiscountRate,'vip_discount'=>$vipDiscount,'final_amount'=>max(0,$afterCoupon-$vipDiscount),'selected_coupon'=>$selected,'available_coupons'=>$available,'unavailable_coupons'=>$unavailable]]);
+        $finalAmount=max(0,$afterCoupon-$vipDiscount);
+        $balanceAmount=min((int)$user->balance,$finalAmount);
+        return response(['data'=>[
+            'original_amount'=>$original,
+            'activity_discount'=>$activityDiscount,
+            'flash_sale'=>$flashSale,
+            'allow_coupon'=>!$flashSale||(bool)$flashSale->allow_coupon,
+            'coupon_discount'=>$couponDiscount,
+            'member_discount_rate'=>$memberDiscountRate,
+            'vip_discount'=>$vipDiscount,
+            'final_amount'=>$finalAmount,
+            'balance_amount'=>$balanceAmount,
+            'payable_amount'=>max(0,$finalAmount-$balanceAmount),
+            'selected_coupon'=>$selected,
+            'available_coupons'=>$available,
+            'unavailable_coupons'=>$unavailable,
+        ]]);
     }
 
     public function fetch(Request $request)

@@ -47,13 +47,24 @@
     function sourceLabel(source) {
         return (
             {
-                manual: "后台手动发放 / Manual issuance",
-                newcomer: "新人邀请奖励 / Newcomer referral reward",
-                referral_newcomer:
-                    "新人邀请奖励 / Newcomer referral reward",
-                distribution_task:
-                    "平台批量发放 / Platform bulk distribution",
+                manual: "后台手动发放",
+                newcomer: "新人邀请奖励",
+                referral_newcomer: "新人邀请奖励",
+                distribution_task: "平台批量发放",
+                campaign: "邀请活动奖励",
             }[source] || source
+        );
+    }
+    function couponStatusLabel(status) {
+        return (
+            {
+                pending: "待生效",
+                available: "可使用",
+                locked: "已锁定",
+                used: "已使用",
+                expired: "已过期",
+                revoked: "已撤销",
+            }[status] || status || "-"
         );
     }
     function notificationLabel(status) {
@@ -584,6 +595,7 @@
         Promise.all([api("/templates"), api("/distribution/tasks")])
             .then(function (all) {
                 cache.templates = all[0].data;
+                cache.plans = all[0].plans || [];
                 content(
                     '<div class="row"><div class="col-lg-5"><div class="block"><div class="block-header"><h3 class="block-title">创建发放任务</h3></div><div class="block-content"><form data-task><div class="form-group"><label>模板</label><select class="form-control" name="template_id">' +
                         cache.templates
@@ -606,12 +618,12 @@
                             "text",
                         ) +
                         field("emails", "指定邮箱（逗号分隔）", "", "text") +
-                        field(
-                            "plan_ids",
-                            "指定套餐 ID（逗号分隔）",
-                            "",
-                            "text",
-                        ) +
+                        '<div class="form-group"><label>指定订阅</label><details class="coupon-plan-picker"><summary data-plan-summary>不限订阅</summary><div class="coupon-plan-options">' +
+                        cache.plans.map(function (plan) {
+                            return '<label><input type="checkbox" name="plan_ids" value="' + plan.id + '"> <span>' + esc(plan.name) + '</span></label>';
+                        }).join("") +
+                        (cache.plans.length ? "" : '<div class="text-muted p-2">暂无可选订阅</div>') +
+                        '</div></details><small class="form-text text-muted">可多选；不选择代表不限订阅。</small></div>' +
                         '<div class="form-group"><label>订阅状态</label><select class="form-control" name="subscription_status"><option value="">不限</option><option value="active">有效</option><option value="expired">已过期</option></select></div><label><input type="checkbox" name="never_purchased"> 从未购买</label><div class="mt-3"><button type="button" class="btn btn-light" data-estimate>预估人数</button> <button class="btn btn-primary">创建并执行</button></div><div data-estimate-result class="mt-2"></div></form></div></div></div><div class="col-lg-7">' +
                         taskTableHtml(all[1].data) +
                         "</div></div>",
@@ -630,11 +642,19 @@
                         return {
                             user_ids: split(form.user_ids.value),
                             emails: split(form.emails.value),
-                            plan_ids: split(form.plan_ids.value),
+                            plan_ids: Array.from(form.querySelectorAll('[name="plan_ids"]:checked')).map(function (item) { return Number(item.value); }),
                             subscription_status: form.subscription_status.value,
                             never_purchased: form.never_purchased.checked,
                         };
                     };
+                var updatePlanSummary = function () {
+                    var checked = Array.from(form.querySelectorAll('[name="plan_ids"]:checked'));
+                    var summary = form.querySelector('[data-plan-summary]');
+                    if (!checked.length) summary.textContent = "不限订阅";
+                    else if (checked.length <= 2) summary.textContent = checked.map(function (item) { return item.nextElementSibling.textContent; }).join("、");
+                    else summary.textContent = "已选择 " + checked.length + " 个订阅";
+                };
+                form.querySelectorAll('[name="plan_ids"]').forEach(function (item) { item.onchange = updatePlanSummary; });
                 root.querySelector("[data-estimate]").onclick = function () {
                     api("/distribution/estimate", {
                         method: "POST",
@@ -686,7 +706,7 @@
                                     x.user_email,
                                     x.template && x.template.name,
                                     sourceLabel(x.source),
-                                    x.status,
+                                    couponStatusLabel(x.status),
                                     dt(x.starts_at),
                                     dt(x.expires_at),
                                     notificationLabel(x.notification_status),
@@ -700,7 +720,8 @@
                     var x = p.data[i];
                     if (!x) return;
                     tr.lastElementChild.innerHTML =
-                        '<button class="btn btn-sm btn-light" data-extend>延期</button><button class="btn btn-sm btn-light text-danger" data-revoke>撤销</button>' +
+                        '<button class="btn btn-sm btn-light" data-extend>延期</button>' +
+                        (x.status === "pending" || x.status === "available" ? '<button class="btn btn-sm btn-light text-danger" data-revoke>撤销</button>' : "") +
                         (x.notification_status === "failed"
                             ? '<button class="btn btn-sm btn-light" data-retry-mail>重发邮件</button>'
                             : "");
@@ -719,20 +740,17 @@
                                     alert(e.message);
                                 });
                     };
-                    tr.querySelector("[data-revoke]").onclick = function () {
-                        var reason = prompt("撤销原因");
-                        if (reason)
-                            api("/user-coupon/revoke", {
-                                method: "POST",
-                                body: JSON.stringify({
-                                    id: x.id,
-                                    reason: reason,
-                                }),
-                            })
-                                .then(wallet)
-                                .catch(function (e) {
-                                    alert(e.message);
-                                });
+                    var revoke = tr.querySelector("[data-revoke]");
+                    if (revoke) revoke.onclick = function () {
+                        if (!confirm("确认撤销该用户的优惠券？撤销后将无法继续使用。")) return;
+                        api("/user-coupon/revoke", {
+                            method: "POST",
+                            body: JSON.stringify({ id: x.id }),
+                        })
+                            .then(wallet)
+                            .catch(function (e) {
+                                alert(e.message);
+                            });
                     };
                     var retryMail = tr.querySelector("[data-retry-mail]");
                     if (retryMail)

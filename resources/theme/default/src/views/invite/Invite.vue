@@ -48,28 +48,33 @@
         </button>
       </div>
 
-      <section v-if="referralProgram" class="member-summary-card">
-        <div class="member-overview-row">
-          <div class="member-level-info">
-            <span>{{ $t('invite.currentLevel') }}</span>
+      <section v-if="referralProgram" class="growth-level-card">
+        <div class="current-level-block">
+          <div class="current-level-title">
+            <span class="level-icon"><IconCrown :size="25" /></span>
             <h2>{{ localizedLevel(referralProgram.level) || '—' }}</h2>
           </div>
-          <div class="member-commission-rate">
-            <span>{{ $t('invite.commissionRate') }}</span>
-            <strong>{{ currentCommissionRate }}%</strong>
+          <div class="level-benefits">
+            <span>{{ $t('invite.commissionRate') }}：<strong>{{ currentCommissionRate }}%</strong></span>
+            <span>{{ $t('invite.planDiscount') }}：<strong>{{ referralProgram.level?.member_discount || 0 }}%</strong></span>
           </div>
         </div>
-        <button class="membership-link" @click="$router.push('/membership')">{{ $t('invite.viewMembershipBenefits') }}</button>
-      </section>
 
-      <section v-if="referralProgram?.next_level" class="growth-card milestone-card">
-        <div class="growth-card-head">
-          <div><span>{{ $t('invite.nextGrowthLevel') }}</span><h3>{{ localizedLevel(referralProgram.next_level) }}</h3></div>
-          <strong>{{ nextLevelRequirementText }}</strong>
+        <div v-if="referralProgram.next_level" class="next-level-block">
+          <div class="next-level-head">
+            <div><span>{{ $t('invite.nextLevel') }}：</span><strong>{{ localizedLevel(referralProgram.next_level) }}</strong></div>
+            <span>{{ $t('invite.effectiveInviteProgress') }} <strong>{{ referralProgram.effective_invites || 0 }} / {{ referralProgram.next_level.required_invites || 0 }}</strong></span>
+          </div>
+          <div class="growth-progress"><i :style="{ width: nextLevelProgress + '%' }"></i></div>
+          <p v-if="referralProgram.next_level.reward" class="level-detail"><b>{{ $t('invite.achievementReward') }}</b>{{ achievementRewardText }}</p>
+          <div class="next-level-privileges">
+            <b>{{ $t('invite.levelPrivileges') }}</b>
+            <span>{{ $t('invite.commissionRate') }}：<strong>{{ referralProgram.next_level.commission_rate || 0 }}%</strong></span>
+            <span>{{ $t('invite.planDiscount') }}：<strong>{{ referralProgram.next_level.member_discount || 0 }}%</strong></span>
+          </div>
+          <p v-if="Number(referralProgram.next_level.required_revenue || 0)" class="level-revenue-condition">{{ $t('invite.revenueProgress') }}：{{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }} / {{ currencySymbol }}{{ formatAmount(referralProgram.next_level.required_revenue) }}</p>
         </div>
-        <div class="growth-progress"><i :style="{ width: nextLevelProgress + '%' }"></i></div>
-        <p>{{ $t('invite.nextLevelBenefits') }}{{ referralProgram.next_level.commission_rate || 0 }}% · {{ $t('invite.planDiscount') }} {{ referralProgram.next_level.member_discount || 0 }}%</p>
-        <p v-if="referralProgram.next_level.reward">{{ $t('invite.achievementReward') }}{{ achievementRewardText }}</p>
+        <div v-else class="highest-level-tip">{{ $t('invite.highestLevel') }}</div>
       </section>
 
       <!-- 统计卡片组 -->
@@ -481,6 +486,7 @@ import {
   IconCurrencyDollar,
   IconBuildingBank,
   IconArrowsExchange,
+  IconCrown,
 } from '@tabler/icons-vue';
 
 export default {
@@ -502,6 +508,7 @@ export default {
     IconCurrencyDollar,
     IconBuildingBank,
     IconArrowsExchange,
+    IconCrown,
   },
   setup() {
     const { showToast } = useToast();
@@ -551,13 +558,6 @@ export default {
           : 100
       )
       : 100);
-    const nextLevelRequirementText = computed(() => {
-      const level = referralProgram.value?.next_level;
-      if (!level) return '';
-      const invites = `${Number(referralProgram.value.effective_invites || 0)}/${Number(level.required_invites || 0)}`;
-      if (!Number(level.required_revenue || 0)) return invites;
-      return `${invites} · ${currencySymbol.value}${formatAmount(referralProgram.value.referral_revenue || 0)}/${currencySymbol.value}${formatAmount(level.required_revenue)}`;
-    });
     const achievementRewardText = computed(() => {
       const reward = referralProgram.value?.next_level?.reward;
       if (!reward) return '';
@@ -896,7 +896,6 @@ export default {
       referralProgram,
       rewardRestrictionText,
       nextLevelProgress,
-      nextLevelRequirementText,
       achievementRewardText,
       localizedLevel,
       currentCommissionRate,
@@ -958,20 +957,33 @@ export default {
   display: flex;
   justify-content: center;
 
-  .member-summary-card,.growth-card { margin-bottom: 18px; padding: 20px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--card-bg-color, #fff); }
-  .member-summary-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-  .member-overview-row { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 18px; }
-  .member-summary-card span,.growth-card span { color: var(--secondary-text-color); font-size: 13px; }
-  .member-summary-card h2,.growth-card h3 { margin: 5px 0 0; color: var(--text-color); }
-  .member-commission-rate { margin-left: auto; text-align: right; }
-  .member-commission-rate strong { display: block; margin-top: 4px; color: var(--theme-color); font-size: 22px; line-height: 1.2; }
-  .membership-link { flex: none; padding: 10px 14px; color: #fff; font-weight: 700; border: 0; border-radius: 11px; background: var(--theme-color); }
-  .growth-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .growth-card-head>strong,.growth-card-head time { color: var(--theme-color); font-weight: 700; }
-  .growth-progress { height: 8px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
+  .growth-level-card { margin-bottom: 18px; overflow: hidden; border: 1px solid var(--border-color); border-radius: 20px; background: var(--card-bg-color, #fff); }
+  .current-level-block,.next-level-block { padding: 20px; }
+  .next-level-block { border-top: 1px solid var(--border-color); }
+  .current-level-title { display: flex; align-items: center; gap: 12px; }
+  .current-level-title h2 { margin: 0; color: var(--text-color); font-size: 23px; }
+  .level-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; color: var(--theme-color); border-radius: 14px; background: rgba(var(--theme-color-rgb), .12); }
+  .level-benefits { display: flex; gap: 24px; margin-top: 14px; color: var(--secondary-text-color); font-size: 14px; }
+  .level-benefits strong,.next-level-privileges strong,.next-level-head strong { color: var(--text-color); }
+  .next-level-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .next-level-head>div { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+  .next-level-head>div strong { overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
+  .next-level-head>span { flex: 0 0 auto; color: var(--secondary-text-color); font-size: 13px; }
+  .growth-progress { height: 9px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
   .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
-  .growth-card p { margin: 12px 0 0; color: var(--secondary-text-color); font-size: 13px; }
-  @media (max-width: 600px) { .member-summary-card { align-items: stretch; flex-direction: column; } .member-overview-row,.growth-card-head { width: 100%; align-items: center; flex-direction: row; } .member-commission-rate { margin-left: auto; text-align: right; } .membership-link { width: 100%; } }
+  .level-detail,.level-revenue-condition { margin: 13px 0 0; color: var(--secondary-text-color); font-size: 13px; }
+  .level-detail b,.next-level-privileges>b { margin-right: 6px; color: var(--text-color); }
+  .next-level-privileges { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 13px; color: var(--secondary-text-color); font-size: 13px; }
+  .highest-level-tip { padding: 18px 20px; color: var(--secondary-text-color); border-top: 1px solid var(--border-color); }
+  @media (max-width: 600px) {
+    .current-level-block,.next-level-block { padding: 17px 16px; }
+    .current-level-title h2 { font-size: 20px; }
+    .level-benefits { justify-content: space-between; gap: 10px; }
+    .next-level-head { align-items: center; }
+    .next-level-head>span { text-align: right; }
+    .next-level-privileges { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px 10px; }
+    .next-level-privileges span { white-space: nowrap; }
+  }
   
   .account-inner {
     width: 100%;

@@ -750,13 +750,14 @@ export default {
   },
   invite: {
     ticketAction: 'Tickets',
-    currentLevel: 'Current level',
     commissionRate: 'Commission rate',
-    viewMembershipBenefits: 'View membership benefits',
-    nextGrowthLevel: 'Next growth level',
-    nextLevelBenefits: 'Level benefits: commission ',
+    nextLevel: 'Next level',
+    effectiveInviteProgress: 'Qualified referrals',
     planDiscount: 'plan discount',
-    achievementReward: 'One-time achievement reward: ',
+    achievementReward: 'Achievement reward: ',
+    levelPrivileges: 'Level privileges: ',
+    revenueProgress: 'Referral revenue',
+    highestLevel: 'You have reached the highest growth level',
     statsTitle: 'Invite Stats',
     title: 'My Commission',
     description: 'Invite friends to register and earn commissions',
@@ -982,7 +983,6 @@ export default {
     trafficChart: 'Traffic Trend Chart'
   },
   couponCenter: { title: 'My coupons' },
-  membership: { title: 'Membership' },
   wallet: {
     autoRenewal: { title: 'Auto renewal', description: 'Your balance will be used to renew the plan before it expires. Keep enough balance available.', noPlan: 'Purchase a plan to enable auto renewal.', enabled: 'Auto renewal enabled', disabled: 'Auto renewal disabled', failed: 'Failed to update auto renewal' },
     balance: {

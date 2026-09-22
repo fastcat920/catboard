@@ -70,8 +70,7 @@ body #app :is(
   .profile-card,
   .wallet-summary-card,
   .invite-balance-card,
-  .member-summary-card,
-  .growth-card,
+  .growth-level-card,
   .combined-card,
   .deposit-card,
   .unified-card
@@ -121,7 +120,7 @@ body #app :is(
     transform var(--motion-fast) ease;
 }
 
-body #app :is(.btn-chip, .tab-btn, .page-button, .btn-action, .membership-link) {
+body #app :is(.btn-chip, .tab-btn, .page-button, .btn-action) {
   min-height: var(--control-height-compact);
   border-radius: var(--radius-chip);
   font-size: var(--font-size-sm);
@@ -316,8 +315,7 @@ body #app :is(
   .gift-container,
   .nodes-container,
   .ticket-container,
-  .wallet-page,
-  .membership-page
+  .wallet-page
 ) {
   width: 100%;
   box-sizing: border-box;
@@ -354,8 +352,7 @@ body #app :is(
   .gift-inner,
   .nodes-inner,
   .ticket-list-container,
-  .wallet-page,
-  .membership-page
+  .wallet-page
 ) {
   width: 100%;
   max-width: var(--page-max-width);
@@ -382,8 +379,7 @@ body #app :is(.dashboard-container, .shop-container, .deposit-container, .accoun
   .plan-card,
   .wallet-summary-card,
   .invite-balance-card,
-  .member-summary-card,
-  .growth-card,
+  .growth-level-card,
   .combined-card,
   .profile-card
 ) {
@@ -654,14 +650,6 @@ body #app .account-container .invite-primary-actions.single-action {
   grid-template-columns: minmax(0, 1fr);
 }
 
-body #app .account-container .member-summary-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 20px;
-  align-items: center;
-  padding: var(--card-padding);
-}
-
 body #app .account-container .member-commission-rate {
   text-align: end;
 }
@@ -730,20 +718,6 @@ body #app :is(.profile-container, .more-container) :is(.setting-item, .password-
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  body #app .account-container .member-summary-card {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  body #app .account-container .member-overview-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  body #app .account-container .membership-link {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
   body #app .account-container .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -763,11 +737,4 @@ body #app :is(.profile-container, .more-container) :is(.setting-item, .password-
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  body #app .account-container .member-summary-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  body #app .account-container .member-commission-rate {
-    text-align: start;
-  }
 }

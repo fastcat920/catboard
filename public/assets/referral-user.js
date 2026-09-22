@@ -3,7 +3,6 @@
     var loading = false;
     function trackVisit(){var hashQuery=location.hash.indexOf('?')>=0?location.hash.slice(location.hash.indexOf('?')):'',q=new URLSearchParams(location.search||hashQuery),code=q.get('code')||q.get('invite_code');if(!code)return;var key='referral_visit_'+code;if(sessionStorage.getItem(key))return;var visitor=localStorage.getItem('referral_visitor_id');if(!visitor){visitor=Date.now().toString(36)+Math.random().toString(36).slice(2);localStorage.setItem('referral_visitor_id',visitor);}fetch('/api/v1/passport/comm/pv',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({invite_code:code,channel:q.get('utm_source')||'direct',visitor_id:visitor})}).then(function(){sessionStorage.setItem(key,'1');}).catch(function(){});}
     function isInvitePage() { return /#\/invite(?:\?|$)/.test(location.hash); }
-    function isProfilePage() { return /#\/profile(?:\?|$)/.test(location.hash); }
     function text(zh, en) { return localStorage.getItem("umi_locale") === "en-US" ? en : zh; }
     function esc(value){var d=document.createElement('div');d.textContent=value==null?'':value;return d.innerHTML;}
     function load() {
@@ -33,21 +32,7 @@
             if (target && target.parentNode) target.parentNode.insertBefore(card, target);
         }).catch(function () {}).finally(function () { loading = false; });
     }
-    function loadMembership(){
-        if(!isProfilePage()||loading||document.querySelector('.member-level-card'))return;
-        var host=document.querySelector('#main-container .content, #main-container .p-0, #main-container');
-        if(!host)return;
-        loading=true;
-        var headers={Accept:'application/json'},auth=localStorage.getItem('authorization');if(auth)headers.authorization=auth;
-        fetch('/api/v1/user/invite/program',{credentials:'include',headers:headers}).then(function(r){return r.json();}).then(function(payload){
-            var p=payload.data&&payload.data.program;if(!p)return;
-            var level=p.level,next=p.next_level,count=Number(p.effective_invites||0),name=level?(localStorage.getItem('umi_locale')==='en-US'&&level.name_en?level.name_en:level.name):'-',description=level?(localStorage.getItem('umi_locale')==='en-US'&&level.description_en?level.description_en:(level.description||'')):'',progress=next?Math.min(100,Math.round(count*100/Number(next.required_invites))):100,card=document.createElement('div');
-            card.className='block block-rounded member-level-card';
-            card.innerHTML='<div class="block-header block-header-default"><h3 class="block-title">'+text('会员等级','Membership level')+'</h3><a href="#/invite">'+text('查看邀请中心','Referral center')+'</a></div><div class="block-content"><div class="member-level-main"><div><small>'+text('当前等级','Current level')+'</small><strong>'+esc(name)+'</strong><p>'+esc(description)+'</p></div><div class="member-level-right"><span>'+text('返佣 ','Commission ')+(level?level.commission_rate:p.setting.base_commission_rate)+'%</span><span>'+text('会员优惠 ','Member discount ')+(level&&level.member_discount?level.member_discount:0)+'%</span><span>'+text('有效邀请 ','Qualified referrals ')+count+'</span></div></div>'+(p.level_expires_at?'<div class="member-level-expiry">'+text('等级有效期至：','Level valid until: ')+new Date(Number(p.level_expires_at)*1000).toLocaleString()+'</div>':'')+(next?'<div class="member-level-next"><div><b>'+text('下一等级：','Next level: ')+esc(localStorage.getItem('umi_locale')==='en-US'&&next.name_en?next.name_en:next.name)+'</b><span>'+count+'/'+next.required_invites+'</span></div><div class="referral-user-bar"><i style="width:'+progress+'%"></i></div><small>'+text('再完成 ','Complete ')+Math.max(0,Number(next.required_invites)-count)+text(' 个有效邀请可升级，并享受 ',' more qualified referrals to unlock ')+(next.member_discount||0)+text('% 会员优惠','% member discount')+'</small></div>':'<div class="member-level-next">'+text('你已达到最高会员等级','You have reached the highest membership level')+'</div>')+'</div>';
-            host.insertBefore(card,host.firstChild);
-        }).catch(function(){}).finally(function(){loading=false;});
-    }
-    function run(){load();loadMembership();}
+    function run(){load();}
     function start(){trackVisit();run();window.addEventListener("hashchange",function(){setTimeout(run,300);});new MutationObserver(function(){requestAnimationFrame(run);}).observe(document.getElementById("root")||document.body,{childList:true,subtree:true});}
     if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();

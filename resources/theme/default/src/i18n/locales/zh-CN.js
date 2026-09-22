@@ -797,13 +797,14 @@ export default {
   // 邀请页面
   invite: {
     ticketAction: '工单',
-    currentLevel: '当前等级',
     commissionRate: '佣金比例',
-    viewMembershipBenefits: '查看会员等级权益',
-    nextGrowthLevel: '下一成长等级',
-    nextLevelBenefits: '等级权益：佣金比例 ',
+    nextLevel: '下一等级',
+    effectiveInviteProgress: '有效邀请数',
     planDiscount: '套餐优惠',
-    achievementReward: '一次性达标奖励：',
+    achievementReward: '达标奖励：',
+    levelPrivileges: '等级特权：',
+    revenueProgress: '邀请成交额',
+    highestLevel: '您已达到最高成长等级',
     statsTitle: '邀请统计',
     title: '我的返佣',
     description: '邀请好友注册使用，获取佣金收入',
@@ -1032,7 +1033,6 @@ export default {
     trafficChart: '流量趋势图'
   },
   couponCenter: { title: '我的优惠券' },
-  membership: { title: '会员等级' },
   wallet: {
     autoRenewal: { title: '自动续费', description: '套餐到期前将使用账户余额自动续费，请确保余额充足。', noPlan: '购买套餐后可开启自动续费。', enabled: '自动续费已开启', disabled: '自动续费已关闭', failed: '自动续费设置失败' },
     balance: {

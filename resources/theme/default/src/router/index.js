@@ -169,9 +169,7 @@ const routes = [
       },
       {
         path: 'membership',
-        name: 'Membership',
-        component: () => import('@/views/membership/Membership.vue'),
-        meta: { titleKey: 'membership.title', requiresAuth: true, activeNav: 'Mine' }
+        redirect: '/invite'
       },
       {
         path: 'mine',

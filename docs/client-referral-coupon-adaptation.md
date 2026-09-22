@@ -464,9 +464,12 @@ Content-Type: application/json
 {
   "data": {
     "original_amount": 2000,
+    "activity_discount": 200,
     "coupon_discount": 500,
-    "vip_discount": 0,
-    "final_amount": 1500,
+    "member_discount": 0,
+    "allow_coupon": true,
+    "allow_member_discount": false,
+    "final_amount": 1300,
     "selected_coupon": {},
     "available_coupons": [],
     "unavailable_coupons": []
@@ -524,6 +527,9 @@ POST /api/v1/user/order/save
 
 - `template.stackable=true`：优惠券优惠后仍可叠加会员折扣。
 - `template.stackable=false`：使用优惠券后不再计算会员折扣。
+- 限时特价的 `allow_coupon` 独立控制活动价是否可以继续叠加优惠券。
+- 限时特价的 `allow_member_discount` 独立控制活动价是否可以继续叠加会员等级折扣。
+- 同时存在限时特价与优惠券时，只有活动和优惠券双方都允许叠加，会员等级折扣才会继续计算。
 - `vip_discount` 与 `final_amount` 始终使用 `/order/preview` 返回值。
 
 ### 3.7 优惠券到账邮件

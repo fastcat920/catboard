@@ -64,7 +64,8 @@ class OrderController extends Controller
         $couponDiscount = $selected ? (int)$selected->calculated_discount : 0;
         $afterCoupon = $couponBase - $couponDiscount;
         $memberDiscountRate = app(\App\Services\ReferralProgramService::class)->memberDiscountRate($user);
-        $memberDiscount = (!$selected || $selected->template->stackable) && $memberDiscountRate
+        $memberDiscountAllowed = !$flashSale || (bool)$flashSale->allow_member_discount;
+        $memberDiscount = $memberDiscountAllowed && (!$selected || $selected->template->stackable) && $memberDiscountRate
             ? (int)round($afterCoupon * $memberDiscountRate / 100)
             : 0;
         if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) {
@@ -82,6 +83,7 @@ class OrderController extends Controller
             'activity_discount'=>$activityDiscount,
             'flash_sale'=>$flashSale,
             'allow_coupon'=>!$flashSale||(bool)$flashSale->allow_coupon,
+            'allow_member_discount'=>$memberDiscountAllowed,
             'coupon_discount'=>$couponDiscount,
             'member_discount_rate'=>$memberDiscountRate,
             'member_discount'=>$memberDiscount,
@@ -235,7 +237,7 @@ class OrderController extends Controller
         $flashSale = app(FlashSaleService::class)->apply($order, $user);
         if ($flashSale && !$flashSale->allow_coupon && $request->input('user_coupon_id')) { DB::rollBack(); abort(422, '当前限时特价不可叠加优惠券'); }
         $userCoupon = $flashSale && !$flashSale->allow_coupon ? null : app(CouponWalletService::class)->lockForOrder($order, $user, $request->input('user_coupon_id') ? (int)$request->input('user_coupon_id') : null, $request->boolean('disable_auto_coupon'));
-        if (!$userCoupon || $userCoupon->template->stackable) $orderService->setVipDiscount($user);
+        if ((!$flashSale || $flashSale->allow_member_discount) && (!$userCoupon || $userCoupon->template->stackable)) $orderService->setVipDiscount($user);
 
         $balanceBefore = (int)$user->balance;
         if ($user->balance > 0 && $order->total_amount > 0) {

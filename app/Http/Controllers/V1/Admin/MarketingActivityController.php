@@ -44,11 +44,12 @@ class MarketingActivityController extends Controller
             'starts_at'=>'required|integer','ends_at'=>'required|integer','audience'=>'required|in:all,new,existing','plan_ids'=>'nullable|array','plan_ids.*'=>'integer|exists:v2_plan,id',
             'periods'=>'nullable|array','periods.*'=>'in:month_price,quarter_price,half_year_price,year_price,two_year_price,three_year_price,onetime_price',
             'discount_type'=>'required|in:fixed_price,percent_off,amount_off','discount_value'=>'required|integer|min:1','minimum_amount'=>'required|integer|min:0',
-            'allow_coupon'=>'required|boolean','priority'=>'required|integer|min:0|max:9999','per_user_limit'=>'nullable|integer|min:1','total_limit'=>'nullable|integer|min:1','enabled'=>'required|boolean',
+            'allow_coupon'=>'required|boolean','allow_member_discount'=>'sometimes|boolean','priority'=>'required|integer|min:0|max:9999','per_user_limit'=>'nullable|integer|min:1','total_limit'=>'nullable|integer|min:1','enabled'=>'required|boolean',
         ]);
         if ($data['ends_at'] <= $data['starts_at']) abort(422, '结束时间必须晚于开始时间');
         if ($data['discount_type'] === 'percent_off' && $data['discount_value'] > 100) abort(422, '优惠比例不能超过 100%');
         $campaign = $request->input('id') ? FlashSaleCampaign::findOrFail($request->input('id')) : new FlashSaleCampaign();
+        if (!array_key_exists('allow_member_discount', $data)) $data['allow_member_discount'] = $campaign->exists ? (bool)$campaign->allow_member_discount : true;
         if ($campaign->exists && $campaign->order_count > 0) {
             foreach (['discount_type','discount_value','plan_ids','periods','audience'] as $field) if (($campaign->{$field} ?? null) != ($data[$field] ?? null)) abort(422, '活动已有成交，优惠核心规则不可修改；请复制创建新活动');
         }

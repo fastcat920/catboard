@@ -70,7 +70,7 @@ class PlanController extends Controller
             $quote = $service->quote($campaign, (int)$plan->{$period});
             $name = ContentLocale::isEnglish($request) && $campaign->name_en ? $campaign->name_en : $campaign->name;
             $description = ContentLocale::isEnglish($request) && $campaign->description_en ? $campaign->description_en : $campaign->description;
-            $sales[$period] = ['id'=>$campaign->id,'name'=>$name,'description'=>$description,'ends_at'=>$campaign->ends_at,'original_amount'=>(int)$plan->{$period},'final_amount'=>$quote['final_amount'],'discount_amount'=>$quote['discount_amount']];
+            $sales[$period] = ['id'=>$campaign->id,'name'=>$name,'description'=>$description,'ends_at'=>$campaign->ends_at,'original_amount'=>(int)$plan->{$period},'final_amount'=>$quote['final_amount'],'discount_amount'=>$quote['discount_amount'],'allow_coupon'=>(bool)$campaign->allow_coupon,'allow_member_discount'=>(bool)$campaign->allow_member_discount];
         }
         // Keep the API contract stable for typed clients: an empty PHP array is
         // encoded as [], while period-keyed data is encoded as an object.

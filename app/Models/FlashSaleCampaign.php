@@ -12,5 +12,7 @@ class FlashSaleCampaign extends Model
     protected $casts = [
         'plan_ids' => 'array',
         'periods' => 'array',
+        'allow_coupon' => 'boolean',
+        'allow_member_discount' => 'boolean',
     ];
 }

@@ -17,7 +17,7 @@ class CreateMarketingActivityCenter extends Migration
             $table->text('plan_ids')->nullable(); $table->text('periods')->nullable();
             $table->enum('discount_type', ['fixed_price', 'percent_off', 'amount_off']);
             $table->unsignedInteger('discount_value'); $table->unsignedInteger('minimum_amount')->default(0);
-            $table->boolean('allow_coupon')->default(true); $table->unsignedInteger('priority')->default(0);
+            $table->boolean('allow_coupon')->default(true); $table->boolean('allow_member_discount')->default(true); $table->unsignedInteger('priority')->default(0);
             $table->unsignedInteger('per_user_limit')->nullable(); $table->unsignedInteger('total_limit')->nullable();
             $table->unsignedInteger('order_count')->default(0); $table->unsignedBigInteger('revenue')->default(0); $table->unsignedBigInteger('discount_total')->default(0);
             $table->boolean('enabled')->default(true)->index();

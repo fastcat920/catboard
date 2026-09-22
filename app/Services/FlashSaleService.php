@@ -61,6 +61,7 @@ class FlashSaleService
             'id' => $campaign->id, 'name' => $campaign->name, 'name_en' => $campaign->name_en,
             'discount_type' => $campaign->discount_type, 'discount_value' => $campaign->discount_value,
             'allow_coupon' => (bool)$campaign->allow_coupon,
+            'allow_member_discount' => (bool)$campaign->allow_member_discount,
         ];
         return $campaign;
     }

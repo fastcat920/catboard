@@ -57,7 +57,7 @@
                 <span v-for="item in periodLabels(coupon.template)" :key="item">{{ item }}</span>
               </dd>
             </div>
-            <div>
+            <div v-if="restrictionLabels(coupon.template).length">
               <dt>{{ copy.restrictions }}</dt>
               <dd class="tag-list restrictions">
                 <span v-for="item in restrictionLabels(coupon.template)" :key="item">{{ item }}</span>
@@ -114,9 +114,7 @@ const copy = computed(() => en.value ? {
   allPlans: 'All plans',
   allPeriods: 'All periods',
   firstOrder: 'First order only',
-  anyOrder: 'No order-type restriction',
-  stackable: 'Stacks with member discount',
-  notStackable: 'Cannot stack with member discount',
+  notStackable: 'Cannot stack with membership-level discount',
   fixedCoupon: 'Amount coupon',
   percentCoupon: 'Discount coupon',
   useNow: 'Use now'
@@ -136,9 +134,7 @@ const copy = computed(() => en.value ? {
   allPlans: '全部套餐',
   allPeriods: '全部周期',
   firstOrder: '仅限首单',
-  anyOrder: '订单类型不限',
-  stackable: '可叠加套餐优惠',
-  notStackable: '不可叠加套餐优惠',
+  notStackable: '不可叠加会员等级折扣',
   fixedCoupon: '金额券',
   percentCoupon: '折扣券',
   useNow: '去使用'
@@ -209,10 +205,12 @@ const periodLabels = template => {
   if (!periods.length) return [copy.value.allPeriods];
   return periods.map(period => periodNames.value[period] || period);
 };
-const restrictionLabels = template => [
-  template?.first_order_only ? copy.value.firstOrder : copy.value.anyOrder,
-  template?.stackable ? copy.value.stackable : copy.value.notStackable
-];
+const restrictionLabels = template => {
+  const restrictions = [];
+  if (Number(template?.first_order_only) === 1) restrictions.push(copy.value.firstOrder);
+  if (Number(template?.stackable) !== 1) restrictions.push(copy.value.notStackable);
+  return restrictions;
+};
 const useCoupon = () => router.push('/shop');
 
 const load = async () => {

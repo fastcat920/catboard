@@ -66,7 +66,7 @@
             <span>{{ $t('invite.effectiveInviteProgress') }} <strong>{{ referralProgram.effective_invites || 0 }} / {{ referralProgram.next_level.required_invites || 0 }}</strong></span>
           </div>
           <div class="growth-progress"><i :style="{ width: nextLevelProgress + '%' }"></i></div>
-          <div v-if="referralProgram.next_level.reward" class="level-meta-row level-detail"><b>{{ $t('invite.achievementReward') }}</b><span>{{ achievementRewardText }}</span></div>
+          <div v-if="referralProgram.next_level.reward" class="level-meta-row level-detail"><b>{{ $t('invite.achievementReward') }}</b><span>{{ achievementReward.label }}：<strong>{{ achievementReward.value }}</strong></span></div>
           <div class="level-meta-row next-level-privileges">
             <b>{{ $t('invite.levelPrivileges') }}</b>
             <div class="level-privilege-values">
@@ -560,17 +560,15 @@ export default {
           : 100
       )
       : 100);
-    const achievementRewardText = computed(() => {
+    const achievementReward = computed(() => {
       const reward = referralProgram.value?.next_level?.reward;
-      if (!reward) return '';
-      if (reward.reward_type === 'traffic') return locale.value === 'en-US' ? `Traffic: ${reward.reward_value} GB` : `流量：${reward.reward_value} GB`;
-      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `Plan duration: ${reward.reward_value} days` : `套餐时长：${reward.reward_value} 天`;
+      if (!reward) return { label: '', value: '' };
+      if (reward.reward_type === 'traffic') return { label: locale.value === 'en-US' ? 'Traffic' : '流量', value: `${reward.reward_value} GB` };
+      if (reward.reward_type === 'duration') return { label: locale.value === 'en-US' ? 'Plan duration' : '套餐时长', value: locale.value === 'en-US' ? `${reward.reward_value} days` : `${reward.reward_value} 天` };
       const label = reward.reward_type === 'commission_balance'
         ? (locale.value === 'en-US' ? 'commission' : '推广佣金')
         : (locale.value === 'en-US' ? 'balance' : '账户余额');
-      return locale.value === 'en-US'
-        ? `${label}: ${currencySymbol.value}${formatAmount(reward.reward_value)}`
-        : `${label}：${currencySymbol.value}${formatAmount(reward.reward_value)}`;
+      return { label, value: `${currencySymbol.value}${formatAmount(reward.reward_value)}` };
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     
@@ -900,7 +898,7 @@ export default {
       referralProgram,
       rewardRestrictionText,
       nextLevelProgress,
-      achievementRewardText,
+      achievementReward,
       localizedLevel,
       currentCommissionRate,
       locale,
@@ -970,7 +968,7 @@ export default {
   .level-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; color: var(--theme-color); border-radius: 14px; background: rgba(var(--theme-color-rgb), .12); }
   .level-benefits { display: flex; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px 24px; margin-left: auto; color: var(--secondary-text-color); font-size: 14px; text-align: right; }
   .level-benefits span { white-space: nowrap; }
-  .level-benefits strong,.next-level-privileges strong,.next-level-head strong { color: var(--text-color); }
+  .level-benefits strong,.level-detail strong,.next-level-privileges strong,.next-level-head strong { color: var(--text-color); }
   .next-level-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .next-level-head>div { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
   .next-level-head>div strong { overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }

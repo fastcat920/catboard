@@ -20,7 +20,7 @@
   </script>
 
   <script defer src="/theme/default/static/js/754.34eefdb9.js?v={{ $version }}"></script>
-  <script defer src="/theme/default/static/js/index.94e7a3f9.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/index.39d36311.js?v={{ $version }}"></script>
 </head>
 <body>
   <div id="app"></div>

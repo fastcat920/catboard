@@ -24,6 +24,7 @@
         </div>
         <div class="progress"><i :style="{ width: `${progress}%` }"></i></div>
         <p>{{ text.remaining.replace('{count}', remaining).replace('{amount}', remainingRevenue) }}</p>
+        <p v-if="program.next_level.reward" class="achievement-reward"><strong>{{ text.achievement }}：</strong>{{ rewardText }}</p>
       </section>
     </template>
   </main>
@@ -35,7 +36,7 @@ import { useI18n } from 'vue-i18n';
 import { getReferralProgram } from '@/api/invite';
 const { locale } = useI18n(); const loading = ref(true); const error = ref(''); const program = ref({});
 const en = computed(() => locale.value === 'en-US');
-const text = computed(() => en.value ? { loading:'Loading…',membership:'Membership level',commission:'Commission rate',discount:'Plan discount',effective:'Qualified referrals',revenue:'Referral revenue',next:'Next level',nextCommission:'Commission rate',nextDiscount:'Plan discount',remaining:'Complete {count} more qualified referrals and ¥{amount} more revenue to upgrade.',validity:'Level validity',permanent:'Permanent' } : { loading:'加载中…',membership:'会员等级',commission:'返佣比例',discount:'套餐优惠',effective:'有效邀请',revenue:'邀请成交额',next:'下一等级',nextCommission:'佣金比例',nextDiscount:'套餐优惠',remaining:'还需 {count} 个有效邀请和 ¥{amount} 成交额即可升级。',validity:'等级有效期',permanent:'永久有效' });
+const text = computed(() => en.value ? { loading:'Loading…',membership:'Membership level',commission:'Commission rate',discount:'Plan discount',effective:'Qualified referrals',revenue:'Referral revenue',next:'Next level',nextCommission:'Commission rate',nextDiscount:'Plan discount',remaining:'Complete {count} more qualified referrals and ¥{amount} more revenue to upgrade.',validity:'Level validity',permanent:'Permanent',achievement:'One-time achievement reward' } : { loading:'加载中…',membership:'会员等级',commission:'返佣比例',discount:'套餐优惠',effective:'有效邀请',revenue:'邀请成交额',next:'下一等级',nextCommission:'佣金比例',nextDiscount:'套餐优惠',remaining:'还需 {count} 个有效邀请和 ¥{amount} 成交额即可升级。',validity:'等级有效期',permanent:'永久有效',achievement:'一次性达标奖励' });
 const current = computed(() => Number(program.value.effective_invites || 0));
 const revenueCents = computed(() => Number(program.value.referral_revenue || 0));
 const revenue = computed(() => (revenueCents.value / 100).toFixed(2));
@@ -46,6 +47,7 @@ const remainingRevenue = computed(() => (Math.max(0, requiredRevenueCents.value 
 const progress = computed(() => Math.min(100, current.value / Math.max(1, Number(program.value.next_level?.required_invites || 1)) * 100, requiredRevenueCents.value ? revenueCents.value / requiredRevenueCents.value * 100 : 100));
 const levelName = row => !row ? '' : (en.value ? row.name_en : row.name) || row.name || row.name_en;
 const levelDescription = row => !row ? '' : (en.value ? row.description_en : row.description) || row.description || row.description_en;
+const rewardText = computed(() => { const reward=program.value.next_level?.reward;if(!reward)return '';if(reward.reward_type==='traffic')return `${reward.reward_value} GB`;if(reward.reward_type==='duration')return en.value?`${reward.reward_value} days`:`${reward.reward_value} 天套餐时长`;const label=reward.reward_type==='commission_balance'?(en.value?'commission':'推广佣金'):(en.value?'balance':'账户余额');return `¥${(Number(reward.reward_value||0)/100).toFixed(2)} ${label}`; });
 const expiry = computed(() => program.value.level_expires_at ? new Date(Number(program.value.level_expires_at) * 1000).toLocaleString(en.value ? 'en-US' : 'zh-CN') : text.value.permanent);
 onMounted(async()=>{try{const result=await getReferralProgram();program.value=result.data?.program||{};}catch(e){error.value=e.response?.message||e.message;}finally{loading.value=false;}});
 </script>
@@ -73,6 +75,8 @@ onMounted(async()=>{try{const result=await getReferralProgram();program.value=re
 .progress { height: 10px; overflow: hidden; background: rgba(var(--theme-color-rgb), .12); border-radius: 20px; }
 .progress i { display: block; height: 100%; background: var(--theme-color); border-radius: inherit; }
 .progress-card p { margin-bottom: 0; color: var(--secondary-text-color); }
+.achievement-reward { padding-top: 10px; border-top: 1px solid var(--border-color); }
+.achievement-reward strong { color: var(--text-color); }
 @media (max-width: 760px) {
   .membership-page { padding: 8px 10px 100px; }
   .hero { display: block; padding: 24px; }

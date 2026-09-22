@@ -6,7 +6,6 @@ use App\Models\Order;
 use App\Models\CouponTemplate;
 use App\Models\UserCoupon;
 use App\Models\ReferralLevel;
-use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\User;
@@ -301,31 +300,42 @@ class ReferralProgramService
                 ->where('reward_type', 'effective_invite')
                 ->where('status', 'granted')
                 ->count();
-            $this->grantMilestones($order, $effectiveCount, $setting);
-            $this->upgradeLevel($order->invite_user_id, $effectiveCount, $order);
+            $referralRevenue = (int)Order::where('invite_user_id', $order->invite_user_id)
+                ->where('status', 3)->sum('total_amount');
+            $this->grantLevelRewards($order, $effectiveCount, $referralRevenue, $setting);
+            $this->upgradeLevel($order->invite_user_id, $effectiveCount, $referralRevenue, $order);
         });
         Cache::forget('admin_referral_dashboard');
     }
 
-    private function grantMilestones(Order $order, int $effectiveCount, ReferralSetting $setting): void
+    private function grantLevelRewards(Order $order, int $effectiveCount, int $referralRevenue, ReferralSetting $setting): void
     {
-        $milestones = ReferralMilestone::where('enabled', 1)
+        if (!Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) return;
+
+        $levels = ReferralLevel::with(['reward' => function ($query) {
+                $query->where('enabled', 1);
+            }])
+            ->where('enabled', 1)
             ->where('required_invites', '<=', $effectiveCount)
-            ->orderBy('required_invites')
-            ->get();
-        foreach ($milestones as $milestone) {
-            if (in_array($milestone->reward_type, ['balance', 'commission_balance'], true)) {
-                if (!$this->withinMonthlyLimit($order->invite_user_id, $milestone->reward_value, $setting)) continue;
-                $this->grantMoney(User::find($order->invite_user_id), $milestone->reward_type, (int)$milestone->reward_value, 'milestone:' . $milestone->id . ':' . $order->invite_user_id, $order, '邀请里程碑：' . $milestone->name);
+            ->where('required_revenue', '<=', $referralRevenue)
+            ->orderBy('sort')->orderBy('id')->get();
+        $user = User::find($order->invite_user_id);
+        foreach ($levels as $level) {
+            $reward = $level->reward;
+            if (!$reward) continue;
+            $eventKey = 'milestone:' . $reward->id . ':' . $order->invite_user_id;
+            $description = '成长等级达标奖励：' . $level->name;
+            if (in_array($reward->reward_type, ['balance', 'commission_balance'], true)) {
+                if (!$this->withinMonthlyLimit($order->invite_user_id, $reward->reward_value, $setting)) continue;
+                $this->grantMoney($user, $reward->reward_type, (int)$reward->reward_value, $eventKey, $order, $description);
             } else {
-                $this->grantEntitlement(User::find($order->invite_user_id), $milestone->reward_type, (int)$milestone->reward_value, 'milestone:' . $milestone->id . ':' . $order->invite_user_id, $order, '邀请里程碑：' . $milestone->name);
+                $this->grantEntitlement($user, $reward->reward_type, (int)$reward->reward_value, $eventKey, $order, $description);
             }
         }
     }
 
-    private function upgradeLevel(int $userId, int $effectiveCount, Order $order): void
+    private function upgradeLevel(int $userId, int $effectiveCount, int $revenue, Order $order): void
     {
-        $revenue = (int)Order::where('invite_user_id', $userId)->where('status', 3)->sum('total_amount');
         $level = ReferralLevel::where('enabled', 1)
             ->where('required_invites', '<=', $effectiveCount)
             ->where('required_revenue', '<=', $revenue)
@@ -350,7 +360,7 @@ class ReferralProgramService
             'reward_type' => 'level',
             'reward_value' => $level->commission_rate,
             'status' => 'granted',
-            'description' => '推广等级升级：' . $level->name,
+            'description' => '成长等级升级：' . $level->name,
             'granted_at' => time(),
         ]);
     }

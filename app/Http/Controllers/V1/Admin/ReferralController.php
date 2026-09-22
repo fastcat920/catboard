@@ -15,6 +15,7 @@ use App\Services\ReferralProgramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReferralController extends Controller
 {
@@ -60,7 +61,9 @@ class ReferralController extends Controller
 
     public function levels()
     {
-        return response(['data' => ReferralLevel::orderBy('sort')->orderBy('id')->get()]);
+        $query = ReferralLevel::orderBy('sort')->orderBy('id');
+        if (Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) $query->with('reward');
+        return response(['data' => $query->get()]);
     }
 
     public function saveLevel(Request $request)
@@ -79,7 +82,16 @@ class ReferralController extends Controller
             'retain_invites' => 'required|integer|min:0',
             'retain_revenue' => 'sometimes|integer|min:0',
             'enabled' => 'required|boolean',
+            'reward_type' => 'sometimes|in:none,balance,commission_balance,traffic,duration',
+            'reward_value' => 'nullable|integer|min:0',
         ]);
+
+        $rewardType = array_key_exists('reward_type', $data) ? $data['reward_type'] : null;
+        $rewardValue = (int)($data['reward_value'] ?? 0);
+        unset($data['reward_type'], $data['reward_value']);
+        if ($rewardType !== null && $rewardType !== 'none' && $rewardValue < 1) {
+            abort(422, '启用达标奖励时，奖励数值必须大于 0');
+        }
 
         $levelId = $request->input('id');
         $existingLevel = $levelId ? ReferralLevel::findOrFail($levelId) : null;
@@ -95,6 +107,9 @@ class ReferralController extends Controller
         }
         if ($isInitialLevel && (int)$data['valid_days'] !== 0) {
             abort(422, '0 邀请初始等级必须永久有效，请将等级有效期设置为 0');
+        }
+        if ($isInitialLevel && $rewardType !== null && $rewardType !== 'none') {
+            abort(422, '0 邀请初始等级不能配置达标奖励');
         }
 
         $sameRequirementLevel = ReferralLevel::where('id', '!=', $levelId ?: 0)
@@ -130,8 +145,35 @@ class ReferralController extends Controller
             abort(422, '等级顺序与升级条件冲突：较高等级“' . $higherConflict->name . '”的升级要求不能低于当前等级');
         }
 
-        $level = $existingLevel ?: new ReferralLevel();
-        $level->fill($data)->save();
+        $level = DB::transaction(function () use ($existingLevel, $data, $rewardType, $rewardValue) {
+            $level = $existingLevel ?: new ReferralLevel();
+            $level->fill($data)->save();
+
+            if ($rewardType !== null && Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) {
+                $reward = ReferralMilestone::where('referral_level_id', $level->id)->lockForUpdate()->first();
+                if ($rewardType === 'none') {
+                    if ($reward) {
+                        $reward->enabled = 0;
+                        $reward->save();
+                    }
+                } else {
+                    $reward = $reward ?: new ReferralMilestone();
+                    $reward->fill([
+                        'referral_level_id' => $level->id,
+                        'name' => $level->name,
+                        'name_en' => $level->name_en,
+                        'required_invites' => $level->required_invites,
+                        'reward_type' => $rewardType,
+                        'reward_value' => $rewardValue,
+                        'enabled' => 1,
+                    ])->save();
+                }
+            }
+
+            return Schema::hasColumn('v2_referral_milestone', 'referral_level_id')
+                ? $level->load('reward')
+                : $level;
+        });
         return response(['data' => $level]);
     }
 
@@ -144,7 +186,12 @@ class ReferralController extends Controller
                 abort(422, '初始等级不能删除，您可以编辑它的名称、描述和权益');
             }
         }
-        $result = (bool)$level->delete();
+        $result = DB::transaction(function () use ($level) {
+            if (Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) {
+                ReferralMilestone::where('referral_level_id', $level->id)->delete();
+            }
+            return (bool)$level->delete();
+        });
         return response(['data' => $result]);
     }
 

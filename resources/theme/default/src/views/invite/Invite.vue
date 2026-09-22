@@ -62,13 +62,14 @@
         <button class="membership-link" @click="$router.push('/membership')">{{ $t('invite.viewMembershipBenefits') }}</button>
       </section>
 
-      <section v-if="referralProgram?.next_milestone" class="growth-card milestone-card">
+      <section v-if="referralProgram?.next_level" class="growth-card milestone-card">
         <div class="growth-card-head">
-          <div><span>{{ $t('invite.milestoneReward') }}</span><h3>{{ localizedMilestone(referralProgram.next_milestone) }}</h3></div>
-          <strong>{{ referralProgram.effective_invites || 0 }}/{{ referralProgram.next_milestone.required_invites }}</strong>
+          <div><span>{{ $t('invite.nextGrowthLevel') }}</span><h3>{{ localizedLevel(referralProgram.next_level) }}</h3></div>
+          <strong>{{ nextLevelRequirementText }}</strong>
         </div>
-        <div class="growth-progress"><i :style="{ width: milestoneProgress + '%' }"></i></div>
-        <p>{{ $t('invite.oneTimeReward') }}{{ milestoneRewardText }}</p>
+        <div class="growth-progress"><i :style="{ width: nextLevelProgress + '%' }"></i></div>
+        <p>{{ $t('invite.nextLevelBenefits') }}{{ referralProgram.next_level.commission_rate || 0 }}% · {{ $t('invite.planDiscount') }} {{ referralProgram.next_level.member_discount || 0 }}%</p>
+        <p v-if="referralProgram.next_level.reward">{{ $t('invite.achievementReward') }}{{ achievementRewardText }}</p>
       </section>
 
       <!-- 统计卡片组 -->
@@ -541,21 +542,33 @@ export default {
       return key ? t(`invite.inviteLink.rewardRestrictions.${key}`) : '';
     });
     const inviteRecords = ref([]);
-    const milestoneProgress = computed(() => referralProgram.value?.next_milestone
-      ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
+    const nextLevelProgress = computed(() => referralProgram.value?.next_level
+      ? Math.min(
+        100,
+        Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_level.required_invites || 1)) * 100,
+        Number(referralProgram.value.next_level.required_revenue || 0)
+          ? Number(referralProgram.value.referral_revenue || 0) / Number(referralProgram.value.next_level.required_revenue) * 100
+          : 100
+      )
       : 100);
-    const milestoneRewardText = computed(() => {
-      const milestone = referralProgram.value?.next_milestone;
-      if (!milestone) return '';
-      if (milestone.reward_type === 'traffic') return `${milestone.reward_value} GB`;
-      if (milestone.reward_type === 'duration') return locale.value === 'en-US' ? `${milestone.reward_value} days` : `${milestone.reward_value} 天套餐时长`;
-      const label = milestone.reward_type === 'commission_balance'
+    const nextLevelRequirementText = computed(() => {
+      const level = referralProgram.value?.next_level;
+      if (!level) return '';
+      const invites = `${Number(referralProgram.value.effective_invites || 0)}/${Number(level.required_invites || 0)}`;
+      if (!Number(level.required_revenue || 0)) return invites;
+      return `${invites} · ${currencySymbol.value}${formatAmount(referralProgram.value.referral_revenue || 0)}/${currencySymbol.value}${formatAmount(level.required_revenue)}`;
+    });
+    const achievementRewardText = computed(() => {
+      const reward = referralProgram.value?.next_level?.reward;
+      if (!reward) return '';
+      if (reward.reward_type === 'traffic') return `${reward.reward_value} GB`;
+      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `${reward.reward_value} days` : `${reward.reward_value} 天套餐时长`;
+      const label = reward.reward_type === 'commission_balance'
         ? (locale.value === 'en-US' ? 'commission' : '推广佣金')
         : (locale.value === 'en-US' ? 'balance' : '账户余额');
-      return `${currencySymbol.value}${formatAmount(milestone.reward_value)} ${label}`;
+      return `${currencySymbol.value}${formatAmount(reward.reward_value)} ${label}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
-    const localizedMilestone = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     
     // 分页相关
     const currentPage = ref(1);
@@ -882,10 +895,10 @@ export default {
       inviteCodes,
       referralProgram,
       rewardRestrictionText,
-      milestoneProgress,
-      milestoneRewardText,
+      nextLevelProgress,
+      nextLevelRequirementText,
+      achievementRewardText,
       localizedLevel,
-      localizedMilestone,
       currentCommissionRate,
       locale,
       inviteStats,

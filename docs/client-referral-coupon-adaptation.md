@@ -47,7 +47,7 @@ const localized = locale === 'en-US'
 
 适用于：
 
-- 推广等级：`name/name_en`、`description/description_en`
+- 成长等级：`name/name_en`、`description/description_en`
 - 邀请活动：`name/name_en`、`description/description_en`
 - 优惠券：`name/name_en`、`description/description_en`
 
@@ -59,7 +59,7 @@ const localized = locale === 'en-US'
 GET /api/v1/user/invite/fetch
 ```
 
-该接口是旧客户端兼容接口，只返回 `codes` 和固定顺序的 `stat` 数组。推广等级、里程碑等增强数据请使用 `/api/v1/user/invite/program`，不要继续扩展本接口的响应结构。
+该接口是旧客户端兼容接口，只返回 `codes` 和固定顺序的 `stat` 数组。成长等级及达标奖励等增强数据请使用 `/api/v1/user/invite/program`，不要继续扩展本接口的响应结构。
 
 基础结构：
 
@@ -128,7 +128,9 @@ GET /api/v1/user/invite/program
   "effective_invites": 3,
   "level": {},
   "level_expires_at": 1790000000,
-  "next_milestone": {},
+  "next_level": {
+    "reward": {}
+  },
   "recent_rewards": [],
   "campaign": {},
   "newcomer_reward": {}
@@ -148,7 +150,7 @@ GET /api/v1/user/invite/program
 
 不要把两者混用。
 
-### 2.3 推广等级
+### 2.3 成长等级
 
 `program.level` 可能为 `null`，否则常用字段如下：
 
@@ -158,7 +160,9 @@ GET /api/v1/user/invite/program
 | `name` / `name_en` | 中英文名称 |
 | `description` / `description_en` | 中英文描述 |
 | `required_invites` | 所需有效邀请人数 |
+| `required_revenue` | 所需邀请成交额，最小货币单位 |
 | `commission_rate` | 返佣比例百分比 |
+| `member_discount` | 套餐优惠百分比 |
 | `valid_days` | 等级有效天数，`0` 表示不设固定有效期 |
 | `retain_invites` | 保级所需有效邀请数 |
 | `enabled` | 是否启用 |
@@ -175,18 +179,21 @@ program.level_expires_at
 - 有有效期时显示到期时间。
 - 无等级时显示普通用户及 `stat[3]` 的返佣比例。
 
-### 2.4 里程碑进度
+### 2.4 下一等级与达标奖励
 
-`program.next_milestone` 表示下一个尚未达到的启用里程碑。
+`program.next_level` 表示下一个尚未达到的成长等级。等级的一次性达标奖励位于 `program.next_level.reward`；没有奖励时该字段为 `null`。旧字段 `program.next_milestone` 已移除。
 
 常用字段：
 
 | 字段 | 含义 |
 |---|---|
-| `name` | 任务名称 |
-| `required_invites` | 达标有效邀请数 |
-| `reward_type` | 奖励类型 |
-| `reward_value` | 奖励值 |
+| `next_level.name` / `name_en` | 下一等级中英文名称 |
+| `next_level.required_invites` | 升级所需有效邀请数 |
+| `next_level.required_revenue` | 升级所需邀请成交额 |
+| `next_level.commission_rate` | 下一等级返佣比例 |
+| `next_level.member_discount` | 下一等级套餐优惠比例 |
+| `next_level.reward.reward_type` | 一次性达标奖励类型 |
+| `next_level.reward.reward_value` | 一次性达标奖励值 |
 
 奖励类型：
 
@@ -201,7 +208,7 @@ program.level_expires_at
 
 ```ts
 const current = program.effective_invites;
-const target = program.next_milestone?.required_invites;
+const target = program.next_level?.required_invites;
 const remaining = target ? Math.max(0, target - current) : 0;
 ```
 
@@ -535,7 +542,7 @@ POST /api/v1/user/order/save
 
 - 数据概览：注册人数、有效邀请、确认中佣金、可用佣金。
 - 当前等级：等级名称、返佣比例、有效期。
-- 下一里程碑：当前进度、还差人数、奖励内容。
+- 下一成长等级：当前进度、升级条件、等级权益和一次性达标奖励。
 - 活动卡片：中英文说明、倒计时、奖励和适用条件。
 - 分享区域：复制邀请链接、邀请码和渠道分享按钮。
 - 新人奖励状态。

@@ -9,7 +9,6 @@ use App\Models\InviteCode;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\ReferralLevel;
-use App\Models\ReferralMilestone;
 use App\Models\ReferralReward;
 use App\Models\ReferralSetting;
 use App\Models\UserCoupon;
@@ -208,11 +207,18 @@ class InviteController extends Controller
                     ->orderBy('sort', 'DESC')->orderBy('id', 'DESC')->first();
             }
             $currentLevelSort = $level ? (int)$level->sort : 0;
-            $nextLevel = ReferralLevel::where('enabled', 1)
+            $nextLevelQuery = ReferralLevel::where('enabled', 1)
                 ->where('sort', '>', $currentLevelSort)
-                ->orderBy('sort')->orderBy('id')->first();
-            $nextMilestone = ReferralMilestone::where('enabled', 1)->where('required_invites', '>', $effectiveCount)
-                ->orderBy('required_invites')->first();
+                ->orderBy('sort')->orderBy('id');
+            if (Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) {
+                $nextLevelQuery->with(['reward' => function ($query) {
+                    $query->where('enabled', 1);
+                }]);
+            }
+            $nextLevel = $nextLevelQuery->first();
+            if ($nextLevel && !Schema::hasColumn('v2_referral_milestone', 'referral_level_id')) {
+                $nextLevel->setRelation('reward', null);
+            }
             $program = [
                 'setting' => $setting,
                 'effective_invites' => $effectiveCount,
@@ -221,7 +227,6 @@ class InviteController extends Controller
                 'level' => $level,
                 'level_expires_at' => $user->referral_level_expires_at,
                 'next_level' => $nextLevel,
-                'next_milestone' => $nextMilestone,
                 'recent_rewards' => ReferralReward::where('user_id', $user->id)->where('reward_type', '!=', 'effective_invite')
                     ->orderBy('id', 'DESC')->limit(10)->get(),
             ];

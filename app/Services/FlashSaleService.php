@@ -52,6 +52,12 @@ class FlashSaleService
     {
         $campaign = $this->match($user, (int)$order->plan_id, (string)$order->period, (int)$order->total_amount, (int)$order->type);
         if (!$campaign) return null;
+        $this->applyCampaign($order, $campaign);
+        return $campaign;
+    }
+
+    public function applyCampaign(Order $order, FlashSaleCampaign $campaign): void
+    {
         $quote = $this->quote($campaign, (int)$order->total_amount);
         $order->flash_sale_campaign_id = $campaign->id;
         $order->flash_sale_discount_amount = $quote['discount_amount'];
@@ -63,7 +69,6 @@ class FlashSaleService
             'allow_coupon' => (bool)$campaign->allow_coupon,
             'allow_member_discount' => (bool)$campaign->allow_member_discount,
         ];
-        return $campaign;
     }
 
     public function complete(Order $order): void

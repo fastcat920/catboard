@@ -17,7 +17,8 @@ class OrderSave extends FormRequest
             'plan_id' => 'required',
             'period' => 'required|in:month_price,quarter_price,half_year_price,year_price,two_year_price,three_year_price,onetime_price,reset_price,deposit',
             'user_coupon_id' => 'nullable|integer',
-            'disable_auto_coupon' => 'nullable|boolean'
+            'disable_auto_coupon' => 'nullable|boolean',
+            'promotion_mode' => 'nullable|in:auto,flash_sale,coupon,standard'
         ];
     }
 

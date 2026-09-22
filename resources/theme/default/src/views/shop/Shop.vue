@@ -43,6 +43,7 @@
                 <span class="period">/ {{ $t(`shop.plan.price_options.${getPriceTypeKey(getLowestPriceInfo(plan).type)}`) }}</span>
               </div>
               <div v-if="getLowestPriceInfo(plan).sale" class="sale-countdown">{{ $t('shop.ends_in') }} {{ saleCountdown(getLowestPriceInfo(plan).sale.ends_at) }}</div>
+              <div v-if="getLowestPriceInfo(plan).sale && getLowestPriceInfo(plan).sale.allow_coupon === false" class="sale-best-price-note">{{ $t('shop.checkout_best_price') }}</div>
 
               <div class="plan-metrics">
                 <div class="plan-metric">
@@ -499,6 +500,7 @@ export default {
   .sale-badge { padding: 5px 9px; border-radius: 999px; color: #fff; background: #ef6a55; font-size: 11px; font-weight: 700; }
   .price-display del { margin-left: 8px; color: var(--secondary-text-color); font-size: 13px; }
   .sale-countdown { margin: -2px 0 14px; color: #ef6a55; font-size: 12px; font-weight: 700; }
+  .sale-best-price-note { margin: -8px 0 14px; color: var(--secondary-text-color); font-size: 11px; line-height: 1.45; }
   padding: 20px;
   display: flex;
   justify-content: center;

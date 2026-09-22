@@ -458,18 +458,49 @@ Content-Type: application/json
 }
 ```
 
+当限时特价与优惠券互斥时，可通过 `promotion_mode` 指定方案：
+
+| 值 | 含义 |
+|---|---|
+| `auto` | 比较活动、优惠券及可叠加的会员等级折扣，自动选择最终价格最低的方案 |
+| `flash_sale` | 使用限时特价方案 |
+| `coupon` | 使用 `user_coupon_id` 指定的优惠券方案 |
+| `standard` | 不使用活动或优惠券，仅使用会员等级折扣 |
+
+旧客户端不传 `promotion_mode` 时保持兼容：未指定优惠券则自动择优，指定优惠券则使用对应优惠券方案。
+
+自动择优比较的是旧套餐抵扣后的最终订单金额，并将各方案允许叠加的会员等级折扣计入；余额抵扣对所有方案等额生效，因此不参与排序。最终金额相同时优先限时活动，其次是不消耗优惠券的会员等级方案。
+
 响应：
 
 ```json
 {
   "data": {
     "original_amount": 2000,
-    "activity_discount": 200,
+    "activity_discount": 0,
     "coupon_discount": 500,
-    "member_discount": 0,
-    "allow_coupon": true,
+    "member_discount": 200,
+    "allow_coupon": false,
     "allow_member_discount": false,
     "final_amount": 1300,
+    "promotion_exclusive": true,
+    "selected_promotion": {
+      "key": "coupon:123",
+      "type": "coupon",
+      "coupon_id": 123,
+      "discount_amount": 700,
+      "final_amount": 1300,
+      "recommended": true
+    },
+    "promotion_options": [
+      {
+        "key": "coupon:123",
+        "type": "coupon",
+        "discount_amount": 700,
+        "final_amount": 1300,
+        "recommended": true
+      }
+    ],
     "selected_coupon": {},
     "available_coupons": [],
     "unavailable_coupons": []
@@ -492,7 +523,8 @@ POST /api/v1/user/order/save
   "plan_id": 1,
   "period": "month_price",
   "user_coupon_id": 123,
-  "disable_auto_coupon": false
+  "disable_auto_coupon": false,
+  "promotion_mode": "coupon"
 }
 ```
 
@@ -501,6 +533,7 @@ POST /api/v1/user/order/save
 - 不传 `user_coupon_id` 且未设置 `disable_auto_coupon=true`：后端自动选择推荐券。
 - 传 `user_coupon_id`：锁定指定优惠券；若已失效或不满足条件，返回 `422`。
 - `disable_auto_coupon=true` 且不传 ID：明确不使用优惠券。
+- 互斥优惠场景下，提交 `promotion_mode` 可固定使用活动、优惠券或会员等级方案；提交 `auto` 会在创建订单时重新校验并择优。
 - 创建订单后优惠券状态变为 `locked`。
 - 订单支付成功后变为 `used`。
 - 未支付订单取消或释放后，优惠券恢复为 `available`；若已过期则变为 `expired`。

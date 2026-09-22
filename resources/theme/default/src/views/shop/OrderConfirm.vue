@@ -86,7 +86,7 @@
           <!-- 账户优惠券 -->
           <div class="section-wrapper">
             <div class="section-title">
-              <span>{{ $t('order.choose_coupon') }}</span>
+              <span>{{ $t(promotionExclusive ? 'order.choose_promotion' : 'order.choose_coupon') }}</span>
             </div>
             <div ref="couponSelectorRef" class="coupon-selector" :class="{ open: couponDropdownOpen }">
               <button
@@ -94,7 +94,7 @@
                 type="button"
                 class="coupon-select-trigger"
                 :disabled="loading.coupons || !selectedPriceType"
-                :aria-label="$t('order.choose_coupon')"
+                :aria-label="$t(promotionExclusive ? 'order.choose_promotion' : 'order.choose_coupon')"
                 :aria-expanded="couponDropdownOpen"
                 aria-haspopup="listbox"
                 aria-controls="order-coupon-options"
@@ -102,6 +102,14 @@
                 @keydown.esc="couponDropdownOpen = false"
               >
                 <span v-if="loading.coupons" class="coupon-placeholder">{{ $t('order.coupon_loading') }}</span>
+                <span v-else-if="promotionExclusive && selectedPromotion" class="coupon-trigger-card promotion-trigger-card">
+                  <span class="coupon-trigger-value">{{ promotionSaving(selectedPromotion) }}</span>
+                  <span class="coupon-trigger-copy">
+                    <strong>{{ promotionName(selectedPromotion) }}</strong>
+                    <small>{{ $t('order.promotion_final', { amount: promotionFinal(selectedPromotion) }) }}</small>
+                  </span>
+                  <span v-if="selectedPromotion.recommended" class="best-coupon-badge">{{ $t('order.best_promotion') }}</span>
+                </span>
                 <span v-else-if="selectedCoupon" class="coupon-trigger-card">
                   <span class="coupon-trigger-value">{{ couponValue(selectedCoupon) }}</span>
                   <span class="coupon-trigger-copy">
@@ -114,7 +122,35 @@
                 <span class="coupon-chevron" aria-hidden="true"></span>
               </button>
 
-              <div v-if="couponDropdownOpen" id="order-coupon-options" class="coupon-dropdown" role="listbox" :aria-label="$t('order.choose_coupon')">
+              <div v-if="couponDropdownOpen" id="order-coupon-options" class="coupon-dropdown" role="listbox" :aria-label="$t(promotionExclusive ? 'order.choose_promotion' : 'order.choose_coupon')">
+                <template v-if="promotionExclusive">
+                  <p class="promotion-hint">{{ $t('order.promotion_exclusive_hint') }}</p>
+                  <button
+                    v-for="option in promotionOptions"
+                    :key="option.key"
+                    type="button"
+                    class="coupon-dropdown-option promotion-option"
+                    :class="{ selected: selectedPromotion?.key === option.key }"
+                    role="option"
+                    :aria-selected="selectedPromotion?.key === option.key"
+                    @click="selectPromotion(option)"
+                  >
+                    <span class="coupon-option-value">
+                      <strong>{{ promotionSaving(option) }}</strong>
+                      <small>{{ $t('order.promotion_saved') }}</small>
+                    </span>
+                    <span class="coupon-option-content">
+                      <span class="coupon-option-heading">
+                        <strong>{{ promotionName(option) }}</strong>
+                        <em v-if="option.recommended">{{ $t('order.best_promotion') }}</em>
+                      </span>
+                      <small>{{ promotionDescription(option) }}</small>
+                      <span class="coupon-option-saving">{{ $t('order.promotion_final', { amount: promotionFinal(option) }) }}</span>
+                    </span>
+                    <span class="coupon-option-check" aria-hidden="true">✓</span>
+                  </button>
+                </template>
+                <template v-else>
                 <div v-if="!availableCoupons.length" class="coupon-dropdown-empty">{{ $t('order.no_eligible_coupon') }}</div>
                 <button
                   v-for="(coupon, index) in availableCoupons"
@@ -150,6 +186,7 @@
                   <span>{{ $t('order.no_coupon') }}</span>
                   <span v-if="disableAutoCoupon" aria-hidden="true">✓</span>
                 </button>
+                </template>
               </div>
             </div>
           </div>
@@ -302,6 +339,10 @@ export default {
     const selectedCouponId = ref(null);
     const disableAutoCoupon = ref(false);
     const couponInfo = ref(null);
+    const promotionExclusive = ref(false);
+    const promotionOptions = ref([]);
+    const selectedPromotion = ref(null);
+    const promotionMode = ref('auto');
     const couponDropdownOpen = ref(false);
     const couponSelectorRef = ref(null);
     const activityDiscount = ref(0);
@@ -411,6 +452,8 @@ export default {
       selectedPriceType.value = type;
       selectedCouponId.value = null;
       disableAutoCoupon.value = false;
+      promotionMode.value = 'auto';
+      selectedPromotion.value = null;
       refreshPreview();
     };
     
@@ -434,12 +477,45 @@ export default {
       return (locale.value === 'en-US' ? template.description_en : template.description) || template.description || template.description_en || '';
     };
     const couponSavings = coupon => `${currencySymbol.value}${(Number(coupon?.calculated_discount || 0) / 100).toFixed(2)}`;
+    const localizedPromotionField = (promotion, field) => (
+      locale.value === 'en-US' ? promotion?.[`${field}_en`] : promotion?.[field]
+    ) || promotion?.[field] || promotion?.[`${field}_en`] || '';
+    const promotionName = promotion => {
+      if (promotion?.type === 'standard') {
+        return Number(promotion.member_discount || 0) > 0
+          ? t('order.member_promotion')
+          : t('order.regular_promotion');
+      }
+      return localizedPromotionField(promotion, 'name') || t('order.regular_promotion');
+    };
+    const promotionDescription = promotion => {
+      if (promotion?.type === 'standard') {
+        return Number(promotion.member_discount || 0) > 0
+          ? t('order.member_promotion_desc', { rate: memberDiscountRate.value })
+          : t('order.regular_promotion_desc');
+      }
+      if (promotion?.type === 'coupon') return localizedPromotionField(promotion, 'description') || t('order.coupon_no_description');
+      return localizedPromotionField(promotion, 'description') || t('order.flash_promotion_desc');
+    };
+    const promotionSaving = promotion => {
+      const amount = Number(promotion?.discount_amount || 0);
+      return amount > 0 ? `-${currencySymbol.value}${(amount / 100).toFixed(2)}` : t('order.no_discount');
+    };
+    const promotionFinal = promotion => `${currencySymbol.value}${(Number(promotion?.final_amount || 0) / 100).toFixed(2)}`;
     const toggleCouponDropdown = () => {
       if (!loading.coupons && selectedPriceType.value) couponDropdownOpen.value = !couponDropdownOpen.value;
     };
     const selectCoupon = value => {
       disableAutoCoupon.value = value === 'none';
       selectedCouponId.value = disableAutoCoupon.value ? null : Number(value);
+      promotionMode.value = disableAutoCoupon.value ? 'auto' : 'coupon';
+      couponDropdownOpen.value = false;
+      refreshPreview();
+    };
+    const selectPromotion = option => {
+      promotionMode.value = option.type;
+      selectedCouponId.value = option.type === 'coupon' ? Number(option.coupon_id) : null;
+      disableAutoCoupon.value = false;
       couponDropdownOpen.value = false;
       refreshPreview();
     };
@@ -455,12 +531,16 @@ export default {
           plan_id: Number(plan.value.id),
           period: selectedPriceType.value,
           user_coupon_id: disableAutoCoupon.value ? null : selectedCouponId.value,
-          disable_auto_coupon: disableAutoCoupon.value
+          disable_auto_coupon: disableAutoCoupon.value,
+          promotion_mode: promotionMode.value
         });
         const data = response.data || {};
         availableCoupons.value = data.available_coupons || [];
         couponInfo.value = data.selected_coupon || null;
         selectedCouponId.value = couponInfo.value?.id || null;
+        promotionExclusive.value = Boolean(data.promotion_exclusive);
+        promotionOptions.value = Array.isArray(data.promotion_options) ? data.promotion_options : [];
+        selectedPromotion.value = data.selected_promotion || null;
         activityDiscount.value = Number(data.activity_discount || 0);
         surplusAmount.value = Number(data.surplus_amount || 0);
         refundAmount.value = Number(data.refund_amount || 0);
@@ -490,6 +570,7 @@ export default {
         
         orderData.user_coupon_id = disableAutoCoupon.value ? null : selectedCouponId.value;
         orderData.disable_auto_coupon = disableAutoCoupon.value;
+        orderData.promotion_mode = promotionMode.value;
 
         const response = await createOrderAfterUnpaidCleanup(orderData);
         
@@ -615,6 +696,9 @@ export default {
       selectedCouponId,
       disableAutoCoupon,
       couponInfo,
+      promotionExclusive,
+      promotionOptions,
+      selectedPromotion,
       couponDropdownOpen,
       couponSelectorRef,
       selectedCoupon,
@@ -640,8 +724,13 @@ export default {
       couponValue,
       couponDescription,
       couponSavings,
+      promotionName,
+      promotionDescription,
+      promotionSaving,
+      promotionFinal,
       toggleCouponDropdown,
       selectCoupon,
+      selectPromotion,
       submitOrder,
       goBack,
       showExistingPlanWarning,
@@ -673,6 +762,7 @@ export default {
   .coupon-trigger-copy small { overflow: hidden; color: var(--secondary-text-color); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
   .best-coupon-badge { padding: 4px 7px; color: var(--theme-color); font-size: 10px; font-weight: 700; white-space: nowrap; background: rgba(var(--theme-color-rgb), .1); border-radius: 999px; }
   .coupon-dropdown { position: absolute; top: calc(100% + 8px); right: 0; left: 0; z-index: 30; display: grid; gap: 9px; max-height: 430px; padding: 10px; overflow-y: auto; background: var(--card-background); border: 1px solid var(--card-border); border-radius: 17px; box-shadow: 0 18px 46px rgba(28, 42, 72, .18); }
+  .promotion-hint { margin: 0; padding: 8px 10px; color: var(--secondary-text-color); font-size: 11px; line-height: 1.5; background: rgba(var(--theme-color-rgb), .06); border-radius: 10px; }
   .coupon-dropdown-option { position: relative; display: grid; grid-template-columns: 100px minmax(0, 1fr) 20px; align-items: stretch; min-height: 94px; padding: 0; overflow: hidden; color: var(--text-color); text-align: left; background: var(--card-background); border: 1px solid var(--card-border); border-radius: 14px; cursor: pointer; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
   .coupon-dropdown-option:hover, .coupon-dropdown-option.selected { border-color: var(--theme-color); box-shadow: 0 5px 16px rgba(var(--theme-color-rgb), .12); }
   .coupon-dropdown-option:hover { transform: translateY(-1px); }
@@ -687,6 +777,7 @@ export default {
   .coupon-option-saving { color: var(--theme-color); font-size: 12px; font-weight: 700; }
   .coupon-option-check { align-self: center; color: var(--theme-color); font-weight: 800; opacity: 0; }
   .coupon-dropdown-option.selected .coupon-option-check { opacity: 1; }
+  .promotion-option .coupon-option-value small { opacity: .82; }
   .coupon-none-option { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; color: var(--secondary-text-color); background: var(--input-background); border: 1px solid var(--card-border); border-radius: 12px; cursor: pointer; }
   .coupon-none-option:hover, .coupon-none-option.selected { color: var(--theme-color); border-color: var(--theme-color); }
   .coupon-dropdown-empty { padding: 16px; color: var(--secondary-text-color); text-align: center; }

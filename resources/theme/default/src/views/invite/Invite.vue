@@ -563,14 +563,14 @@ export default {
     const achievementRewardText = computed(() => {
       const reward = referralProgram.value?.next_level?.reward;
       if (!reward) return '';
-      if (reward.reward_type === 'traffic') return locale.value === 'en-US' ? `Traffic ${reward.reward_value} GB` : `流量 ${reward.reward_value} GB`;
-      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `Plan duration ${reward.reward_value} days` : `套餐时长 ${reward.reward_value} 天`;
+      if (reward.reward_type === 'traffic') return locale.value === 'en-US' ? `Traffic: ${reward.reward_value} GB` : `流量：${reward.reward_value} GB`;
+      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `Plan duration: ${reward.reward_value} days` : `套餐时长：${reward.reward_value} 天`;
       const label = reward.reward_type === 'commission_balance'
         ? (locale.value === 'en-US' ? 'commission' : '推广佣金')
         : (locale.value === 'en-US' ? 'balance' : '账户余额');
       return locale.value === 'en-US'
-        ? `${label} ${currencySymbol.value}${formatAmount(reward.reward_value)}`
-        : `${label}${currencySymbol.value}${formatAmount(reward.reward_value)}`;
+        ? `${label}: ${currencySymbol.value}${formatAmount(reward.reward_value)}`
+        : `${label}：${currencySymbol.value}${formatAmount(reward.reward_value)}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     

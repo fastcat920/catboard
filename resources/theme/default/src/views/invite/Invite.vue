@@ -66,11 +66,13 @@
             <span>{{ $t('invite.effectiveInviteProgress') }} <strong>{{ referralProgram.effective_invites || 0 }} / {{ referralProgram.next_level.required_invites || 0 }}</strong></span>
           </div>
           <div class="growth-progress"><i :style="{ width: nextLevelProgress + '%' }"></i></div>
-          <p v-if="referralProgram.next_level.reward" class="level-detail"><b>{{ $t('invite.achievementReward') }}</b>{{ achievementRewardText }}</p>
-          <div class="next-level-privileges">
+          <div v-if="referralProgram.next_level.reward" class="level-meta-row level-detail"><b>{{ $t('invite.achievementReward') }}</b><span>{{ achievementRewardText }}</span></div>
+          <div class="level-meta-row next-level-privileges">
             <b>{{ $t('invite.levelPrivileges') }}</b>
-            <span>{{ $t('invite.commissionRate') }}：<strong>{{ referralProgram.next_level.commission_rate || 0 }}%</strong></span>
-            <span>{{ $t('invite.planDiscount') }}：<strong>{{ referralProgram.next_level.member_discount || 0 }}%</strong></span>
+            <div class="level-privilege-values">
+              <span>{{ $t('invite.commissionRate') }}：<strong>{{ referralProgram.next_level.commission_rate || 0 }}%</strong></span>
+              <span>{{ $t('invite.planDiscount') }}：<strong>{{ referralProgram.next_level.member_discount || 0 }}%</strong></span>
+            </div>
           </div>
           <p v-if="Number(referralProgram.next_level.required_revenue || 0)" class="level-revenue-condition">{{ $t('invite.revenueProgress') }}：{{ currencySymbol }}{{ formatAmount(referralProgram.referral_revenue || 0) }} / {{ currencySymbol }}{{ formatAmount(referralProgram.next_level.required_revenue) }}</p>
         </div>
@@ -561,12 +563,14 @@ export default {
     const achievementRewardText = computed(() => {
       const reward = referralProgram.value?.next_level?.reward;
       if (!reward) return '';
-      if (reward.reward_type === 'traffic') return `${reward.reward_value} GB`;
-      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `${reward.reward_value} days` : `${reward.reward_value} 天套餐时长`;
+      if (reward.reward_type === 'traffic') return locale.value === 'en-US' ? `Traffic ${reward.reward_value} GB` : `流量 ${reward.reward_value} GB`;
+      if (reward.reward_type === 'duration') return locale.value === 'en-US' ? `Plan duration ${reward.reward_value} days` : `套餐时长 ${reward.reward_value} 天`;
       const label = reward.reward_type === 'commission_balance'
         ? (locale.value === 'en-US' ? 'commission' : '推广佣金')
         : (locale.value === 'en-US' ? 'balance' : '账户余额');
-      return `${currencySymbol.value}${formatAmount(reward.reward_value)} ${label}`;
+      return locale.value === 'en-US'
+        ? `${label} ${currencySymbol.value}${formatAmount(reward.reward_value)}`
+        : `${label}${currencySymbol.value}${formatAmount(reward.reward_value)}`;
     });
     const localizedLevel = row => !row ? '' : (locale.value === 'en-US' ? row.name_en : row.name) || row.name || row.name_en || '';
     
@@ -959,11 +963,13 @@ export default {
 
   .growth-level-card { margin-bottom: 18px; overflow: hidden; border: 1px solid var(--border-color); border-radius: 20px; background: var(--card-bg-color, #fff); }
   .current-level-block,.next-level-block { padding: 20px; }
+  .current-level-block { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
   .next-level-block { border-top: 1px solid var(--border-color); }
-  .current-level-title { display: flex; align-items: center; gap: 12px; }
-  .current-level-title h2 { margin: 0; color: var(--text-color); font-size: 23px; }
+  .current-level-title { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; gap: 12px; }
+  .current-level-title h2 { overflow: hidden; margin: 0; color: var(--text-color); font-size: 23px; text-overflow: ellipsis; white-space: nowrap; }
   .level-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; color: var(--theme-color); border-radius: 14px; background: rgba(var(--theme-color-rgb), .12); }
-  .level-benefits { display: flex; gap: 24px; margin-top: 14px; color: var(--secondary-text-color); font-size: 14px; }
+  .level-benefits { display: flex; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px 24px; margin-left: auto; color: var(--secondary-text-color); font-size: 14px; text-align: right; }
+  .level-benefits span { white-space: nowrap; }
   .level-benefits strong,.next-level-privileges strong,.next-level-head strong { color: var(--text-color); }
   .next-level-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .next-level-head>div { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
@@ -972,17 +978,21 @@ export default {
   .growth-progress { height: 9px; margin-top: 15px; overflow: hidden; border-radius: 10px; background: rgba(var(--theme-color-rgb), .12); }
   .growth-progress i { display: block; height: 100%; border-radius: inherit; background: var(--theme-color); }
   .level-detail,.level-revenue-condition { margin: 13px 0 0; color: var(--secondary-text-color); font-size: 13px; }
-  .level-detail b,.next-level-privileges>b { margin-right: 6px; color: var(--text-color); }
-  .next-level-privileges { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 13px; color: var(--secondary-text-color); font-size: 13px; }
+  .level-meta-row { display: flex; align-items: baseline; gap: 8px; }
+  .level-meta-row>b { flex: 0 0 auto; color: var(--text-color); }
+  .next-level-privileges { margin-top: 13px; color: var(--secondary-text-color); font-size: 13px; }
+  .level-privilege-values { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  .level-privilege-values span { white-space: nowrap; }
   .highest-level-tip { padding: 18px 20px; color: var(--secondary-text-color); border-top: 1px solid var(--border-color); }
   @media (max-width: 600px) {
     .current-level-block,.next-level-block { padding: 17px 16px; }
     .current-level-title h2 { font-size: 20px; }
-    .level-benefits { justify-content: space-between; gap: 10px; }
+    .current-level-block { gap: 12px; }
+    .level-benefits { gap: 4px 12px; }
     .next-level-head { align-items: center; }
     .next-level-head>span { text-align: right; }
-    .next-level-privileges { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px 10px; }
-    .next-level-privileges span { white-space: nowrap; }
+    .level-meta-row { gap: 6px; }
+    .level-privilege-values { gap: 4px 12px; }
   }
   
   .account-inner {

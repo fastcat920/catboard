@@ -897,9 +897,9 @@ export default {
       noInviteCode: '暂无可用邀请码',
       created: '邀请码生成成功，可以分享给好友了',
       rewardRestrictions: {
-        blockInviterCommission: '您当前没有有效套餐，新注册好友产生的订单将无法为您提供返佣。',
-        blockInviteeRewards: '您当前没有有效套餐，新注册好友将无法获得新人邀请奖励。',
-        blockBoth: '您当前没有有效套餐，新注册好友产生的订单不会为您提供返佣，好友也无法获得新人邀请奖励。'
+        blockInviterCommission: '您当前没有有效套餐，好友购买套餐后您将无法获得订单返佣。',
+        blockInviteeRewards: '您当前没有有效套餐，通过您的邀请码注册的好友将无法获得新人奖励。',
+        blockBoth: '您当前没有有效套餐，您将无法获得订单返佣，受邀好友也无法获得新人奖励。'
       }
     },
     share: {

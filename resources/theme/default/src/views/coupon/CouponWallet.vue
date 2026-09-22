@@ -33,13 +33,14 @@
         <div class="coupon-value">
           <strong>{{ discount(coupon.template) }}</strong>
           <span>{{ couponType(coupon.template) }}</span>
+          <span class="mobile-status-badge">{{ statusText(coupon.status) }}</span>
         </div>
 
         <div class="coupon-content">
           <div class="coupon-heading">
             <div>
               <h2>{{ localized(coupon.template, 'name') }}</h2>
-              <p>{{ localized(coupon.template, 'description') || copy.noDescription }}</p>
+              <p v-if="couponDescription(coupon.template)">{{ couponDescription(coupon.template) }}</p>
             </div>
             <span class="status-badge">{{ statusText(coupon.status) }}</span>
           </div>
@@ -75,6 +76,14 @@
           <button v-if="coupon.status === 'available'" type="button" @click="useCoupon">
             {{ copy.useNow }}
           </button>
+          <button
+            v-else-if="coupon.status === 'locked'"
+            type="button"
+            :disabled="!lockedOrderTradeNo(coupon)"
+            @click="viewLockedOrder(coupon)"
+          >
+            {{ copy.viewOrder }}
+          </button>
         </div>
       </article>
     </section>
@@ -105,7 +114,6 @@ const copy = computed(() => en.value ? {
   refresh: 'Refresh',
   loading: 'Loading…',
   empty: 'No coupons in this category',
-  noDescription: 'No description',
   source: 'Source',
   validity: 'Valid',
   plans: 'Plans',
@@ -117,7 +125,8 @@ const copy = computed(() => en.value ? {
   notStackable: 'Cannot stack with membership-level discount',
   fixedCoupon: 'Amount coupon',
   percentCoupon: 'Discount coupon',
-  useNow: 'Use now'
+  useNow: 'Use now',
+  viewOrder: 'View'
 } : {
   eyebrow: '账户权益',
   title: '我的优惠券',
@@ -125,7 +134,6 @@ const copy = computed(() => en.value ? {
   refresh: '刷新',
   loading: '加载中…',
   empty: '暂无此类优惠券',
-  noDescription: '暂无说明',
   source: '来源',
   validity: '有效期',
   plans: '适用套餐',
@@ -137,7 +145,8 @@ const copy = computed(() => en.value ? {
   notStackable: '不可叠加会员等级折扣',
   fixedCoupon: '金额券',
   percentCoupon: '折扣券',
-  useNow: '去使用'
+  useNow: '去使用',
+  viewOrder: '查看'
 });
 
 const tabs = computed(() => [
@@ -173,6 +182,7 @@ const groupedStatus = status => {
 const filtered = computed(() => coupons.value.filter(item => groupedStatus(item.status) === tab.value));
 const count = key => coupons.value.filter(item => groupedStatus(item.status) === key).length;
 const localized = (row, key) => !row ? '' : (en.value ? row[`${key}_en`] : row[key]) || row[key] || row[`${key}_en`] || '';
+const couponDescription = template => String(localized(template, 'description') || '').trim();
 const discount = item => formatCouponValue(item, {
   currency: currencySymbol.value,
   percentSuffix: en.value ? '% OFF' : '%'
@@ -212,6 +222,15 @@ const restrictionLabels = template => {
   return restrictions;
 };
 const useCoupon = () => router.push('/shop');
+const lockedOrderTradeNo = coupon => coupon?.locked_order_trade_no || coupon?.locked_trade_no || '';
+const viewLockedOrder = coupon => {
+  const tradeNo = lockedOrderTradeNo(coupon);
+  if (!tradeNo) return;
+  router.push({
+    path: '/payment',
+    query: { trade_no: tradeNo, from: 'coupons' }
+  });
+};
 
 const load = async () => {
   loading.value = true;
@@ -359,6 +378,7 @@ watch(locale, load);
   font-weight: 700;
   white-space: nowrap;
 }
+.mobile-status-badge { display: none; }
 
 .coupon-rules {
   display: grid;
@@ -427,35 +447,83 @@ watch(locale, load);
     p { font-size: 13px; }
   }
   .refresh-button { padding-inline: 14px; }
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+
+    button {
+      min-width: 0;
+      padding: 8px 4px;
+      font-size: 13px;
+    }
+    span { margin-left: 3px; }
+  }
   .coupon-card {
-    grid-template-columns: 108px minmax(0, 1fr);
-    grid-template-areas: 'value content' 'action action';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'value' 'content' 'action';
     min-height: 0;
   }
-  .coupon-value { grid-area: value; padding: 20px 12px; }
-  .coupon-value strong { font-size: 22px; }
-  .coupon-content { grid-area: content; padding: 18px 14px; }
+  .coupon-value {
+    grid-area: value;
+    align-items: flex-start;
+    min-height: 96px;
+    padding: 20px;
+    text-align: left;
+
+    &::before {
+      top: auto;
+      right: auto;
+      bottom: -9px;
+      left: -9px;
+    }
+    &::after {
+      top: auto;
+      right: -9px;
+      bottom: -9px;
+    }
+  }
+  .coupon-value strong { font-size: 30px; }
+  .coupon-value > span:not(.mobile-status-badge) { margin-top: 7px; }
+  .coupon-value .mobile-status-badge {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    margin: 0;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .16);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 1;
+  }
+  .coupon-content { grid-area: content; padding: 18px 16px 12px; }
   .coupon-heading { gap: 8px; }
   .coupon-heading h2 { font-size: 16px; }
   .coupon-heading p { font-size: 12px; }
-  .status-badge { padding-inline: 7px; }
+  .status-badge { display: none; }
   .coupon-rules { margin-top: 14px; }
   .coupon-rules > div { grid-template-columns: 64px minmax(0, 1fr); gap: 6px; }
   .coupon-meta { flex-direction: column; gap: 4px; }
-  .coupon-action { grid-area: action; padding: 0 14px 14px; }
+  .coupon-action { grid-area: action; padding: 4px 16px 16px; }
   .coupon-action:empty { display: none; }
-  .coupon-action button { width: 100%; }
+  .coupon-action button { width: 100%; min-height: 44px; }
 }
 
 @media (max-width: 390px) {
   .page-intro p { display: none; }
-  .coupon-card { grid-template-columns: 92px minmax(0, 1fr); }
-  .coupon-value strong { font-size: 19px; }
+  .coupon-value { min-height: 90px; padding: 18px 16px; }
+  .coupon-value strong { font-size: 27px; }
+  .coupon-value .mobile-status-badge { top: 16px; right: 16px; }
   .coupon-content { padding-inline: 12px; }
-  .coupon-heading { display: block; }
-  .status-badge { display: inline-block; margin-top: 7px; }
-  .coupon-rules > div { grid-template-columns: 1fr; }
-  .coupon-rules dt { padding: 0; }
+  .coupon-rules > div { grid-template-columns: 60px minmax(0, 1fr); }
+  .coupon-action { padding-inline: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

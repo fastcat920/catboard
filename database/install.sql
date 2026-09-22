@@ -113,7 +113,7 @@ DROP TABLE IF EXISTS `v2_coupon_template`;
 CREATE TABLE `v2_coupon_template` (
   `id` int unsigned NOT NULL AUTO_INCREMENT, `name` varchar(255) NOT NULL, `name_en` varchar(255) DEFAULT NULL, `description` text, `description_en` text,
   `discount_type` enum('fixed','percent') NOT NULL, `discount_value` int unsigned NOT NULL,
-  `plan_ids` text, `periods` text, `first_order_only` tinyint(1) NOT NULL DEFAULT '0', `allow_renewal` tinyint(1) NOT NULL DEFAULT '1', `stackable` tinyint(1) NOT NULL DEFAULT '0',
+  `plan_ids` text, `periods` text, `first_order_only` tinyint(1) NOT NULL DEFAULT '0', `stackable` tinyint(1) NOT NULL DEFAULT '0',
   `per_user_limit` int unsigned NOT NULL DEFAULT '1', `total_limit` int unsigned DEFAULT NULL, `daily_limit` int unsigned DEFAULT NULL, `valid_days` smallint unsigned DEFAULT NULL,
   `starts_at` int unsigned DEFAULT NULL, `ends_at` int unsigned DEFAULT NULL, `issued_count` int unsigned NOT NULL DEFAULT '0', `used_count` int unsigned NOT NULL DEFAULT '0', `enabled` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` int unsigned NOT NULL, `updated_at` int unsigned NOT NULL, PRIMARY KEY (`id`), KEY `enabled` (`enabled`)

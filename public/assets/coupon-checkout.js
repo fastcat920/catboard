@@ -117,10 +117,6 @@
                     "仅限首笔订单",
                     "First order only",
                 ),
-                renewal_not_supported: text(
-                    "不适用于续费订单",
-                    "Not valid for renewals",
-                ),
             }[reason] || reason
         );
     }

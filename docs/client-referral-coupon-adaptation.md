@@ -363,8 +363,9 @@ GET /api/v1/user/coupon/wallet
 | `plan_ids` | 限定套餐 ID 数组，空表示不限 |
 | `periods` | 限定购买周期数组，空表示不限 |
 | `first_order_only` | 是否仅限用户首笔有效套餐订单 |
-| `allow_renewal` | 是否可用于续费 |
 | `stackable` | 是否可与会员折扣叠加 |
+
+`first_order_only` 为 `true` 时仅允许首笔套餐订单使用；为 `false` 时不限制订单类型，可用于首购、续费或更换套餐。
 
 状态显示：
 
@@ -418,7 +419,6 @@ GET /api/v1/user/coupon/available?plan_id=1&period=month_price
 | `plan_not_supported` | 不适用于当前套餐 |
 | `period_not_supported` | 不适用于当前购买周期 |
 | `first_order_only` | 仅限首单用户使用 |
-| `renewal_not_supported` | 不支持续费订单 |
 
 ### 3.3 订单预览
 

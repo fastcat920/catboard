@@ -385,7 +385,6 @@
             "</div></div>" +
             [
                 ["first_order_only", "仅限首单"],
-                ["allow_renewal", "允许续费"],
                 ["stackable", "允许叠加会员折扣"],
                 ["email_notify_enabled", "优惠券到账后发送邮件"],
                 ["enabled", "启用"],
@@ -397,7 +396,7 @@
                         '" ' +
                         (x[v[0]] ||
                         (!x.id &&
-                            ["allow_renewal", "email_notify_enabled", "enabled"].indexOf(v[0]) >= 0)
+                            ["email_notify_enabled", "enabled"].indexOf(v[0]) >= 0)
                             ? "checked"
                             : "") +
                         "> " +
@@ -456,7 +455,6 @@
                         return i.value;
                     }),
                     first_order_only: f.first_order_only.checked ? 1 : 0,
-                    allow_renewal: f.allow_renewal.checked ? 1 : 0,
                     stackable: f.stackable.checked ? 1 : 0,
                     email_notify_enabled: f.email_notify_enabled.checked ? 1 : 0,
                     per_user_limit: Number(f.per_user_limit.value || 1),

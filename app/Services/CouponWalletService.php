@@ -53,7 +53,7 @@ class CouponWalletService
     {
         $this->refreshStatuses($user->id);
         return UserCoupon::with('template')->where('user_id', $user->id)->where('status', 'available')->get()
-            ->filter(function ($coupon) use ($user, $planId, $period, $amount, $orderType) { return $this->eligibilityReason($coupon, $user, $planId, $period, $amount, $orderType)===null; })
+            ->filter(function ($coupon) use ($user, $planId, $period, $amount) { return $this->eligibilityReason($coupon, $user, $planId, $period, $amount)===null; })
             ->map(function ($coupon) use ($amount) { $coupon->calculated_discount = $this->discount($coupon->template, $amount); return $coupon; })
             ->sort(function ($a, $b) { return $a->calculated_discount === $b->calculated_discount ? $a->expires_at <=> $b->expires_at : $b->calculated_discount <=> $a->calculated_discount; })->values();
     }
@@ -62,7 +62,7 @@ class CouponWalletService
     {
         $this->refreshStatuses($user->id);
         return UserCoupon::with('template')->where('user_id',$user->id)->where('status','available')->get()
-            ->map(function($coupon)use($user,$planId,$period,$amount,$orderType){$coupon->unavailable_reason=$this->eligibilityReason($coupon,$user,$planId,$period,$amount,$orderType);return $coupon;})
+            ->map(function($coupon)use($user,$planId,$period,$amount){$coupon->unavailable_reason=$this->eligibilityReason($coupon,$user,$planId,$period,$amount);return $coupon;})
             ->filter(function($coupon){return $coupon->unavailable_reason!==null;})->values();
     }
 
@@ -114,7 +114,7 @@ class CouponWalletService
         });
     }
 
-    private function eligibilityReason(UserCoupon $coupon, User $user, int $planId, string $period, int $amount, ?int $orderType): ?string
+    private function eligibilityReason(UserCoupon $coupon, User $user, int $planId, string $period, int $amount): ?string
     {
         $t=$coupon->template;if(!$t||!$t->enabled)return 'template_disabled';
         if($t->plan_ids && !in_array($planId,array_map('intval',$t->plan_ids),true))return 'plan_not_supported';
@@ -122,7 +122,6 @@ class CouponWalletService
         if(!array_key_exists($user->id,$this->paidOrderCache))$this->paidOrderCache[$user->id]=Order::where('user_id',$user->id)->where('status',3)->where('plan_id','>',0)->exists();
         $hasPaid=$this->paidOrderCache[$user->id];
         if($t->first_order_only && $hasPaid)return 'first_order_only';
-        if(!$t->allow_renewal && (int)$orderType===2)return 'renewal_not_supported';
         return null;
     }
     private function discount(CouponTemplate $t,int $amount): int { $value=$t->discount_type==='fixed'?$t->discount_value:(int)round($amount*$t->discount_value/100); return min($amount,max(0,$value)); }

@@ -27,27 +27,6 @@
     </transition>
     
     <div class="account-inner">
-      <!-- FastCatAPP 双余额卡 -->
-      <div class="invite-balance-grid">
-        <div class="invite-balance-card">
-          <div class="balance-card-title"><IconCurrencyDollar :size="14" />{{ $t('invite.balance.title') }}</div>
-          <div class="balance-value">{{ currencySymbol }}{{ formatAmount(inviteStats.availableCommission) }}</div>
-        </div>
-        <div class="invite-balance-card">
-          <div class="balance-card-title"><IconBuildingBank :size="14" />{{ $t('common.myWallet') }}</div>
-          <div class="balance-value">{{ currencySymbol }}{{ formatAmount(walletBalance) }}</div>
-        </div>
-      </div>
-
-      <div class="invite-primary-actions" :class="{ 'single-action': withdrawClose !== 0 }">
-        <button v-if="withdrawClose === 0" class="btn-primary" @click="toggleWithdrawCard">
-          <IconBuildingBank :size="18" />{{ $t('invite.balance.withdraw') }}
-        </button>
-        <button class="btn-primary transfer-action" @click="toggleTransferCard">
-          <IconArrowsExchange :size="18" />{{ $t('invite.balance.transferToBalance') }}
-        </button>
-      </div>
-
       <section v-if="referralProgram" class="growth-level-card">
         <div class="current-level-block">
           <div class="current-level-title">
@@ -78,6 +57,27 @@
         </div>
         <div v-else class="highest-level-tip">{{ $t('invite.highestLevel') }}</div>
       </section>
+
+      <!-- FastCatAPP 双余额卡 -->
+      <div class="invite-balance-grid">
+        <div class="invite-balance-card">
+          <div class="balance-card-title"><IconCurrencyDollar :size="14" />{{ $t('invite.balance.title') }}</div>
+          <div class="balance-value">{{ currencySymbol }}{{ formatAmount(inviteStats.availableCommission) }}</div>
+        </div>
+        <div class="invite-balance-card">
+          <div class="balance-card-title"><IconBuildingBank :size="14" />{{ $t('common.myWallet') }}</div>
+          <div class="balance-value">{{ currencySymbol }}{{ formatAmount(walletBalance) }}</div>
+        </div>
+      </div>
+
+      <div class="invite-primary-actions" :class="{ 'single-action': withdrawClose !== 0 }">
+        <button v-if="withdrawClose === 0" class="btn-primary" @click="toggleWithdrawCard">
+          <IconBuildingBank :size="18" />{{ $t('invite.balance.withdraw') }}
+        </button>
+        <button class="btn-primary transfer-action" @click="toggleTransferCard">
+          <IconArrowsExchange :size="18" />{{ $t('invite.balance.transferToBalance') }}
+        </button>
+      </div>
 
       <!-- 统计卡片组 -->
       <div class="invite-section-title"><IconChartBar :size="18" />{{ $t('invite.statsTitle') }}</div>

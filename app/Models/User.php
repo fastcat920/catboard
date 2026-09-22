@@ -11,6 +11,8 @@ class User extends Model
     protected $guarded = ['id'];
     protected $casts = [
         'created_at' => 'timestamp',
-        'updated_at' => 'timestamp'
+        'updated_at' => 'timestamp',
+        'invite_commission_eligible' => 'boolean',
+        'invitee_reward_eligible' => 'boolean',
     ];
 }

@@ -184,6 +184,8 @@ class OrderService
         $order->invite_user_id = $user->invite_user_id;
         $inviter = User::find($user->invite_user_id);
         if (!$inviter) return;
+        $referralService = app(ReferralProgramService::class);
+        if (!$referralService->inviterCommissionEligible($user)) return;
         $isCommission = false;
         switch ((int)$inviter->commission_type) {
             case 0:
@@ -199,7 +201,6 @@ class OrderService
         }
 
         if (!$isCommission) return;
-        $referralService = app(ReferralProgramService::class);
         $commissionRate = $referralService->commissionRate($inviter);
         $commissionRate = min($commissionRate, 100);
         $order->commission_balance = $order->total_amount * ($commissionRate / 100);

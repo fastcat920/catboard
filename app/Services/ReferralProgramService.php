@@ -16,6 +16,102 @@ use Illuminate\Support\Facades\Schema;
 
 class ReferralProgramService
 {
+    public const NO_ACTIVE_PLAN_ALLOW_ALL = 'allow_all';
+    public const NO_ACTIVE_PLAN_BLOCK_INVITER_COMMISSION = 'block_inviter_commission';
+    public const NO_ACTIVE_PLAN_BLOCK_INVITEE_REWARDS = 'block_invitee_rewards';
+    public const NO_ACTIVE_PLAN_BLOCK_BOTH = 'block_both';
+
+    private const NO_ACTIVE_PLAN_POLICIES = [
+        self::NO_ACTIVE_PLAN_ALLOW_ALL,
+        self::NO_ACTIVE_PLAN_BLOCK_INVITER_COMMISSION,
+        self::NO_ACTIVE_PLAN_BLOCK_INVITEE_REWARDS,
+        self::NO_ACTIVE_PLAN_BLOCK_BOTH,
+    ];
+
+    public function hasValidPlan(User $user): bool
+    {
+        return $user->plan_id !== null
+            && ($user->expired_at === null || (int)$user->expired_at > time());
+    }
+
+    public function noActivePlanRewardPolicy(): string
+    {
+        $setting = $this->setting();
+        if (!$setting || !$setting->enabled
+            || !Schema::hasColumn('v2_referral_setting', 'no_active_plan_reward_policy')) {
+            return self::NO_ACTIVE_PLAN_ALLOW_ALL;
+        }
+        $policy = (string)$setting->no_active_plan_reward_policy;
+        return in_array($policy, self::NO_ACTIVE_PLAN_POLICIES, true)
+            ? $policy
+            : self::NO_ACTIVE_PLAN_ALLOW_ALL;
+    }
+
+    public function snapshotReferralEligibility(User $invitee, ?User $inviter = null): void
+    {
+        if (!Schema::hasColumn('v2_user', 'invite_commission_eligible')
+            || !Schema::hasColumn('v2_user', 'invitee_reward_eligible')
+            || !Schema::hasColumn('v2_user', 'invite_reward_evaluated_at')) return;
+
+        if (!$invitee->invite_user_id) {
+            $invitee->invite_commission_eligible = null;
+            $invitee->invitee_reward_eligible = null;
+            $invitee->invite_reward_evaluated_at = null;
+            return;
+        }
+
+        $inviter = $inviter ?: User::find($invitee->invite_user_id);
+        $eligibility = $inviter
+            ? $this->referralEligibilityFor($inviter, $this->noActivePlanRewardPolicy())
+            : ['invite_commission_eligible' => true, 'invitee_reward_eligible' => true];
+        $invitee->invite_commission_eligible = $eligibility['invite_commission_eligible'];
+        $invitee->invitee_reward_eligible = $eligibility['invitee_reward_eligible'];
+        $invitee->invite_reward_evaluated_at = time();
+    }
+
+    public function referralEligibilityFor(User $inviter, string $policy): array
+    {
+        if (!in_array($policy, self::NO_ACTIVE_PLAN_POLICIES, true)) {
+            $policy = self::NO_ACTIVE_PLAN_ALLOW_ALL;
+        }
+        if ($this->hasValidPlan($inviter) || $policy === self::NO_ACTIVE_PLAN_ALLOW_ALL) {
+            return ['invite_commission_eligible' => true, 'invitee_reward_eligible' => true];
+        }
+        return [
+            'invite_commission_eligible' => !in_array($policy, [
+                self::NO_ACTIVE_PLAN_BLOCK_INVITER_COMMISSION,
+                self::NO_ACTIVE_PLAN_BLOCK_BOTH,
+            ], true),
+            'invitee_reward_eligible' => !in_array($policy, [
+                self::NO_ACTIVE_PLAN_BLOCK_INVITEE_REWARDS,
+                self::NO_ACTIVE_PLAN_BLOCK_BOTH,
+            ], true),
+        ];
+    }
+
+    public function inviterCommissionEligible(User $invitee): bool
+    {
+        if (!Schema::hasColumn('v2_user', 'invite_commission_eligible')) return true;
+        return $invitee->invite_commission_eligible === null
+            ? true
+            : (bool)$invitee->invite_commission_eligible;
+    }
+
+    public function inviteeRewardEligible(User $invitee): bool
+    {
+        if (!Schema::hasColumn('v2_user', 'invitee_reward_eligible')) return true;
+        return $invitee->invitee_reward_eligible === null
+            ? true
+            : (bool)$invitee->invitee_reward_eligible;
+    }
+
+    public function rewardRestrictionForInviter(User $inviter): ?array
+    {
+        $policy = $this->noActivePlanRewardPolicy();
+        if ($policy === self::NO_ACTIVE_PLAN_ALLOW_ALL || $this->hasValidPlan($inviter)) return null;
+        return ['policy' => $policy];
+    }
+
     public function assignInitialLevel(User $user): ?ReferralLevel
     {
         if ($user->referral_level_id || !Schema::hasTable('v2_referral_level')
@@ -48,6 +144,7 @@ class ReferralProgramService
     public function issueNewcomerCoupon(User $user): ?UserCoupon
     {
         if (!$user->invite_user_id || !Schema::hasTable('v2_user_coupon')) return null;
+        if (!$this->inviteeRewardEligible($user)) return null;
         $setting = $this->setting();
         if (!$setting || !$setting->enabled || !$setting->newcomer_coupon_template_id) return null;
         $template = CouponTemplate::find($setting->newcomer_coupon_template_id);
@@ -188,9 +285,10 @@ class ReferralProgramService
             if ($effectiveReward) $effectiveReward->fill($effectiveData)->save();
             else ReferralReward::create(array_merge(['event_key' => $effectiveKey], $effectiveData));
 
-            if ($setting->invitee_reward > 0) {
+            $invitee = User::find($order->user_id);
+            if ($setting->invitee_reward > 0 && $invitee && $this->inviteeRewardEligible($invitee)) {
                 $this->grantMoney(
-                    User::find($order->user_id),
+                    $invitee,
                     'balance',
                     (int)$setting->invitee_reward,
                     'invitee_first_order:' . $order->id,

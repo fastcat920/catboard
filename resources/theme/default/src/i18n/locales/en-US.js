@@ -848,7 +848,12 @@ export default {
       copyLink: 'Copy Link',
       copied: 'Copied',
       noInviteCode: 'No invite codes available',
-      created: 'Invite code generated successfully, share it with your friends'
+      created: 'Invite code generated successfully, share it with your friends',
+      rewardRestrictions: {
+        blockInviterCommission: 'You do not have an active plan. Orders from newly registered friends will not earn you commission.',
+        blockInviteeRewards: 'You do not have an active plan. Newly registered friends will not receive newcomer referral rewards.',
+        blockBoth: 'You do not have an active plan. Orders from newly registered friends will not earn you commission, and they will not receive newcomer referral rewards.'
+      }
     },
     share: {
       wechat: 'WeChat',

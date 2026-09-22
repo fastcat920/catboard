@@ -19,6 +19,7 @@ class ReferralSetting extends Model
             'newcomer_coupon_template_id' => null,
             'base_commission_rate' => (int)config('v2board.invite_commission', 10),
             'freeze_days' => 3,
+            'no_active_plan_reward_policy' => 'allow_all',
         ]);
     }
 }

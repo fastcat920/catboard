@@ -186,10 +186,13 @@ class InviteController extends Controller
         $user = User::find($request->user['id']);
         $commission_rate = $this->resolveCommissionRate($user);
         $program = null;
+        $rewardRestriction = null;
         if (Schema::hasTable('v2_referral_reward')) {
             $setting = ReferralSetting::current();
+            $referralService = app(ReferralProgramService::class);
+            $rewardRestriction = $referralService->rewardRestrictionForInviter($user);
             if (!$setting->enabled) {
-                return response(['data' => ['program' => null]]);
+                return response(['data' => ['program' => null, 'reward_restriction' => null]]);
             }
             $effectiveCount = ReferralReward::where('user_id', $user->id)
                 ->where('reward_type', 'effective_invite')->where('status', 'granted')->count();
@@ -229,7 +232,8 @@ class InviteController extends Controller
         }
         return response([
             'data' => [
-                'program' => $program
+                'program' => $program,
+                'reward_restriction' => $rewardRestriction,
             ]
         ]);
     }

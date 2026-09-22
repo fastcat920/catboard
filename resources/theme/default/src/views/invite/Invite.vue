@@ -147,6 +147,7 @@
         
         <!-- 邀请链接内容 -->
         <div v-if="activeTab === 'invite'" class="card-body">
+          <p v-if="rewardRestrictionText" class="invite-reward-warning">{{ rewardRestrictionText }}</p>
           <div class="tab-content-toolbar">
             <span><IconLink :size="16" />{{ $t('invite.inviteLink.inviteCode') }} ({{ inviteCodes.length }})</span>
             <button class="btn-action" @click="createInviteCode" :disabled="creatingCode">
@@ -518,6 +519,7 @@ export default {
     const currencySymbol = ref('¥');
     const inviteCodes = ref([]);
     const referralProgram = ref(null);
+    const rewardRestriction = ref(null);
     const walletBalance = ref(0);
     const inviteStats = reactive({
       registeredUsers: 0,
@@ -528,6 +530,16 @@ export default {
       availableCommission: 0
     });
     const currentCommissionRate = computed(() => Number(referralProgram.value?.commission_rate ?? inviteStats.commissionRate ?? 0));
+    const rewardRestrictionText = computed(() => {
+      const policy = rewardRestriction.value?.policy;
+      if (!policy) return '';
+      const key = {
+        block_inviter_commission: 'blockInviterCommission',
+        block_invitee_rewards: 'blockInviteeRewards',
+        block_both: 'blockBoth'
+      }[policy];
+      return key ? t(`invite.inviteLink.rewardRestrictions.${key}`) : '';
+    });
     const inviteRecords = ref([]);
     const milestoneProgress = computed(() => referralProgram.value?.next_milestone
       ? Math.min(100, Number(referralProgram.value.effective_invites || 0) / Math.max(1, Number(referralProgram.value.next_milestone.required_invites || 1)) * 100)
@@ -671,10 +683,12 @@ export default {
         try {
           const programRes = await getReferralProgram();
           referralProgram.value = programRes.data?.program || null;
+          rewardRestriction.value = programRes.data?.reward_restriction || null;
           inviteStats.effectiveInvites = Number(referralProgram.value?.effective_invites || 0);
         } catch (programError) {
           console.error('获取推广计划失败:', programError);
           referralProgram.value = null;
+          rewardRestriction.value = null;
         }
       } catch (err) {
         console.error('获取邀请数据失败:', err);
@@ -867,6 +881,7 @@ export default {
       creatingCode,
       inviteCodes,
       referralProgram,
+      rewardRestrictionText,
       milestoneProgress,
       milestoneRewardText,
       localizedLevel,
@@ -1521,6 +1536,14 @@ export default {
   > span { display: inline-flex; align-items: center; gap: 6px; color: var(--heading-color); font-size: 14px; font-weight: 600; }
   > span svg { color: var(--theme-color); }
   .btn-action { color: #fff !important; background: var(--theme-color) !important; }
+}
+.invite-reward-warning {
+  margin: 0 0 12px;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  text-align: center;
 }
 .amount-income { color: #16a34a !important; }
 .amount-expense { color: #dc2626 !important; }

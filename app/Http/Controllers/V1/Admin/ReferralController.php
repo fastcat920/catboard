@@ -49,6 +49,7 @@ class ReferralController extends Controller
             'base_commission_rate' => 'required|integer|min:0|max:100',
             'freeze_days' => 'required|integer|min:0|max:365',
             'monthly_reward_limit' => 'nullable|integer|min:0',
+            'no_active_plan_reward_policy' => 'sometimes|string|in:allow_all,block_inviter_commission,block_invitee_rewards,block_both',
         ]);
         $setting = ReferralSetting::first();
         if ($setting) $setting->update($data);
@@ -281,18 +282,21 @@ class ReferralController extends Controller
         $user = User::findOrFail($request->input('user_id'));
         $inviter = $user->invite_user_id ? User::find($user->invite_user_id) : null;
         return response(['data' => [
-            'user' => $user->only(['id', 'email', 'invite_user_id', 'created_at']),
+            'user' => $user->only([
+                'id', 'email', 'invite_user_id', 'created_at',
+                'invite_commission_eligible', 'invitee_reward_eligible', 'invite_reward_evaluated_at',
+            ]),
             'inviter' => $inviter ? $inviter->only(['id', 'email']) : null,
             'orders' => Order::where('user_id', $user->id)->orderBy('id', 'DESC')->limit(20)->get(['id', 'trade_no', 'plan_id', 'total_amount', 'status', 'created_at']),
             'rewards' => ReferralReward::where('invited_user_id', $user->id)->orderBy('id', 'DESC')->get(),
         ]]);
     }
 
-    public function changeRelation(Request $request)
+    public function changeRelation(Request $request, ReferralProgramService $service)
     {
         $data = $request->validate(['user_id' => 'required|integer|exists:v2_user,id', 'inviter_id' => 'nullable|integer|exists:v2_user,id']);
         if ($data['inviter_id'] && (int)$data['inviter_id'] === (int)$data['user_id']) abort(422, '不能邀请自己');
-        DB::transaction(function () use ($data) {
+        DB::transaction(function () use ($data, $service) {
             $user = User::where('id', $data['user_id'])->lockForUpdate()->firstOrFail();
             if (ReferralReward::where('invited_user_id', $user->id)->where('status', 'granted')->exists()) {
                 abort(422, '该关系已产生有效奖励，请先撤销关联订单奖励');
@@ -305,6 +309,7 @@ class ReferralController extends Controller
                 }
             }
             $user->invite_user_id = $data['inviter_id'] ?: null;
+            $service->snapshotReferralEligibility($user);
             $user->save();
         });
         Cache::forget('admin_referral_dashboard');

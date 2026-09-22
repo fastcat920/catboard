@@ -7,6 +7,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Utils\Helper;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AccountDeletionService
 {
@@ -34,7 +35,11 @@ class AccountDeletionService
             (new AuthService($lockedUser))->removeAllSession();
 
             InviteCode::where('user_id', $lockedUser->id)->delete();
-            User::where('invite_user_id', $lockedUser->id)->update(['invite_user_id' => null]);
+            $relationReset = ['invite_user_id' => null];
+            foreach (['invite_commission_eligible', 'invitee_reward_eligible', 'invite_reward_evaluated_at'] as $column) {
+                if (Schema::hasColumn('v2_user', $column)) $relationReset[$column] = null;
+            }
+            User::where('invite_user_id', $lockedUser->id)->update($relationReset);
             Ticket::where('user_id', $lockedUser->id)->where('status', 0)->update([
                 'status' => 1,
                 'updated_at' => time(),
@@ -47,6 +52,9 @@ class AccountDeletionService
             $lockedUser->password_salt = null;
             $lockedUser->telegram_id = null;
             $lockedUser->invite_user_id = null;
+            if (Schema::hasColumn('v2_user', 'invite_commission_eligible')) $lockedUser->invite_commission_eligible = null;
+            if (Schema::hasColumn('v2_user', 'invitee_reward_eligible')) $lockedUser->invitee_reward_eligible = null;
+            if (Schema::hasColumn('v2_user', 'invite_reward_evaluated_at')) $lockedUser->invite_reward_evaluated_at = null;
             $lockedUser->last_login_ip = null;
             $lockedUser->token = Helper::guid();
             $lockedUser->uuid = Helper::guid(true);

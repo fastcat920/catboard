@@ -122,6 +122,7 @@ class AuthController extends Controller
                 }
             }
 
+            app(ReferralProgramService::class)->snapshotReferralEligibility($user);
             if (!$user->save()) {
                 abort(500, __('Register failed'));
             }

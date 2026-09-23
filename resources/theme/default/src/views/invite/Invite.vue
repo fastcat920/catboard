@@ -27,11 +27,6 @@
     </transition>
     
     <div class="account-inner">
-      <p class="invite-effective-note">
-        <IconInfoCircle :size="16" />
-        <span>{{ $t('invite.users.definition') }}</span>
-      </p>
-
       <section v-if="loading.referralProgram" class="growth-level-card growth-level-skeleton" aria-busy="true">
         <div class="level-skeleton-head"><i></i><span></span><b></b></div>
         <div class="level-skeleton-body"><span></span><span></span><span></span></div>
@@ -225,6 +220,10 @@
 
         <!-- 邀请用户内容 -->
         <div v-if="activeTab === 'users'" class="card-body invite-users-tab">
+          <p class="invite-effective-note">
+            <IconInfoCircle :size="16" />
+            <span>{{ $t('invite.users.definition') }}</span>
+          </p>
           <InviteUsersPanel embedded />
         </div>
         
@@ -1596,8 +1595,8 @@ export default {
   border: 0 !important;
   border-radius: 12px !important;
 
-  .tab-buttons { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 4px; }
-  .tab-btn { display: flex; min-height: 40px; align-items: center; justify-content: center; color: var(--secondary-text-color); border-radius: 8px !important; }
+  .tab-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 4px; }
+  .tab-btn { display: flex; min-width: 0; min-height: 40px; align-items: center; justify-content: center; padding-right: 6px !important; padding-left: 6px !important; color: var(--secondary-text-color); border-radius: 8px !important; white-space: nowrap; }
   .tab-btn.active { color: #fff !important; background: var(--theme-color) !important; }
   .card-actions { margin-left: 8px; }
 }
@@ -1642,6 +1641,7 @@ export default {
   .combined-card .tab-header { align-items: stretch; flex-direction: column; }
   .combined-card .tab-header .card-actions { margin: 6px 0 0; }
   .combined-card .tab-header .btn-action { width: 100%; justify-content: center; }
+  .combined-card .tab-header .tab-btn { font-size: 13px; }
   .tab-content-toolbar { align-items: flex-start; flex-direction: column; }
 }
 

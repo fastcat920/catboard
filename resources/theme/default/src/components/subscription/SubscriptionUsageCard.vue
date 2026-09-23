@@ -27,13 +27,13 @@
           : `${$t('dashboard.nextResetTime')}${resetDay} ${$t('dashboard.days')}${$t('dashboard.nextResetTime1')}` }}
       </p>
 
-      <div v-if="!isExpired" class="subscription-progress-row">
+      <div class="subscription-progress-row">
         <div class="subscription-progress-track">
           <span :style="{ width: `${safePercent}%`, backgroundColor: progressColor }"></span>
         </div>
         <strong :style="{ color: progressColor }">{{ safePercent.toFixed(1) }}%</strong>
       </div>
-      <p v-if="!isExpired" class="subscription-traffic" :style="{ color: trafficActionColor }">
+      <p class="subscription-traffic" :style="{ color: trafficActionColor }">
         {{ $t('dashboard.usedTraffic') }}{{ usedTraffic || '0 GB' }}&nbsp;/&nbsp;
         {{ $t('dashboard.planTraffic') }}{{ totalTraffic || '0 GB' }}
       </p>

@@ -195,6 +195,7 @@ export default {
     subscriptionInfo: '套餐信息',
     planName: '套餐名称',
     expired: '已过期',
+    expiredAt: '已于 {date} 到期',
     expiryDate: '于',
     expiryDate1: '到期，',
     usedTraffic: '已用 ',
@@ -829,6 +830,7 @@ export default {
     },
     users: {
       title: '邀请用户',
+      definition: '有效邀请指被邀请人有首次购买订单',
       loading: '正在加载邀请用户…',
       loadFailed: '邀请用户加载失败',
       empty: '暂无邀请用户',
@@ -976,14 +978,11 @@ export default {
   // 文档页面相关翻译
   docs: {
     title: '使用文档',
-    searchPlaceholder: '搜索文档...',
     loading: '正在加载文档...',
     retry: '重试',
-    clearSearch: '清除搜索',
     backToList: '返回文档列表',
     lastUpdated: '最后更新',
     noDocuments: '暂无文档',
-    noSearchResults: '未找到相关文档',
     fetchError: '获取文档失败',
     unknownError: '发生未知错误',
     docNotFound: '文档不存在',
@@ -1046,6 +1045,7 @@ export default {
   },
   couponCenter: { title: '我的优惠券' },
   wallet: {
+    title: '钱包余额',
     autoRenewal: { title: '自动续费', description: '套餐到期前将使用账户余额自动续费，请确保余额充足。', noPlan: '购买套餐后可开启自动续费。', enabled: '自动续费已开启', disabled: '自动续费已关闭', failed: '自动续费设置失败' },
     balance: {
       title: '当前余额',

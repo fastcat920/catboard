@@ -27,7 +27,16 @@
     </transition>
     
     <div class="account-inner">
-      <section v-if="referralProgram" class="growth-level-card">
+      <p class="invite-effective-note">
+        <IconInfoCircle :size="16" />
+        <span>{{ $t('invite.users.definition') }}</span>
+      </p>
+
+      <section v-if="loading.referralProgram" class="growth-level-card growth-level-skeleton" aria-busy="true">
+        <div class="level-skeleton-head"><i></i><span></span><b></b></div>
+        <div class="level-skeleton-body"><span></span><span></span><span></span></div>
+      </section>
+      <section v-else-if="referralProgram" class="growth-level-card">
         <div class="current-level-block">
           <div class="current-level-title">
             <span class="level-icon"><IconCrown :size="25" /></span>
@@ -92,7 +101,7 @@
           </div>
         </template>
         <template v-else>
-          <button type="button" class="stats-card stats-card-link" @click="$router.push('/invite/users')">
+          <div class="stats-card">
             <div class="stats-icon">
               <IconUsers :size="24" />
             </div>
@@ -100,15 +109,17 @@
               <div class="stats-label">{{ $t('invite.stats.registeredUsers') }}</div>
               <div class="stats-value">{{ inviteStats.registeredUsers }}</div>
             </div>
-            <IconChevronRight class="stats-arrow" :size="18" />
-          </button>
+          </div>
           <div class="stats-card">
             <div class="stats-icon">
               <IconUsers :size="24" />
             </div>
             <div class="stats-info">
               <div class="stats-label">{{ $t('invite.stats.effectiveInvites') }}</div>
-              <div class="stats-value">{{ inviteStats.effectiveInvites }}</div>
+              <div class="stats-value">
+                <span v-if="loading.referralProgram" class="stats-inline-skeleton" aria-hidden="true"></span>
+                <template v-else>{{ inviteStats.effectiveInvites }}</template>
+              </div>
             </div>
           </div>
           <div class="stats-card">
@@ -142,6 +153,13 @@
               @click="activeTab = 'invite'"
             >
               {{ $t('invite.inviteLink.title') }}
+            </button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'users' }"
+              @click="activeTab = 'users'"
+            >
+              {{ $t('invite.users.title') }}
             </button>
             <button 
               class="tab-btn" 
@@ -203,6 +221,11 @@
               </button>
             </div>
           </template>
+        </div>
+
+        <!-- 邀请用户内容 -->
+        <div v-if="activeTab === 'users'" class="card-body invite-users-tab">
+          <InviteUsersPanel embedded />
         </div>
         
         <!-- 返佣记录内容 -->
@@ -471,6 +494,7 @@ import { useToast } from '@/composables/useToast';
 import { INVITE_CONFIG } from '@/utils/baseConfig';
 import { getInviteData, getReferralProgram, getInviteDetails, getCommissionConfig, generateInviteCode, transferCommission, withdrawCommission } from '@/api/invite';
 import { getUserInfo } from '@/api/user';
+import InviteUsersPanel from './InviteUsers.vue';
 import {
   IconUsers,
   IconChartBar,
@@ -489,6 +513,7 @@ import {
   IconBuildingBank,
   IconArrowsExchange,
   IconCrown,
+  IconInfoCircle,
 } from '@tabler/icons-vue';
 
 export default {
@@ -511,6 +536,8 @@ export default {
     IconBuildingBank,
     IconArrowsExchange,
     IconCrown,
+    IconInfoCircle,
+    InviteUsersPanel,
   },
   setup() {
     const { showToast } = useToast();
@@ -522,7 +549,8 @@ export default {
     const loading = reactive({
       inviteData: true,
       inviteDetails: true,
-      commConfig: true
+      commConfig: true,
+      referralProgram: true
     });
     
     const creatingCode = ref(false);
@@ -683,34 +711,45 @@ export default {
     
     const fetchInviteData = async () => {
       loading.inviteData = true;
-      try {
-        const res = await getInviteData();
-        if (res.data) {
-          inviteCodes.value = res.data.codes || [];
-          if (res.data.stat) {
-            inviteStats.registeredUsers = res.data.stat[0] || 0;
-            inviteStats.totalCommission = ((res.data.stat[1] || 0) / 100);
-            inviteStats.pendingCommission = ((res.data.stat[2] || 0) / 100);
-            inviteStats.commissionRate = res.data.stat[3] || 0;
-            inviteStats.availableCommission = ((res.data.stat[4] || 0) / 100);
+      loading.referralProgram = true;
+
+      const inviteDataRequest = getInviteData()
+        .then((res) => {
+          if (res.data) {
+            inviteCodes.value = res.data.codes || [];
+            if (res.data.stat) {
+              inviteStats.registeredUsers = res.data.stat[0] || 0;
+              inviteStats.totalCommission = ((res.data.stat[1] || 0) / 100);
+              inviteStats.pendingCommission = ((res.data.stat[2] || 0) / 100);
+              inviteStats.commissionRate = res.data.stat[3] || 0;
+              inviteStats.availableCommission = ((res.data.stat[4] || 0) / 100);
+            }
           }
-        }
-        try {
-          const programRes = await getReferralProgram();
+        })
+        .catch((err) => {
+          console.error('获取邀请数据失败:', err);
+          showToast(t('invite.records.fetchDataError'), 'error');
+        })
+        .finally(() => {
+          loading.inviteData = false;
+        });
+
+      const referralProgramRequest = getReferralProgram()
+        .then((programRes) => {
           referralProgram.value = programRes.data?.program || null;
           rewardRestriction.value = programRes.data?.reward_restriction || null;
           inviteStats.effectiveInvites = Number(referralProgram.value?.effective_invites || 0);
-        } catch (programError) {
+        })
+        .catch((programError) => {
           console.error('获取推广计划失败:', programError);
           referralProgram.value = null;
           rewardRestriction.value = null;
-        }
-      } catch (err) {
-        console.error('获取邀请数据失败:', err);
-        showToast(t('invite.records.fetchDataError'), 'error');
-      } finally {
-        loading.inviteData = false;
-      }
+        })
+        .finally(() => {
+          loading.referralProgram = false;
+        });
+
+      await Promise.allSettled([inviteDataRequest, referralProgramRequest]);
     };
 
     const fetchWalletBalance = async () => {
@@ -959,7 +998,34 @@ export default {
   display: flex;
   justify-content: center;
 
+  .invite-effective-note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    line-height: 1.5;
+    background: rgba(var(--theme-color-rgb), .07);
+    border: 1px solid rgba(var(--theme-color-rgb), .14);
+    border-radius: 12px;
+
+    svg { flex: 0 0 auto; color: var(--theme-color); }
+  }
+
   .growth-level-card { margin-bottom: 18px; overflow: hidden; border: 1px solid var(--border-color); border-radius: 20px; background: var(--card-bg-color, #fff); }
+  .growth-level-skeleton { min-height: 158px; padding: 20px; }
+  .level-skeleton-head { display: flex; align-items: center; gap: 12px; }
+  .level-skeleton-head i { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 14px; }
+  .level-skeleton-head span { width: 128px; height: 18px; border-radius: 999px; }
+  .level-skeleton-head b { width: 210px; height: 14px; margin-left: auto; border-radius: 999px; }
+  .level-skeleton-body { display: grid; gap: 10px; margin-top: 22px; }
+  .level-skeleton-body span { height: 10px; border-radius: 999px; }
+  .level-skeleton-body span:nth-child(1) { width: 55%; }
+  .level-skeleton-body span:nth-child(2) { width: 100%; }
+  .level-skeleton-body span:nth-child(3) { width: 72%; }
+  .level-skeleton-head i,.level-skeleton-head span,.level-skeleton-head b,.level-skeleton-body span { background: var(--skeleton-background); animation: invite-skeleton-pulse 1.4s ease-in-out infinite; }
   .current-level-block,.next-level-block { padding: 20px; }
   .current-level-block { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
   .next-level-block { border-top: 1px solid var(--border-color); }
@@ -1129,29 +1195,17 @@ export default {
         }
       }
     }
-  }
 
-  .stats-card-link {
-    width: 100%;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
-
-    .stats-arrow {
-      flex: none;
-      margin-left: 6px;
-      color: var(--secondary-text-color);
-    }
-
-    &:hover {
-      border-color: rgba(var(--theme-color-rgb), .35);
-      box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), .1);
-      transform: translateY(-1px);
+    .stats-inline-skeleton {
+      display: inline-block;
+      width: 42px;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--skeleton-background);
+      animation: invite-skeleton-pulse 1.4s ease-in-out infinite;
     }
   }
-  
+
   .balance-container {
     display: flex;
     align-items: center;
@@ -1542,7 +1596,7 @@ export default {
   border: 0 !important;
   border-radius: 12px !important;
 
-  .tab-buttons { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; gap: 4px; }
+  .tab-buttons { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 4px; }
   .tab-btn { display: flex; min-height: 40px; align-items: center; justify-content: center; color: var(--secondary-text-color); border-radius: 8px !important; }
   .tab-btn.active { color: #fff !important; background: var(--theme-color) !important; }
   .card-actions { margin-left: 8px; }
@@ -1578,6 +1632,7 @@ export default {
   line-height: 1.6;
   text-align: center;
 }
+.invite-users-tab { padding-top: 8px; }
 .amount-income { color: #16a34a !important; }
 .amount-expense { color: #dc2626 !important; }
 
@@ -1588,6 +1643,12 @@ export default {
   .combined-card .tab-header .card-actions { margin: 6px 0 0; }
   .combined-card .tab-header .btn-action { width: 100%; justify-content: center; }
   .tab-content-toolbar { align-items: flex-start; flex-direction: column; }
+}
+
+@keyframes invite-skeleton-pulse { 50% { opacity: .45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .level-skeleton-head i,.level-skeleton-head span,.level-skeleton-head b,.level-skeleton-body span,.stats-inline-skeleton { animation: none; }
 }
 
 /* 暗黑模式修复：卡片背景与页面背景一致（不独立），弹窗背景独立 */

@@ -189,6 +189,7 @@ export default {
     subscriptionInfo: 'Subscription Info',
     planName: 'Plan Name',
     expired: 'Expired',
+    expiredAt: 'Expired on {date}',
     expiryDate: 'Expires on',
     expiryDate1: ', ',
     usedTraffic: 'Used ',
@@ -782,6 +783,7 @@ export default {
     },
     users: {
       title: 'Invited users',
+      definition: 'A qualified referral is an invited user who has completed their first purchase order.',
       loading: 'Loading invited users…',
       loadFailed: 'Failed to load invited users',
       empty: 'No invited users yet',
@@ -928,14 +930,11 @@ export default {
   },
   docs: {
     title: 'User Guide',
-    searchPlaceholder: 'Search documentation...',
     loading: 'Loading documentation...',
     retry: 'Retry',
-    clearSearch: 'Clear Search',
     backToList: 'Back to Document List',
     lastUpdated: 'Last Updated',
     noDocuments: 'No documents',
-    noSearchResults: 'No matching documents found',
     fetchError: 'Failed to fetch documents',
     unknownError: 'An unknown error occurred',
     docNotFound: 'Document not found',
@@ -996,6 +995,7 @@ export default {
   },
   couponCenter: { title: 'My coupons' },
   wallet: {
+    title: 'Wallet balance',
     autoRenewal: { title: 'Auto renewal', description: 'Your balance will be used to renew the plan before it expires. Keep enough balance available.', noPlan: 'Purchase a plan to enable auto renewal.', enabled: 'Auto renewal enabled', disabled: 'Auto renewal disabled', failed: 'Failed to update auto renewal' },
     balance: {
       title: 'Current balance',

@@ -8,7 +8,7 @@
         {{ planName || $t('dashboard.noSubscription') }}
       </h2>
       <p class="subscription-expiry" :class="{ warning: isExpiringSoon, danger: isExpired }">
-        <template v-if="isExpired">{{ $t('dashboard.expired') }}</template>
+        <template v-if="isExpired">{{ $t('dashboard.expiredAt', { date: expiryDate || $t('dashboard.none') }) }}</template>
         <template v-else>
           {{ $t('dashboard.expiryDate') }}
           {{ isPermanent ? $t('dashboard.permanent') : (expiryDate || $t('dashboard.none')) }}
@@ -27,13 +27,13 @@
           : `${$t('dashboard.nextResetTime')}${resetDay} ${$t('dashboard.days')}${$t('dashboard.nextResetTime1')}` }}
       </p>
 
-      <div class="subscription-progress-row">
+      <div v-if="!isExpired" class="subscription-progress-row">
         <div class="subscription-progress-track">
           <span :style="{ width: `${safePercent}%`, backgroundColor: progressColor }"></span>
         </div>
         <strong :style="{ color: progressColor }">{{ safePercent.toFixed(1) }}%</strong>
       </div>
-      <p class="subscription-traffic" :style="{ color: trafficActionColor }">
+      <p v-if="!isExpired" class="subscription-traffic" :style="{ color: trafficActionColor }">
         {{ $t('dashboard.usedTraffic') }}{{ usedTraffic || '0 GB' }}&nbsp;/&nbsp;
         {{ $t('dashboard.planTraffic') }}{{ totalTraffic || '0 GB' }}
       </p>
@@ -42,7 +42,7 @@
         <button
           v-if="showRenew"
           class="subscription-action renew"
-          :class="{ warning: isExpiringSoon }"
+          :class="{ warning: isExpiringSoon && !isExpired, danger: isExpired }"
           type="button"
           @click="$emit('renew')"
         >
@@ -206,6 +206,10 @@ const progressColor = computed(() => {
 
 .subscription-action.renew.warning {
   background: var(--warning-color, #f59e0b);
+}
+
+.subscription-action.renew.danger {
+  background: var(--danger-color, #ef4444);
 }
 
 .subscription-skeleton { display: grid; gap: 10px; }

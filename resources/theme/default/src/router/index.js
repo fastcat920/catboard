@@ -285,7 +285,7 @@ const routes = [
         name: 'Deposit',
         component: () => import('@/views/wallet/WalletDeposit.vue'),
         meta: {
-          titleKey: 'wallet.deposit.title',
+          titleKey: 'wallet.title',
           requiresAuth: true,
           activeNav: 'Mine' // 激活"我的"菜单
         }

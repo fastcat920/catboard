@@ -21,12 +21,41 @@
         </div>
       </div>
 
-      <!-- 充值卡片 -->
-      <div class="dashboard-card deposit-card">
-        <div class="card-header">
-          <h2 class="card-title">{{ $t('wallet.deposit.title') }}</h2>
+      <!-- 充值与余额记录切换卡片 -->
+      <div class="dashboard-card wallet-content-card">
+        <div class="wallet-tabs" role="tablist" :aria-label="$t('wallet.title')">
+          <button
+            id="wallet-deposit-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'deposit'"
+            aria-controls="wallet-deposit-panel"
+            :class="{ active: activeTab === 'deposit' }"
+            @click="activeTab = 'deposit'"
+          >
+            {{ $t('wallet.deposit.title') }}
+          </button>
+          <button
+            id="wallet-records-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'records'"
+            aria-controls="wallet-records-panel"
+            :class="{ active: activeTab === 'records' }"
+            @click="activeTab = 'records'"
+          >
+            {{ $t('wallet.records.title') }}
+          </button>
         </div>
-        <div class="card-body">
+
+        <section
+          v-show="activeTab === 'deposit'"
+          id="wallet-deposit-panel"
+          class="wallet-tab-panel deposit-card"
+          role="tabpanel"
+          aria-labelledby="wallet-deposit-tab"
+        >
+          <div class="card-body">
           <div class="deposit-notice">
             <IconAlertCircle :size="20" class="notice-icon" />
             <span>{{ $t('wallet.deposit.notice') }}</span>
@@ -98,73 +127,80 @@
               <span>{{ $t('wallet.deposit.button') }}</span>
             </button>
           </div>
-        </div>
-      </div>
+          </div>
+        </section>
 
       <!-- 余额流水 -->
-      <div class="dashboard-card records-card">
-        <div class="card-header">
-          <h2 class="card-title">{{ $t('wallet.records.title') }}</h2>
-          <button class="records-refresh" type="button" :disabled="loading.records" @click="fetchBalanceRecords(currentPage)">
-            {{ $t('wallet.records.refresh') }}
-          </button>
-        </div>
+        <section
+          v-show="activeTab === 'records'"
+          id="wallet-records-panel"
+          class="wallet-tab-panel records-card"
+          role="tabpanel"
+          aria-labelledby="wallet-records-tab"
+        >
+          <div class="records-toolbar">
+            <span>{{ $t('wallet.records.title') }}</span>
+            <button class="records-refresh" type="button" :disabled="loading.records" @click="fetchBalanceRecords(currentPage)">
+              {{ $t('wallet.records.refresh') }}
+            </button>
+          </div>
 
-        <div v-if="loading.records" class="records-state">
-          <span class="loader records-loader"></span>
-          <span>{{ $t('wallet.records.loading') }}</span>
-        </div>
-        <div v-else-if="recordsError" class="records-state records-error">
-          <span>{{ $t('wallet.records.loadFailed') }}</span>
-          <button type="button" @click="fetchBalanceRecords(currentPage)">{{ $t('common.retry') }}</button>
-        </div>
-        <div v-else-if="!balanceRecords.length" class="records-state">{{ $t('wallet.records.empty') }}</div>
-        <template v-else>
-          <div class="records-table-wrap">
-            <table class="records-table">
-              <thead>
-                <tr>
-                  <th>{{ $t('wallet.records.time') }}</th>
-                  <th>{{ $t('wallet.records.type') }}</th>
-                  <th class="amount-cell">{{ $t('wallet.records.amount') }}</th>
-                  <th>{{ $t('wallet.records.status') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="record in balanceRecords" :key="record.id">
-                  <td data-label="time">{{ formatRecordTime(record.created_at) }}</td>
-                  <td data-label="type"><span class="record-type">{{ recordTypeLabel(record.type) }}</span></td>
-                  <td data-label="amount" class="amount-cell" :class="record.amount >= 0 ? 'income' : 'expense'">
-                    {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
-                  </td>
-                  <td data-label="status"><span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span></td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-if="loading.records" class="records-state">
+            <span class="loader records-loader"></span>
+            <span>{{ $t('wallet.records.loading') }}</span>
           </div>
-          <div class="mobile-balance-records">
-            <article v-for="record in balanceRecords" :key="`mobile-${record.id}`" class="mobile-balance-record">
-              <div class="mobile-record-header">
-                <span class="mobile-record-time">{{ formatRecordTime(record.created_at) }}</span>
-                <span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span>
-              </div>
-              <div class="mobile-record-body">
-                <span class="record-type">{{ recordTypeLabel(record.type) }}</span>
-                <strong class="mobile-record-amount" :class="record.amount >= 0 ? 'income' : 'expense'">
-                  {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
-                </strong>
-              </div>
-            </article>
+          <div v-else-if="recordsError" class="records-state records-error">
+            <span>{{ $t('wallet.records.loadFailed') }}</span>
+            <button type="button" @click="fetchBalanceRecords(currentPage)">{{ $t('common.retry') }}</button>
           </div>
-          <div class="records-pagination">
-            <span>{{ $t('wallet.records.total', { total: recordsTotal }) }}</span>
-            <div class="pagination-actions">
-              <button type="button" :disabled="currentPage <= 1" @click="changeRecordsPage(currentPage - 1)">{{ $t('wallet.records.previous') }}</button>
-              <span>{{ currentPage }} / {{ totalPages }}</span>
-              <button type="button" :disabled="currentPage >= totalPages" @click="changeRecordsPage(currentPage + 1)">{{ $t('wallet.records.next') }}</button>
+          <div v-else-if="!balanceRecords.length" class="records-state">{{ $t('wallet.records.empty') }}</div>
+          <template v-else>
+            <div class="records-table-wrap">
+              <table class="records-table">
+                <thead>
+                  <tr>
+                    <th>{{ $t('wallet.records.time') }}</th>
+                    <th>{{ $t('wallet.records.type') }}</th>
+                    <th class="amount-cell">{{ $t('wallet.records.amount') }}</th>
+                    <th>{{ $t('wallet.records.status') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="record in balanceRecords" :key="record.id">
+                    <td data-label="time">{{ formatRecordTime(record.created_at) }}</td>
+                    <td data-label="type"><span class="record-type">{{ recordTypeLabel(record.type) }}</span></td>
+                    <td data-label="amount" class="amount-cell" :class="record.amount >= 0 ? 'income' : 'expense'">
+                      {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
+                    </td>
+                    <td data-label="status"><span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          </div>
-        </template>
+            <div class="mobile-balance-records">
+              <article v-for="record in balanceRecords" :key="`mobile-${record.id}`" class="mobile-balance-record">
+                <div class="mobile-record-header">
+                  <span class="mobile-record-time">{{ formatRecordTime(record.created_at) }}</span>
+                  <span class="status-badge" :class="record.status">{{ recordStatusLabel(record.status) }}</span>
+                </div>
+                <div class="mobile-record-body">
+                  <span class="record-type">{{ recordTypeLabel(record.type) }}</span>
+                  <strong class="mobile-record-amount" :class="record.amount >= 0 ? 'income' : 'expense'">
+                    {{ record.amount >= 0 ? '+' : '-' }}{{ currencySymbol }}{{ formatAmount(Math.abs(record.amount)) }}
+                  </strong>
+                </div>
+              </article>
+            </div>
+            <div class="records-pagination">
+              <span>{{ $t('wallet.records.total', { total: recordsTotal }) }}</span>
+              <div class="pagination-actions">
+                <button type="button" :disabled="currentPage <= 1" @click="changeRecordsPage(currentPage - 1)">{{ $t('wallet.records.previous') }}</button>
+                <span>{{ currentPage }} / {{ totalPages }}</span>
+                <button type="button" :disabled="currentPage >= totalPages" @click="changeRecordsPage(currentPage + 1)">{{ $t('wallet.records.next') }}</button>
+              </div>
+            </div>
+          </template>
+        </section>
       </div>
     </div>
   </div>
@@ -185,6 +221,7 @@ const { showToast } = useToast();
 const router = useRouter();
 
 // 响应式数据
+const activeTab = ref('deposit');
 const userBalance = ref(0);
 const autoRenewal = ref(false);
 const hasPlan = ref(false);
@@ -473,6 +510,42 @@ onMounted(() => {
       }
     }
   }
+
+  .wallet-content-card {
+    padding: 6px 20px 20px;
+  }
+
+  .wallet-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin: 0 -14px 18px;
+    padding: 6px;
+    background: rgba(var(--theme-color-rgb), .06);
+    border-radius: 12px;
+
+    button {
+      display: flex;
+      min-height: 40px;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      color: var(--secondary-text-color);
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color var(--motion-fast) ease, background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+
+      &:hover { color: var(--theme-color); }
+      &:focus-visible { outline: 3px solid rgba(var(--theme-color-rgb), .22); outline-offset: 2px; }
+      &.active { color: #fff; background: var(--theme-color); box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), .18); }
+    }
+  }
+
+  .wallet-tab-panel { min-width: 0; }
   
   /* 余额卡片高度和内容行距压缩 */
   .balance-card {
@@ -752,7 +825,15 @@ onMounted(() => {
   }
 
   .records-card {
-    .card-header { margin-bottom: 16px; }
+    .records-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+
+      > span { color: var(--heading-color); font-size: 14px; font-weight: 600; }
+    }
 
     .records-refresh {
       padding: 6px 12px;
@@ -909,6 +990,9 @@ onMounted(() => {
         font-size: 0.95rem;
       }
     }
+
+    .wallet-content-card { padding: 6px 14px 16px; }
+    .wallet-tabs { margin-right: -8px; margin-left: -8px; }
 
     .records-card {
       .records-table-wrap { display: none; }

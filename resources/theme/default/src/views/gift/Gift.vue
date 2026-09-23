@@ -29,66 +29,99 @@
         </div>
       </div>
 
-      <!-- 礼品卡兑换方法 -->
-      <div class="dashboard-card instruction-card">
-        <div class="card-header">
-          <h3>{{ $t('profile.giftCardUseTitle') }}</h3>
+      <!-- 使用说明与兑换记录切换卡片 -->
+      <div class="dashboard-card gift-content-card">
+        <div class="gift-tabs" role="tablist" :aria-label="$t('profile.giftCard')">
+          <button
+            id="gift-instructions-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'instructions'"
+            aria-controls="gift-instructions-panel"
+            :class="{ active: activeTab === 'instructions' }"
+            @click="activeTab = 'instructions'"
+          >
+            {{ $t('profile.giftCardUseTitle') }}
+          </button>
+          <button
+            id="gift-records-tab"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'records'"
+            aria-controls="gift-records-panel"
+            :class="{ active: activeTab === 'records' }"
+            @click="activeTab = 'records'"
+          >
+            {{ $t('profile.giftCardRedemptionHistory') }}
+          </button>
         </div>
-        <div class="settings-content">
+
+        <section
+          v-show="activeTab === 'instructions'"
+          id="gift-instructions-panel"
+          class="gift-tab-panel instruction-panel"
+          role="tabpanel"
+          aria-labelledby="gift-instructions-tab"
+        >
           <div class="instruction-content" v-html="$t('profile.giftCardUsecontent')"></div>
-        </div>
-      </div>
+        </section>
 
-      <!-- 兑换记录 -->
-      <div class="dashboard-card redemption-card">
-        <div class="card-header redemption-header">
-          <h3>{{ $t('profile.giftCardRedemptionHistory') }}</h3>
-          <button class="refresh-button" type="button" :aria-label="$t('common.refresh')" :disabled="loadingRecords" @click="fetchRedemptions(currentPage)">
-            <IconRefresh :size="17" :class="{ spinning: loadingRecords }" />
-          </button>
-        </div>
+        <section
+          v-show="activeTab === 'records'"
+          id="gift-records-panel"
+          class="gift-tab-panel redemption-panel"
+          role="tabpanel"
+          aria-labelledby="gift-records-tab"
+        >
+          <div class="redemption-toolbar">
+            <span>{{ $t('profile.giftCardRedemptionHistory') }}</span>
+            <button class="refresh-button" type="button" :aria-label="$t('common.refresh')" :disabled="loadingRecords" @click="fetchRedemptions(currentPage)">
+              <IconRefresh :size="17" :class="{ spinning: loadingRecords }" />
+            </button>
+          </div>
 
-        <div v-if="loadingRecords && redemptions.length === 0" class="record-state">
-          <span class="record-loader"></span>
-          <p>{{ $t('profile.giftCardRecordsLoading') }}</p>
-        </div>
-        <div v-else-if="recordsError" class="record-state error-state">
-          <IconAlertTriangle :size="34" />
-          <p>{{ recordsError }}</p>
-          <button type="button" class="retry-button" @click="fetchRedemptions(currentPage)">{{ $t('common.retry') }}</button>
-        </div>
-        <div v-else-if="redemptions.length === 0" class="record-state">
-          <IconHistory :size="38" />
-          <p>{{ $t('profile.giftCardRecordsEmpty') }}</p>
-        </div>
-        <div v-else class="redemption-table-wrap">
-          <table class="redemption-table">
-            <thead>
-              <tr>
-                <th>{{ $t('profile.giftCardRecordCode') }}</th>
-                <th>{{ $t('profile.giftCardRecordContent') }}</th>
-                <th>{{ $t('profile.giftCardRecordTime') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in redemptions" :key="record.id">
-                <td class="record-code">{{ record.code_masked || '—' }}</td>
-                <td class="record-content">{{ formatRedemptionValue(record) }}</td>
-                <td class="record-time">{{ formatRedemptionTime(record.redeemed_at) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div v-if="loadingRecords && redemptions.length === 0" class="record-state">
+            <span class="record-loader"></span>
+            <p>{{ $t('profile.giftCardRecordsLoading') }}</p>
+          </div>
+          <div v-else-if="recordsError" class="record-state error-state">
+            <IconAlertTriangle :size="34" />
+            <p>{{ recordsError }}</p>
+            <button type="button" class="retry-button" @click="fetchRedemptions(currentPage)">{{ $t('common.retry') }}</button>
+          </div>
+          <div v-else-if="redemptions.length === 0" class="record-state">
+            <IconHistory :size="38" />
+            <p>{{ $t('profile.giftCardRecordsEmpty') }}</p>
+          </div>
+          <div v-else class="redemption-table-wrap">
+            <table class="redemption-table">
+              <thead>
+                <tr>
+                  <th>{{ $t('profile.giftCardRecordCode') }}</th>
+                  <th>{{ $t('profile.giftCardRecordContent') }}</th>
+                  <th>{{ $t('profile.giftCardRecordTime') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="record in redemptions" :key="record.id">
+                  <td class="record-code">{{ record.code_masked || '—' }}</td>
+                  <td class="record-content">{{ formatRedemptionValue(record) }}</td>
+                  <td class="record-time">{{ formatRedemptionTime(record.redeemed_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div v-if="totalPages > 1 && !recordsError" class="record-pagination">
-          <button type="button" :disabled="loadingRecords || currentPage <= 1" @click="fetchRedemptions(currentPage - 1)">
-            <IconChevronLeft :size="17" />
-          </button>
-          <span>{{ currentPage }} / {{ totalPages }}</span>
-          <button type="button" :disabled="loadingRecords || currentPage >= totalPages" @click="fetchRedemptions(currentPage + 1)">
-            <IconChevronRight :size="17" />
-          </button>
-        </div>
+          <div v-if="totalPages > 1 && !recordsError" class="record-pagination">
+            <button type="button" :disabled="loadingRecords || currentPage <= 1" @click="fetchRedemptions(currentPage - 1)">
+              <IconChevronLeft :size="17" />
+            </button>
+            <span>{{ currentPage }} / {{ totalPages }}</span>
+            <button type="button" :disabled="loadingRecords || currentPage >= totalPages" @click="fetchRedemptions(currentPage + 1)">
+              <IconChevronRight :size="17" />
+            </button>
+          </div>
+        </section>
       </div>
 
     </div>
@@ -107,6 +140,7 @@ const { showToast } = useToast();
 
 const giftCardCode = ref('');
 const isRedeeming = ref(false);
+const activeTab = ref('instructions');
 const redemptions = ref([]);
 const loadingRecords = ref(true);
 const recordsError = ref('');
@@ -343,11 +377,56 @@ const redeemGiftCard = async () => {
   }
 }
 
-/* 兑换记录 */
-.redemption-header {
+/* 使用说明与兑换记录切换 */
+.gift-content-card {
+  padding: 6px 20px 20px;
+}
+
+.gift-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 -14px 18px;
+  padding: 6px;
+  background: rgba(var(--theme-color-rgb), .06);
+  border-radius: 12px;
+
+  button {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    color: var(--secondary-text-color);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color .2s ease, background-color .2s ease, box-shadow .2s ease;
+
+    &:hover { color: var(--theme-color); }
+    &:focus-visible { outline: 3px solid rgba(var(--theme-color-rgb), .22); outline-offset: 2px; }
+    &.active { color: #fff; background: var(--theme-color); box-shadow: 0 4px 12px rgba(var(--theme-color-rgb), .18); }
+  }
+}
+
+.gift-tab-panel { min-width: 0; }
+.instruction-panel { padding: 4px 0 0; }
+
+.redemption-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 36px;
+  padding: 0 0 8px;
+
+  > span {
+    color: var(--heading-color);
+    font-size: 14px;
+    font-weight: 600;
+  }
 }
 
 .refresh-button {
@@ -478,8 +557,11 @@ const redeemGiftCard = async () => {
 }
 
 @media (max-width: 576px) {
+  .gift-content-card { padding-right: 16px; padding-left: 16px; }
+  .gift-tabs { margin-right: -10px; margin-left: -10px; }
+
   .redemption-table-wrap {
-    padding: 0 16px;
+    padding: 0;
     overflow: visible;
   }
 

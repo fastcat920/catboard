@@ -1,5 +1,5 @@
 <template>
-  <main class="invite-users-page">
+  <div class="invite-users-page" :class="{ embedded }">
     <section class="list-card">
       <div v-if="loading" class="state">{{ $t('invite.users.loading') }}</div>
       <div v-else-if="error" class="state error">
@@ -36,7 +36,7 @@
         </footer>
       </template>
     </section>
-  </main>
+  </div>
 </template>
 
 <script setup>
@@ -44,6 +44,10 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-vue';
 import { getInvitedUsers } from '@/api/invite';
+
+defineProps({
+  embedded: { type: Boolean, default: false }
+});
 
 const { t, locale } = useI18n();
 const rows = ref([]);
@@ -79,6 +83,8 @@ onMounted(() => load(1));
 
 <style scoped lang="scss">
 .invite-users-page { width: 100%; max-width: var(--page-max-width); margin: 0 auto; padding: 18px 0 60px; color: var(--text-color); }
+.invite-users-page.embedded { max-width: none; padding: 0; }
+.invite-users-page.embedded .list-card { border: 0; border-radius: 0; background: transparent; }
 .list-card { overflow: hidden; border: 1px solid var(--border-color); border-radius: 20px; background: var(--card-background); }
 .state { display: flex; min-height: 260px; align-items: center; justify-content: center; gap: 12px; color: var(--secondary-text-color); }
 .state.error { color: #dc3545; }

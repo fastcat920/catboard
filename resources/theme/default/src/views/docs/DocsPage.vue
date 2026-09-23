@@ -7,28 +7,6 @@
     />
     
     <div class="docs-inner">
-      <div class="search-wrapper">
-        <div class="search-input-wrapper">
-          <IconSearch :size="20" class="search-icon" />
-          <input
-            v-model="searchQuery"
-            class="search-input"
-            type="search"
-            :placeholder="$t('docs.searchPlaceholder')"
-            :aria-label="$t('docs.searchPlaceholder')"
-          />
-          <button
-            v-if="searchQuery"
-            type="button"
-            class="clear-button"
-            :aria-label="$t('docs.clearSearch')"
-            @click="clearSearch"
-          >
-            <IconX :size="18" />
-          </button>
-        </div>
-      </div>
-
       <!-- 加载状态 -->
       <div v-if="loading" class="docs-loading">
         <LoadingSpinner />
@@ -63,16 +41,14 @@
       <!-- 空状态 -->
       <div v-else class="docs-empty">
         <IconFileSearch :size="48" class="empty-icon" />
-        <p v-if="searchQuery">{{ $t('docs.noSearchResults') }}</p>
-        <p v-else>{{ $t('docs.noDocuments') }}</p>
-        <button v-if="searchQuery" @click="clearSearch" class="retry-button">{{ $t('docs.clearSearch') }}</button>
+        <p>{{ $t('docs.noDocuments') }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup name="DocsPage">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
@@ -81,9 +57,7 @@ import {
   IconAlertTriangle,
   IconFileSearch,
   IconFileText,
-  IconFolder,
-  IconSearch,
-  IconX
+  IconFolder
 } from '@tabler/icons-vue';
 import { fetchKnowledgeList } from '@/api/docs';
 import DomainAuthAlert from '@/components/common/DomainAuthAlert.vue';
@@ -98,8 +72,6 @@ const { showToast } = useToast();
 const loading = ref(true);
 const error = ref('');
 const documents = ref({});
-const searchQuery = ref('');
-let searchTimer = null;
 let listRequestSequence = 0;
 
 // 域名授权
@@ -115,9 +87,6 @@ const hasDocuments = computed(() => {
     Object.values(documents.value).some(items => Array.isArray(items) && items.length > 0);
 });
 
-// 清除搜索
-const clearSearch = () => { searchQuery.value = ''; };
-
 // 跳转详情
 const goToDocument = (id) => { router.push(`/docs/${id}`); };
 
@@ -127,7 +96,7 @@ const fetchKnowledge = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const result = await fetchKnowledgeList(searchQuery.value);
+    const result = await fetchKnowledgeList();
     if (requestSequence !== listRequestSequence) return;
     if (result?.data) {
       documents.value = result.data;
@@ -147,19 +116,9 @@ const fetchKnowledge = async () => {
 // 后端会按当前请求语言返回整篇本地化内容，切换语言时重新获取列表。
 watch(locale, () => { fetchKnowledge(); });
 
-// 搜索交由后端处理，以便关键词可同时匹配中文和英文字段。
-watch(searchQuery, () => {
-  if (searchTimer) window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(fetchKnowledge, 300);
-});
-
 onMounted(() => {
   authStatus.value = applyDomainAuth();
   fetchKnowledge();
-});
-
-onUnmounted(() => {
-  if (searchTimer) window.clearTimeout(searchTimer);
 });
 </script>
 
@@ -207,54 +166,6 @@ onUnmounted(() => {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-  }
-}
-
-.search-wrapper {
-  margin-bottom: 1.5rem;
-}
-
-.search-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  .search-icon {
-    position: absolute;
-    left: 1rem;
-    color: var(--text-muted);
-    transition: color 0.3s;
-  }
-  .search-input {
-    width: 100%;
-    padding: 0.85rem 2.5rem;
-    border-radius: 20px;
-    border: 1px solid var(--card-border);
-    background-color: #ffffff;
-    color: var(--text-color);
-    font-size: 1rem;
-    transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
-    &:focus {
-      outline: none;
-      border-color: var(--theme-color);
-      box-shadow: 0 0 0 2px rgba(var(--theme-color-rgb), 0.2);
-      & + .search-icon { color: var(--theme-color); }
-    }
-    &::placeholder { color: var(--text-muted); }
-  }
-  .clear-button {
-    position: absolute;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 50%;
-    transition: color 0.3s, background-color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.3s, transform 0.3s;
-    &:hover {
-      background-color: rgba(var(--theme-color-rgb), 0.1);
-      color: var(--theme-color);
-    }
   }
 }
 
@@ -401,9 +312,7 @@ onUnmounted(() => {
 <!-- 全局暗黑模式覆盖（非 scoped） -->
 <style lang="scss">
 .dark .doc-item,
-.dark-theme .doc-item,
-.dark .search-input,
-.dark-theme .search-input {
+.dark-theme .doc-item {
   background-color: #1e293b !important;
 }
 </style>

@@ -1,49 +1,207 @@
 {
-    "name": "default",
-    "description": "默认主题",
-    "version": "1.7.5",
-    "images": "https://images.unsplash.com/photo-1515405295579-ba7b45403062?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2160&q=80",
-    "configs": [{
-        "label": "主题色",
-        "placeholder": "请选择主题颜色",
-        "field_name": "theme_color",
-        "field_type": "select",
-        "select_options": {
-            "default": "默认(蓝色)",
-            "green": "奶绿色",
-            "black": "黑色",
-            "darkblue": "暗蓝色"
-        },
-        "default_value": "default"
-    }, {
-        "label": "背景",
-        "placeholder": "请输入背景图片URL",
-        "field_name": "background_url",
-        "field_type": "input"
-    }, {
-        "label": "边栏风格",
-        "placeholder": "请选择边栏风格",
-        "field_name": "theme_sidebar",
-        "field_type": "select",
-        "select_options": {
-            "light": "亮",
-            "dark": "暗"
-        },
-        "default_value": "light"
-    }, {
-        "label": "顶部风格",
-        "placeholder": "请选择顶部风格",
-        "field_name": "theme_header",
-        "field_type": "select",
-        "select_options": {
-            "light": "亮",
-            "dark": "暗"
-        },
-        "default_value": "dark"
-    }, {
-        "label": "自定义页脚HTML",
-        "placeholder": "可以实现客服JS代码的加入等",
-        "field_name": "custom_html",
-        "field_type": "textarea"
-    }]
+  "name": "default",
+  "description": "Catboard 默认用户主题",
+  "version": "2.0.0",
+  "images": "/theme/default/images/background.jpg",
+  "configs": [
+    {
+      "label": "主题主色",
+      "placeholder": "例如 #4566AE",
+      "field_name": "primary_color",
+      "field_type": "input",
+      "default_value": "#4566AE"
+    },
+    {
+      "label": "显示标题 Logo",
+      "placeholder": "请选择是否显示",
+      "field_name": "show_logo",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "默认语言",
+      "field_name": "default_language",
+      "field_type": "select",
+      "select_options": {
+        "zh-CN": "简体中文",
+        "en-US": "English"
+      },
+      "default_value": "zh-CN"
+    },
+    {
+      "label": "默认外观",
+      "field_name": "default_theme",
+      "field_type": "select",
+      "select_options": {
+        "light": "浅色",
+        "dark": "深色"
+      },
+      "default_value": "light"
+    },
+    {
+      "label": "启用落地页",
+      "placeholder": "请选择是否启用",
+      "field_name": "enable_landing_page",
+      "field_type": "select",
+      "select_options": {
+        "0": "关闭",
+        "1": "启用"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示客户端下载卡片",
+      "field_name": "show_download_card",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示 iOS 客户端",
+      "field_name": "show_ios",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示 Android 客户端",
+      "field_name": "show_android",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示 macOS 客户端",
+      "field_name": "show_macos",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示 Windows 客户端",
+      "field_name": "show_windows",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "显示 Linux 客户端",
+      "field_name": "show_linux",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "0"
+    },
+    {
+      "label": "显示 OpenWrt 客户端",
+      "field_name": "show_openwrt",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "0"
+    },
+    {
+      "label": "iOS 下载地址",
+      "field_name": "client_link_ios",
+      "field_type": "input",
+      "default_value": "/#/docs/13"
+    },
+    {
+      "label": "Android 下载地址",
+      "field_name": "client_link_android",
+      "field_type": "input",
+      "default_value": "/#/docs/2"
+    },
+    {
+      "label": "macOS 下载地址",
+      "field_name": "client_link_macos",
+      "field_type": "input",
+      "default_value": "/#/docs/5"
+    },
+    {
+      "label": "Windows 下载地址",
+      "field_name": "client_link_windows",
+      "field_type": "input",
+      "default_value": "/#/docs/3"
+    },
+    {
+      "label": "Linux 下载地址",
+      "field_name": "client_link_linux",
+      "field_type": "input",
+      "default_value": "https://github.com/xxx/releases/latest"
+    },
+    {
+      "label": "OpenWrt 下载地址",
+      "field_name": "client_link_openwrt",
+      "field_type": "input",
+      "default_value": "https://github.com/xxx/releases/latest"
+    },
+    {
+      "label": "启用客服系统",
+      "field_name": "customer_service_enabled",
+      "field_type": "select",
+      "select_options": {
+        "0": "关闭",
+        "1": "启用"
+      },
+      "default_value": "0"
+    },
+    {
+      "label": "客服嵌入模式",
+      "field_name": "customer_service_embed_mode",
+      "field_type": "select",
+      "select_options": {
+        "embed": "页面嵌入",
+        "popup": "弹出页面"
+      },
+      "default_value": "embed"
+    },
+    {
+      "label": "未登录时显示客服",
+      "field_name": "customer_service_guest_visible",
+      "field_type": "select",
+      "select_options": {
+        "0": "隐藏",
+        "1": "显示"
+      },
+      "default_value": "1"
+    },
+    {
+      "label": "Crisp ID",
+      "placeholder": "填写 Crisp Website ID",
+      "field_name": "crisp_id",
+      "field_type": "input",
+      "default_value": ""
+    },
+    {
+      "label": "自定义页脚 HTML",
+      "placeholder": "可填写客服、统计等 HTML 或 JavaScript",
+      "field_name": "custom_html",
+      "field_type": "textarea",
+      "default_value": ""
+    }
+  ]
 }

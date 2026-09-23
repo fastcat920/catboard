@@ -8,6 +8,8 @@ use App\Http\Requests\Staff\UserUpdate;
 use App\Jobs\SendEmailJob;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\CommissionLedgerService;
+use App\Services\BalanceLedgerService;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
@@ -51,10 +53,41 @@ class UserController extends Controller
             $params['group_id'] = $plan->group_id;
         }
 
+        $commissionBefore = (int)$user->commission_balance;
+        $balanceBefore = (int)$user->balance;
         try {
             $user->update($params);
         } catch (\Exception $e) {
             abort(500, '保存失败');
+        }
+        $freshUser = $user->fresh();
+        $commissionAfter = (int)$freshUser->commission_balance;
+        $balanceAfter = (int)$freshUser->balance;
+        if ($commissionAfter !== $commissionBefore) {
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'admin_adjustment',
+                'amount' => $commissionAfter - $commissionBefore,
+                'balance_before' => $commissionBefore,
+                'balance_after' => $commissionAfter,
+                'source_key' => 'staff_adjustment:' . $user->id . ':' . time() . ':' . uniqid(),
+                'source_type' => 'staff',
+                'source_id' => $request->user['id'] ?? null,
+                'description' => '客服调整佣金余额',
+            ]);
+        }
+        if ($balanceAfter !== $balanceBefore) {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'admin_adjustment',
+                'amount' => $balanceAfter - $balanceBefore,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'staff_balance_adjustment:' . $user->id . ':' . time() . ':' . uniqid(),
+                'source_type' => 'staff',
+                'source_id' => $request->user['id'] ?? null,
+                'description' => '客服调整余额',
+            ]);
         }
         return response([
             'data' => true
@@ -68,8 +101,9 @@ class UserController extends Controller
         $builder = User::orderBy($sort, $sortType);
         $this->filter($request, $builder);
         $users = $builder->get();
+        $sendAt = $request->filled('send_at') ? (int)$request->input('send_at') : null;
         foreach ($users as $user) {
-            SendEmailJob::dispatch([
+            $job = SendEmailJob::dispatch([
                 'email' => $user->email,
                 'subject' => $request->input('subject'),
                 'template_name' => 'notify',
@@ -79,10 +113,11 @@ class UserController extends Controller
                     'content' => $request->input('content')
                 ]
             ]);
+            if ($sendAt) $job->delay(max(0, $sendAt - time()));
         }
 
         return response([
-            'data' => true
+            'data' => ['scheduled_at' => $sendAt, 'recipient_count' => $users->count()]
         ]);
     }
 

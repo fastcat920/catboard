@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\V1\Guest;
 
 use App\Http\Controllers\Controller;
+use App\Support\ContentLocale;
 use App\Utils\Dict;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 class CommController extends Controller
 {
-    public function config()
+    public function config(Request $request)
     {
         return response([
             'data' => [
@@ -20,7 +22,8 @@ class CommController extends Controller
                     : 0,
                 'is_recaptcha' => (int)config('v2board.recaptcha_enable', 0) ? 1 : 0,
                 'recaptcha_site_key' => config('v2board.recaptcha_site_key'),
-                'app_description' => config('v2board.app_description'),
+                'app_name' => ContentLocale::value(config('v2board.app_name', 'V2Board'), config('v2board.app_name_en'), $request),
+                'app_description' => ContentLocale::value(config('v2board.app_description'), config('v2board.app_description_en'), $request),
                 'app_url' => config('v2board.app_url'),
                 'logo' => config('v2board.logo'),
             ]

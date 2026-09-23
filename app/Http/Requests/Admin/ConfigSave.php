@@ -32,7 +32,9 @@ class ConfigSave extends FormRequest
         'force_https' => 'in:0,1',
         'stop_register' => 'in:0,1',
         'app_name' => '',
+        'app_name_en' => 'nullable|string|max:255',
         'app_description' => '',
+        'app_description_en' => 'nullable|string|max:255',
         'app_url' => 'nullable|url',
         'subscribe_url' => 'nullable',
         'subscribe_path' => 'nullable|regex:/^\\//',
@@ -75,6 +77,7 @@ class ConfigSave extends FormRequest
         'email_password' => '',
         'email_encryption' => '',
         'email_from_address' => '',
+        'coupon_email_notification_enable' => 'in:0,1',
         // telegram
         'telegram_bot_enable' => 'in:0,1',
         'telegram_bot_token' => '',

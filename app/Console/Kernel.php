@@ -34,6 +34,8 @@ class Kernel extends ConsoleKernel
         // check
         $schedule->command('check:order')->everyMinute()->withoutOverlapping();
         $schedule->command('check:commission')->everyFifteenMinutes();
+        $schedule->command('check:referral-levels')->hourly()->withoutOverlapping();
+        $schedule->command('coupon:check-wallet')->hourly()->withoutOverlapping();
         $schedule->command('check:ticket')->everyMinute();
         $schedule->command('check:renewal')->dailyAt('22:30');
         // reset
@@ -43,6 +45,8 @@ class Kernel extends ConsoleKernel
         $schedule->command('send:remindMail')->dailyAt('11:30');
         // horizon metrics
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
+        $schedule->command('security:node-health')->everyMinute()->withoutOverlapping();
+        $schedule->command('security:analyze --scheduled')->everyMinute()->withoutOverlapping();
     }
 
     /**

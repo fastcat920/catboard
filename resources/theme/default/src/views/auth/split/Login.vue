@@ -264,9 +264,7 @@ export default {
       return AUTH_LAYOUT_CONFIG?.splitLayout?.leftContent?.greeting?.show !== false;
     });
     
-    const greetingMessage = computed(() => {
-      return getTimeBasedGreeting();
-    });
+    const greetingMessage = computed(() => getTimeBasedGreeting(t));
     
     const greetingColorClass = computed(() => {
       const color = AUTH_LAYOUT_CONFIG?.splitLayout?.leftContent?.greeting?.color || 'white';
@@ -413,17 +411,17 @@ export default {
     };
     
     // 获取基于时间的问候语
-    const getTimeBasedGreeting = () => {
+    const getTimeBasedGreeting = translate => {
       const hour = new Date().getHours();
       
       if (hour >= 5 && hour < 12) {
-        return 'Good Morning';
+        return translate('auth.greetingMorning');
       } else if (hour >= 12 && hour < 18) {
-        return 'Good Afternoon';
+        return translate('auth.greetingAfternoon');
       } else if (hour >= 18 && hour < 22) {
-        return 'Good Evening';
+        return translate('auth.greetingEvening');
       } else {
-        return 'Good Night';
+        return translate('auth.greetingNight');
       }
     };
     

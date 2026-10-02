@@ -1,5 +1,6 @@
 import { submitOrder, cancelOrder } from '@/api/shop';
 import { fetchOrderList } from '@/api/orderlist';
+import { requestMessage } from '@/api/request';
 
 const getBackendMessage = value => {
   if (!value) return '';
@@ -53,7 +54,7 @@ export const cancelUnpaidOrders = async () => {
 
   if (failed.length) {
     const message = getBackendMessage(failed[0].reason);
-    throw new Error(message || '取消未支付订单失败');
+    throw new Error(message || requestMessage('failed'));
   }
 
   return tradeNos.length;

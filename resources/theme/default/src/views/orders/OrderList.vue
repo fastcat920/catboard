@@ -170,7 +170,7 @@ const fetchOrders = async (page = 1) => {
     }
   } catch (err) {
     console.error('Failed to fetch orders:', err);
-    error.value = err && err.message ? err.message : t('common.networkError') || '网络错误';
+    error.value = err?.response?.message || t('orders.loadFailed');
     if ($toast) $toast.error(error.value);
   } finally {
     loading.value = false;

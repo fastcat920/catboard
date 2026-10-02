@@ -601,7 +601,7 @@ const validateChangeEmailForm = () => {
     changeEmailErrors.value.newEmail = t('profile.newEmailRequired');
     valid = false;
   } else if (!isValidEmail(newEmail)) {
-    changeEmailErrors.value.newEmail = t('profile.emailInvalid');
+    changeEmailErrors.value.newEmail = t('auth.emailInvalid');
     valid = false;
   } else if (newEmail.toLowerCase() === (changeEmailForm.value.currentEmail || '').trim().toLowerCase()) {
     changeEmailErrors.value.newEmail = t('profile.newEmailSame');
@@ -637,7 +637,7 @@ const fetchUserInfo = async (showLoading = true) => {
       changeEmailForm.value.currentEmail = response.data.email || '';
       remindExpire.value = !!response.data.remind_expire;
       remindTraffic.value = !!response.data.remind_traffic;
-    } else error.value = t('common.unknownError');
+    } else error.value = t('errors.unknown');
   } catch (err) {
     console.error(err);
     error.value = err?.message || t('common.networkError');
@@ -726,7 +726,7 @@ const sendChangeEmailCode = async () => {
     return;
   }
   if (!isValidEmail(newEmail)) {
-    changeEmailErrors.value.newEmail = t('profile.emailInvalid');
+    changeEmailErrors.value.newEmail = t('auth.emailInvalid');
     return;
   }
   if (!password) {

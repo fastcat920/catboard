@@ -723,7 +723,7 @@ const fetchDocDetail = async () => {
   } catch (err) {
     if (requestSequence !== docRequestSequence) return;
     console.error('Failed to fetch document detail:', err);
-    error.value = err && err.message ? err.message : t('docs.unknownError');
+    error.value = err?.response?.message || t('docs.fetchError');
     
     // 只有在$toast存在时才调用它
     if ($toast) {

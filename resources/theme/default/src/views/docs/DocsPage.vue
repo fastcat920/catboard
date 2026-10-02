@@ -106,7 +106,7 @@ const fetchKnowledge = async () => {
   } catch (err) {
     if (requestSequence !== listRequestSequence) return;
     console.error('Failed to fetch knowledge list:', err);
-    error.value = err.message || t('docs.unknownError');
+    error.value = err?.response?.message || t('docs.fetchError');
     showToast(error.value, 'error');
   } finally {
     if (requestSequence === listRequestSequence) loading.value = false;

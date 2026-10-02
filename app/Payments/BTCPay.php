@@ -52,7 +52,7 @@ class BTCPay {
         $ret = @json_decode($ret_raw, true);
         
         if(empty($ret['checkoutLink'])) {
-            abort(500, "error!");
+            abort(500, __('Payment gateway request failed'));
         }
         return [
             'type' => 1, // Redirect to url
@@ -75,7 +75,7 @@ class BTCPay {
         $computedSignature = "sha256=" . \hash_hmac('sha256', $payload, $this->config['btcpay_webhook_key']);
 
         if (!self::hashEqual($signraturHeader, $computedSignature)) {
-            abort(400, 'HMAC signature does not match');
+            abort(400, __('Payment callback verification failed'));
             return false;
         }
 
@@ -145,4 +145,3 @@ class BTCPay {
     }
     
 }
-

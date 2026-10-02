@@ -156,9 +156,7 @@ export default {
     const availableCouponCount = ref(0);
     const hasAvailableCoupons = computed(() => availableCouponCount.value > 0);
     const couponShortcutLabel = computed(() => hasAvailableCoupons.value
-      ? (locale.value === 'en-US'
-        ? `${availableCouponCount.value} available coupon${availableCouponCount.value === 1 ? '' : 's'}`
-        : `${availableCouponCount.value} 张可用优惠券`)
+      ? t('couponCenter.availableCount', { count: availableCouponCount.value })
       : t('couponCenter.title'));
 
     const refreshAvailableCoupons = async () => {

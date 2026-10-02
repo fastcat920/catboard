@@ -90,7 +90,7 @@
                 id="verificationCode" 
                 class="form-control" 
                 v-model="formData.verificationCode" 
-                :placeholder="$t('auth.codePlaceholder')"
+                    :placeholder="$t('auth.verificationCodePlaceholder')"
                 :aria-invalid="!!errors.verificationCode"
                 :aria-describedby="errors.verificationCode ? 'register-code-error' : undefined"
                 required
@@ -586,10 +586,10 @@ export default {
       }
       
       if (!formData.confirmPassword) {
-        errors.confirmPassword = t('auth.confirmPasswordRequired');
+        errors.confirmPassword = t('validation.confirmPasswordRequired');
         isValid = false;
       } else if (formData.password !== formData.confirmPassword) {
-        errors.confirmPassword = t('auth.passwordsDoNotMatch');
+        errors.confirmPassword = t('validation.passwordsDontMatch');
         isValid = false;
       }
       

@@ -60,7 +60,7 @@
                 id="verificationCode"
                 class="form-control"
                 v-model="formData.verificationCode"
-                :placeholder="$t('auth.codePlaceholder')"
+                :placeholder="$t('auth.verificationCodePlaceholder')"
                 :aria-invalid="!!errors.verificationCode"
                 :aria-describedby="errors.verificationCode ? 'reset-code-error' : undefined"
               />
@@ -576,10 +576,10 @@ export default {
         isValid = false;
       }
       if (!formData.confirmPassword) {
-        errors.confirmPassword = t('auth.confirmPasswordRequired');
+        errors.confirmPassword = t('validation.confirmPasswordRequired');
         isValid = false;
       } else if (formData.newPassword !== formData.confirmPassword) {
-        errors.confirmPassword = t('auth.passwordsDoNotMatch');
+        errors.confirmPassword = t('validation.passwordsDontMatch');
         isValid = false;
       }
       if (!isValid) return;
@@ -587,9 +587,9 @@ export default {
       try {
         loading.value = true;
         const resetData = {
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.newPassword,
-          email_code: parseInt(formData.verificationCode)
+          email_code: String(formData.verificationCode).trim()
         };
         if (config.is_recaptcha === 1) {
           if (captchaResponse.value) {

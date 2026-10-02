@@ -19,7 +19,7 @@ class NoticeController extends Controller
     
             if (!$notice) {
                 return response([
-                    'message' => 'Notice not found'
+                    'message' => __('Notice does not exist')
                 ], 404);
             }
             ContentLocale::localize($notice, ['title', 'content'], $request);

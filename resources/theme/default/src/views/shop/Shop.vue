@@ -297,7 +297,7 @@ export default {
         }
       } catch (error) {
         console.error('获取套餐数据失败:', error);
-        showToast('获取套餐数据失败', 'error');
+        showToast(t('shop.loadFailed'), 'error');
       } finally {
         loading.plans = false;
       }

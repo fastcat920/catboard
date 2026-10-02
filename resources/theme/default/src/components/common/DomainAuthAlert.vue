@@ -14,8 +14,8 @@
         </svg>
       </div>
       <div class="alert-message">
-        <h3>{{ $t('auth.licenseNotAuthorized', 'N O L I C E N S E F A I L E D') }}</h3>
-        <p>{{ $t('auth.contactAdmin', 'N O L I C E N S E F A I L E D') }}</p>
+        <h3>{{ $t('common.domainNotAuthorized') }}</h3>
+        <p>{{ $t('common.contactAdmin') }}</p>
         <p class="current-domain">{{ apiDomain }}</p>
       </div>
     </div>
@@ -132,4 +132,4 @@ export default {
     }
   }
 }
-</style> 
+</style>

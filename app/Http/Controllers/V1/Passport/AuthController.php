@@ -228,7 +228,7 @@ class AuthController extends Controller
             }
             $user = User::find($userId);
             if (!$user) {
-                abort(500, __('The user does not '));
+                abort(500, __('The user does not exist'));
             }
             if ($user->banned) {
                 abort(500, __('Your account has been suspended'));

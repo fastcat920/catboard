@@ -204,7 +204,7 @@ watch(locale, () => {
 });
 
 const giftCardErrorKeys = {
-  'giftcard cannot be empty': 'profile.giftCardEmpty',
+  'gift card cannot be empty': 'profile.giftCardEmpty',
   'the gift card does not exist': 'profile.giftCardNotFound',
   'the gift card is not yet valid': 'profile.giftCardNotActive',
   'the gift card has expired': 'profile.giftCardExpired',

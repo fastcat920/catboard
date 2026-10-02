@@ -1,7 +1,7 @@
 /**
  * 认证相关API接口
  */
-import request from './request';
+import request, { requestMessage } from './request';
 import store from '@/store';
 import { SITE_CONFIG } from '@/utils/baseConfig';
 
@@ -261,7 +261,7 @@ export const login = async (loginData) => {
   
   // 验证响应数据是否包含必要的字段
   if (!responseData || !(responseData.token || responseData.auth_data)) {
-    throw new Error('登录数据不完整');
+    throw new Error(requestMessage('responseError'));
   }
   
   // 处理登录成功
@@ -353,7 +353,7 @@ export function register(data) {
  * @param {object} data - 重置密码参数
  * @param {string} data.email - 邮箱
  * @param {string} data.password - 新密码
- * @param {number} data.email_code - 邮箱验证码
+ * @param {string} data.email_code - 6 位邮箱验证码
  * @returns {Promise<boolean>} - 是否重置成功
  * 特点：
  * 1. 通过邮箱验证码验证身份

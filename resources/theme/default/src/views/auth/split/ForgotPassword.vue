@@ -74,7 +74,7 @@
                     id="verificationCode"
                     class="form-control"
                     v-model="formData.verificationCode"
-                    :placeholder="$t('auth.codePlaceholder')"
+                    :placeholder="$t('auth.verificationCodePlaceholder')"
                     :aria-invalid="!!errors.verificationCode"
                     :aria-describedby="errors.verificationCode ? 'reset-code-error' : undefined"
                   />
@@ -243,17 +243,17 @@ window.onCaptchaForgotPasswordModalVerified = function(response) {
 let isGoogleModalRecaptchaRendered = false;
 
 // 获取基于时间的问候语
-const getTimeBasedGreeting = () => {
+const getTimeBasedGreeting = translate => {
   const hour = new Date().getHours();
   
   if (hour >= 5 && hour < 12) {
-    return 'Good Morning';
+    return translate('auth.greetingMorning');
   } else if (hour >= 12 && hour < 18) {
-    return 'Good Afternoon';
+    return translate('auth.greetingAfternoon');
   } else if (hour >= 18 && hour < 22) {
-    return 'Good Evening';
+    return translate('auth.greetingEvening');
   } else {
-    return 'Good Night';
+    return translate('auth.greetingNight');
   }
 };
 
@@ -346,9 +346,7 @@ export default {
       return AUTH_LAYOUT_CONFIG?.splitLayout?.leftContent?.greeting?.show !== false;
     });
     
-    const greetingMessage = computed(() => {
-      return getTimeBasedGreeting();
-    });
+    const greetingMessage = computed(() => getTimeBasedGreeting(t));
     
     const greetingColorClass = computed(() => {
       const color = AUTH_LAYOUT_CONFIG?.splitLayout?.leftContent?.greeting?.color || 'white';
@@ -453,7 +451,7 @@ export default {
         }
       } catch (error) {
         console.error('无法获取网站配置:', error);
-        showToast(t('errors.configLoadFailed'), 'error');
+        showToast(t('messages.configLoadFailed'), 'error');
       } finally {
         configLoading.value = false;
       }
@@ -855,10 +853,10 @@ export default {
       
       // 验证确认密码
       if (!formData.confirmPassword) {
-        errors.confirmPassword = t('auth.confirmPasswordRequired');
+        errors.confirmPassword = t('validation.confirmPasswordRequired');
         isValid = false;
       } else if (formData.newPassword !== formData.confirmPassword) {
-        errors.confirmPassword = t('auth.passwordsDoNotMatch');
+        errors.confirmPassword = t('validation.passwordsDontMatch');
         isValid = false;
       }
       
@@ -869,9 +867,9 @@ export default {
         
         // 构建重置密码请求数据
         const resetData = {
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.newPassword,
-          email_code: parseInt(formData.verificationCode)
+          email_code: String(formData.verificationCode).trim()
         };
         
         // 添加验证码数据（如果需要）

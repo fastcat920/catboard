@@ -44,7 +44,7 @@ class CommController extends Controller
         $payment = Payment::where('id', $request->input('id'))
             ->where('payment', 'StripeCredit')
             ->first();
-        if (!$payment) abort(500, 'payment is not found');
+        if (!$payment) abort(500, __('Payment method is not available'));
         return response([
             'data' => $payment->config['stripe_pk_live']
         ]);

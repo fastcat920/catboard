@@ -51,29 +51,6 @@ export function fetchPlanById(id) {
   });
 }
 
-/**
- * verifyCoupon - 验证优惠券
- * @Board @url POST /user/coupon/check
- * @param {string} code - 优惠券代码
- * @param {number|string} planId - 套餐ID
- * @returns {Promise<object>} - 优惠券验证结果
- * 返回数据：
- * - 优惠券类型（金额或比例）
- * - 折扣数值
- * - 有效期信息
- * - 使用限制
- */
-export function verifyCoupon(code, planId) {
-  return request({
-    url: '/user/coupon/check',
-    method: 'post',
-    data: {
-      code: code,
-      plan_id: planId
-    }
-  });
-}
-
 export function fetchCouponWallet() {
   return request({ url: '/user/coupon/wallet', method: 'get' });
 }
@@ -96,7 +73,7 @@ export function previewOrder(data) {
  * @param {object} data - 订单数据
  * @param {number|string} data.plan_id - 套餐ID
  * @param {string} data.period - 支付周期
- * @param {string} [data.coupon_code] - 优惠券代码(可选)
+ * @param {number|null} [data.user_coupon_id] - 用户选择的优惠券 ID
  * @returns {Promise<object>} - 订单创建结果
  * 返回数据：
  * - 订单号

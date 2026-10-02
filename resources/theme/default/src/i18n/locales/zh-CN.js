@@ -90,6 +90,8 @@ export default {
     emailPlaceholder: '请输入您的邮箱地址',
     passwordPlaceholder: '请输入您的密码',
     confirmPasswordPlaceholder: '请再次输入密码',
+    newPassword: '新密码',
+    passwordTooShort: '密码不能少于 8 位',
     emailVerificationSent: '验证码已发送至您的邮箱',
     emailVerificationFailed: '验证码发送失败',
     verificationCodePlaceholder: '请输入验证码',
@@ -125,10 +127,12 @@ export default {
     codeRequired: '请输入验证码',
     codeInvalid: '验证码无效',
     codeSent: '验证码已发送',
+    checkSpam: '如果没有收到邮件，请检查垃圾邮件文件夹',
     sendCodeFailed: '验证码发送失败',
     passwordResetSuccess: '密码重置成功',
     passwordResetFailed: '密码重置失败，请稍后重试',
     inviteCode: '邀请码',
+    inviteCodeRequired: '请输入邀请码',
     agreeToTerms: '我已阅读并同意',
     termsOfService: '服务条款',
     mustAgreeToTerms: '您必须同意服务条款才能注册',
@@ -138,13 +142,21 @@ export default {
     // 验证码相关
     captcha: '人机验证',
     captchaRequired: '请完成人机验证',
+    greetingMorning: '早上好',
+    greetingAfternoon: '下午好',
+    greetingEvening: '晚上好',
+    greetingNight: '晚安',
     captchaInvalid: '人机验证失败，请重试',
     captchaExpired: '验证已过期，请重新验证',
     captchaError: '验证出错，请重试',
     captchaLoading: '正在加载验证组件...',
     // 令牌验证登录相关
     verifyTokenSuccess: '令牌验证成功',
-    verifyTokenFailed: '令牌验证失败，请重试'
+    verifyTokenFailed: '令牌验证失败，请重试',
+    popup: {
+      close_btn: '关闭',
+      wait_close_btn: '{seconds} 秒后关闭'
+    }
   },
   validation: {
     required: '{field}不能为空',
@@ -186,7 +198,8 @@ export default {
     mainText: SITE_CONFIG.landingText['zh-CN'] || '探索全球网络无限可能',
     loginPrompt: '请先登录以使用快猫',
     loginButton: '登录',
-    exploreButton: '开始探索'
+    exploreButton: '开始探索',
+    navigatingToLogin: '正在前往登录页面…'
   },
   dashboard: {
     welcome: '我的账号',
@@ -295,6 +308,7 @@ export default {
   nodes: {
     title: '节点列表',
     loading: '正在加载节点...',
+    loadFailed: '节点列表加载失败',
     noNodes: '暂无可用节点',
     copiedToClipboard: '已复制到剪贴板',
     welcome: {
@@ -322,6 +336,7 @@ export default {
   orders: {
     title: '订单记录',
     loading: '正在加载订单...',
+    loadFailed: '订单记录加载失败',
     tradeNo: '订单号',
     createdAt: '创建时间',
     cycle: '周期',
@@ -336,6 +351,7 @@ export default {
     cancelConfirmText: '您确定要取消此订单吗？此操作无法撤销。',
     cancelSuccess: '订单已取消',
     cancelFailed: '取消订单失败',
+    defaultOrderName: '套餐订单',
     welcome: {
       title: '订单记录',
       description: '查看并管理您的订单'
@@ -385,6 +401,8 @@ export default {
     
     // 操作提示
     formIncomplete: '请填写完整的工单信息',
+    subjectRequired: '请输入工单标题',
+    messageRequired: '请输入问题描述',
     createSuccess: '工单创建成功',
     createError: '工单创建失败',
     fetchError: '获取工单列表失败',
@@ -605,6 +623,7 @@ export default {
     checkout_best_price: '结算时将与账户优惠券及会员等级折扣自动择优',
     sale_countdown: '{days}天 {hours}小时 {minutes}分',
     loading: '正在加载套餐...',
+    loadFailed: '套餐数据加载失败',
     filter: {
       all: '全部',
       recurring: '周期性',
@@ -674,16 +693,6 @@ export default {
     existing_plan_warning_title: '您已有一个有效套餐',
     existing_plan_warning_desc: '购买新套餐将替换您当前的有效套餐',
     select_period: '选择计费周期',
-    coupon: '优惠码',
-    enter_coupon: '输入优惠码（如有）',
-    verify_coupon: '验证',
-    coupon_applied: '已应用',
-    remove_coupon: '移除',
-    coupon_success: '优惠码 {code} 应用成功',
-    coupon_success_fixed: '优惠码 {code} 应用成功，优惠 {amount} 元',
-    coupon_success_percent: '优惠码 {code} 应用成功，优惠 {percent}%',
-    coupon_invalid: '无效的优惠码',
-    coupon_removed: '优惠码已移除',
     order_summary: '订单摘要',
     subtotal: '小计',
     plan_amount: '套餐原价',
@@ -787,6 +796,7 @@ export default {
     check_timeout: '检测支付状态超时，请稍后重试',
     payment_pending: '支付处理中，请稍后再检查',
     payment_returned_unpaid: '尚未完成支付，您可以重新发起支付',
+    unknown_status_desc: '订单状态未知，请稍后刷新',
     copy_success: '已复制到剪贴板',
     copy_failed: '复制失败，请手动复制',
     check_manually: '点击检查',
@@ -809,6 +819,11 @@ export default {
   },
   // 邀请页面
   invite: {
+    confirm: {
+      title: '操作确认',
+      cancel: '取消',
+      confirm: '确认'
+    },
     ticketAction: '工单',
     commissionRate: '佣金比例',
     nextLevel: '下一等级',
@@ -1003,6 +1018,7 @@ export default {
     recommendText: '请使用以下推荐的浏览器访问：',
     currentBrowser: '您当前正在使用：',
     currentUrl: '当前网址：',
+    download: '下载',
     downloadChrome: '下载 Chrome 浏览器',
     downloadEdge: '下载 Edge 浏览器',
     downloadSafari: '下载 Safari 浏览器',
@@ -1043,7 +1059,10 @@ export default {
     trafficLogDesc: '查看详细的流量使用记录和统计',
     trafficChart: '流量趋势图'
   },
-  couponCenter: { title: '我的优惠券' },
+  couponCenter: {
+    title: '我的优惠券',
+    availableCount: '{count} 张可用优惠券'
+  },
   wallet: {
     title: '钱包余额',
     autoRenewal: { title: '自动续费', description: '套餐到期前将使用账户余额自动续费，请确保余额充足。', noPlan: '购买套餐后可开启自动续费。', enabled: '自动续费已开启', disabled: '自动续费已关闭', failed: '自动续费设置失败' },

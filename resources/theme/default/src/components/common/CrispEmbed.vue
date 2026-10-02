@@ -256,7 +256,7 @@ export default {
         const resetDays = calculateDaysUntilReset();
         
         const sessionData = {
-          email: userEmail || 'Unknown',
+          email: userEmail || (locale.value === 'en-US' ? 'Unknown' : '未知'),
           plan: planName,
           expires: expireDate,
           used_traffic: usedTrafficGB + ' GB',
@@ -443,8 +443,8 @@ export default {
           }
         }
       }
-      if (resetDay === null || resetDay === undefined) return 'N/A';
-      if (resetDay === 0) return 'Today';
+      if (resetDay === null || resetDay === undefined) return locale.value === 'en-US' ? 'N/A' : '暂无';
+      if (resetDay === 0) return locale.value === 'en-US' ? 'Today' : '今天';
       const now = new Date();
       const currentDay = now.getDate();
       const currentMonth = now.getMonth();
@@ -457,7 +457,7 @@ export default {
       }
       const diffTime = nextReset - now;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays + ' days';
+      return locale.value === 'en-US' ? `${diffDays} days` : `${diffDays} 天`;
     };
 
 

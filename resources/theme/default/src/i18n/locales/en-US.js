@@ -88,6 +88,8 @@ export default {
     emailPlaceholder: 'Please enter your email address',
     passwordPlaceholder: 'Please enter your password',
     confirmPasswordPlaceholder: 'Please confirm your password',
+    newPassword: 'New password',
+    passwordTooShort: 'Password must be at least 8 characters',
     emailVerificationSent: 'Verification code has been sent to your email',
     emailVerificationFailed: 'Failed to send verification code',
     verificationCodePlaceholder: 'Please enter verification code',
@@ -121,10 +123,12 @@ export default {
     codeRequired: 'Please enter verification code',
     codeInvalid: 'Invalid verification code',
     codeSent: 'Verification code sent',
+    checkSpam: 'If the email has not arrived, please check your spam folder',
     sendCodeFailed: 'Failed to send verification code',
     passwordResetSuccess: 'Password reset successful',
     passwordResetFailed: 'Password reset failed, please try again later',
     inviteCode: 'Invite Code',
+    inviteCodeRequired: 'Please enter an invitation code',
     agreeToTerms: 'I have read and agree to the',
     termsOfService: 'Terms of Service',
     mustAgreeToTerms: 'You must agree to the Terms of Service to register',
@@ -133,12 +137,20 @@ export default {
     requiresAuth: 'Login Required',
     captcha: 'Verification',
     captchaRequired: 'Please complete verification',
+    greetingMorning: 'Good Morning',
+    greetingAfternoon: 'Good Afternoon',
+    greetingEvening: 'Good Evening',
+    greetingNight: 'Good Night',
     captchaInvalid: 'Verification failed, please try again',
     captchaExpired: 'Verification expired, please verify again',
     captchaError: 'Verification error, please try again',
     captchaLoading: 'Loading verification component...',
     verifyTokenSuccess: 'Token verification successful',
-    verifyTokenFailed: 'Token verification failed, please try again'
+    verifyTokenFailed: 'Token verification failed, please try again',
+    popup: {
+      close_btn: 'Close',
+      wait_close_btn: 'Close in {seconds}s'
+    }
   },
   validation: {
     required: '{field} is required',
@@ -180,7 +192,8 @@ export default {
     mainText: SITE_CONFIG.landingText['en-US'] || 'Explore Unlimited Global Network Possibilities',
     loginPrompt: 'Please sign in to use Fastcat',
     loginButton: 'Sign In',
-    exploreButton: 'Start Exploring'
+    exploreButton: 'Start Exploring',
+    navigatingToLogin: 'Opening the sign-in page…'
   },
   dashboard: {
     welcome: 'My Account',
@@ -282,6 +295,7 @@ export default {
   nodes: {
     title: 'Node List',
     loading: 'Loading nodes...',
+    loadFailed: 'Failed to load nodes',
     noNodes: 'No nodes available',
     copiedToClipboard: 'Copied to clipboard',
     welcome: {
@@ -308,6 +322,7 @@ export default {
   orders: {
     title: 'Order records',
     loading: 'Loading orders...',
+    loadFailed: 'Failed to load orders',
     tradeNo: 'Order No.',
     createdAt: 'Created At',
     cycle: 'Cycle',
@@ -322,6 +337,7 @@ export default {
     cancelConfirmText: 'Are you sure you want to cancel this order? This action cannot be undone.',
     cancelSuccess: 'Order cancelled',
     cancelFailed: 'Failed to cancel order',
+    defaultOrderName: 'Plan order',
     welcome: {
       title: 'Order records',
       description: 'View and manage your orders'
@@ -359,6 +375,8 @@ export default {
     loadingMessages: 'Loading messages...',
     loadingTickets: 'Loading tickets...',
     formIncomplete: 'Please complete all required fields',
+    subjectRequired: 'Please enter a ticket subject',
+    messageRequired: 'Please describe your issue',
     createSuccess: 'Ticket created successfully',
     createError: 'Failed to create ticket',
     fetchError: 'Failed to fetch tickets',
@@ -560,6 +578,7 @@ export default {
     checkout_best_price: 'The best final price will be selected against coupons and membership discounts at checkout',
     sale_countdown: '{days}d {hours}h {minutes}m',
     loading: 'Loading plans...',
+    loadFailed: 'Failed to load plan data',
     filter: {
       all: 'All',
       recurring: 'Recurring',
@@ -628,16 +647,6 @@ export default {
     existing_plan_warning_title: 'You already have an active plan',
     existing_plan_warning_desc: 'Purchasing a new plan will replace your current active plan',
     select_period: 'Select Billing Cycle',
-    coupon: 'Coupon Code',
-    enter_coupon: 'Enter coupon code (if any)',
-    verify_coupon: 'Verify',
-    coupon_applied: 'Applied',
-    remove_coupon: 'Remove',
-    coupon_success: 'Coupon {code} applied successfully',
-    coupon_success_fixed: 'Coupon {code} applied successfully, saved {amount}',
-    coupon_success_percent: 'Coupon {code} applied successfully, saved {percent}%',
-    coupon_invalid: 'Invalid coupon code',
-    coupon_removed: 'Coupon removed',
     order_summary: 'Order Summary',
     subtotal: 'Subtotal',
     plan_amount: 'Plan Price',
@@ -741,6 +750,7 @@ export default {
     check_timeout: 'Payment status check timeout, please try again later',
     payment_pending: 'Payment is being processed, please check again later',
     payment_returned_unpaid: 'Payment was not completed. You can try again.',
+    unknown_status_desc: 'The order status is unknown. Please refresh and try again.',
     copy_success: 'Copied to clipboard',
     copy_failed: 'Copy failed, please copy manually',
     check_manually: 'Click to Check',
@@ -762,6 +772,11 @@ export default {
     }
   },
   invite: {
+    confirm: {
+      title: 'Confirm action',
+      cancel: 'Cancel',
+      confirm: 'Confirm'
+    },
     ticketAction: 'Tickets',
     commissionRate: 'Commission rate',
     nextLevel: 'Next level',
@@ -954,6 +969,7 @@ export default {
     recommendText: 'Please access using one of the following recommended browsers:',
     currentBrowser: 'You are currently using:',
     currentUrl: 'Current URL:',
+    download: 'Download',
     downloadChrome: 'Download Chrome',
     downloadEdge: 'Download Edge',
     downloadSafari: 'Download Safari',
@@ -993,7 +1009,10 @@ export default {
     trafficLogDesc: 'View detailed traffic usage records and statistics',
     trafficChart: 'Traffic Trend Chart'
   },
-  couponCenter: { title: 'My coupons' },
+  couponCenter: {
+    title: 'My coupons',
+    availableCount: 'Available coupons: {count}'
+  },
   wallet: {
     title: 'Wallet balance',
     autoRenewal: { title: 'Auto renewal', description: 'Your balance will be used to renew the plan before it expires. Keep enough balance available.', noPlan: 'Purchase a plan to enable auto renewal.', enabled: 'Auto renewal enabled', disabled: 'Auto renewal disabled', failed: 'Failed to update auto renewal' },

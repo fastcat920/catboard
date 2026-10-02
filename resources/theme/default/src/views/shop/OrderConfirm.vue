@@ -643,7 +643,7 @@ export default {
         }
       } catch (error) {
         console.error('获取用户信息失败:', error);
-        showToast(error.response?.message || error.message || t('dashboard.userinfo_error'), 'error');
+        showToast(error.response?.message || error.message || t('nodes.userInfoError'), 'error');
       } finally {
         loading.userInfo = false;
       }

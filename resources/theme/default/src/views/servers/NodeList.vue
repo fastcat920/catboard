@@ -112,7 +112,7 @@ const fetchUserInfo = async () => {
     if (res?.data) userInfo.value = res.data;
   } catch (err) {
     console.error('获取用户信息失败:', err);
-    showToast(t('common.userInfoError') || '获取用户信息失败', 'error');
+    showToast(t('nodes.userInfoError'), 'error');
   }
 };
 
@@ -125,7 +125,7 @@ const fetchNodes = async () => {
     nodes.value = res?.data || [];
   } catch (err) {
     console.error('获取节点列表失败:', err);
-    error.value = err.message || t('common.networkError') || '网络错误';
+    error.value = err?.response?.message || t('nodes.loadFailed');
     showToast(error.value, 'error');
   } finally {
     loading.value = false;

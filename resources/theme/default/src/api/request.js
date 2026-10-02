@@ -18,6 +18,33 @@ const request = axios.create({
 });
 
 let isRedirectingToLogin = false;
+const requestMessages = {
+  'zh-CN': {
+    configError: '请求配置错误',
+    responseError: '响应数据处理错误',
+    sessionExpired: '登录已过期，请重新登录',
+    badRequest: '请求参数错误',
+    unauthorized: '未授权，请重新登录',
+    forbidden: '拒绝访问',
+    notFound: '请求的资源不存在',
+    failed: '请求失败',
+    timeout: '请求超时',
+    network: '网络错误，请检查您的网络连接'
+  },
+  'en-US': {
+    configError: 'Request configuration error',
+    responseError: 'Failed to process response data',
+    sessionExpired: 'Your session has expired. Please sign in again',
+    badRequest: 'Invalid request parameters',
+    unauthorized: 'Unauthorized. Please sign in again',
+    forbidden: 'Access denied',
+    notFound: 'The requested resource was not found',
+    failed: 'Request failed',
+    timeout: 'Request timed out',
+    network: 'Network error. Please check your connection'
+  }
+};
+export const requestMessage = key => (requestMessages[getRequestLocale()] || requestMessages['zh-CN'])[key];
 const isAuthExpiredMessage = message => typeof message === 'string' && /未登录|未登陆|登录.*过期|登陆.*过期|unauthenticated|token.*(expired|invalid)/i.test(message);
 const handleSessionExpired = message => {
   if (isRedirectingToLogin) return;
@@ -173,7 +200,7 @@ request.interceptors.request.use(
   },
   error => {
     console.error('请求拦截器错误:', error);
-    return Promise.reject(new Error('请求配置错误'));
+    return Promise.reject(new Error(requestMessage('configError')));
   }
 );
 
@@ -194,7 +221,7 @@ request.interceptors.response.use(
       return res;
     } catch (err) {
       console.error('响应数据处理错误:', err);
-      return Promise.reject(new Error('响应数据处理错误'));
+      return Promise.reject(new Error(requestMessage('responseError')));
     }
   },
   error => {
@@ -205,7 +232,7 @@ request.interceptors.response.use(
     const responseMessage = error.response?.data?.message;
     const requestHadAuth = Boolean(error.config?.headers?.Authorization);
     if ((statusCode === 401 || isAuthExpiredMessage(responseMessage)) && requestHadAuth && error.config?.skipAuth !== true) {
-      handleSessionExpired(responseMessage || '登录已过期，请重新登录');
+      handleSessionExpired(responseMessage || requestMessage('sessionExpired'));
     }
 
     // 确保error.response.message存在，便于页面使用
@@ -215,17 +242,17 @@ request.interceptors.response.use(
     } else if (error.response) {
       // 根据HTTP状态码设置通用错误信息
       switch (error.response.status) {
-        case 400: error.response.message = '请求参数错误'; break;
-        case 401: error.response.message = '未授权，请重新登录'; break;
-        case 403: error.response.message = '拒绝访问'; break;
-        case 404: error.response.message = '请求的资源不存在'; break;
-        default: error.response.message = `请求失败 (${statusCode})`;
+        case 400: error.response.message = requestMessage('badRequest'); break;
+        case 401: error.response.message = requestMessage('unauthorized'); break;
+        case 403: error.response.message = requestMessage('forbidden'); break;
+        case 404: error.response.message = requestMessage('notFound'); break;
+        default: error.response.message = `${requestMessage('failed')} (${statusCode})`;
       }
     } else if (error.message) {
       if (error.message.includes('timeout')) {
-        error.message = '请求超时';
+        error.message = requestMessage('timeout');
       } else if (error.message.includes('Network Error')) {
-        error.message = '网络错误，请检查您的网络连接';
+        error.message = requestMessage('network');
       }
     }
     

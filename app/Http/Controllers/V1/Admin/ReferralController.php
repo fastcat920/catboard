@@ -207,30 +207,90 @@ class ReferralController extends Controller
         $from = strtotime('-' . ($days - 1) . ' days midnight');
         $visits = ReferralVisit::where('created_at', '>=', $from);
         $registrations = User::whereNotNull('invite_user_id')->where('created_at', '>=', $from);
-        $firstOrders = Order::whereNotNull('invite_user_id')->where('type', 1)->where('status', 3)->where('created_at', '>=', $from);
+        $firstCompletedPlanOrderIds = function () {
+            return Order::where('status', 3)
+                ->whereIn('type', [1, 2, 3])
+                ->selectRaw('MIN(id)')
+                ->groupBy('user_id');
+        };
+        $registrationUserIds = function () use ($from) {
+            return User::whereNotNull('invite_user_id')
+                ->where('created_at', '>=', $from)
+                ->select('id');
+        };
+        $completedPlanOrders = Order::whereNotNull('invite_user_id')
+            ->where('status', 3)
+            ->whereIn('type', [1, 2, 3])
+            ->where('created_at', '>=', $from);
+        $firstOrders = Order::whereNotNull('invite_user_id')
+            ->whereIn('id', $firstCompletedPlanOrderIds())
+            ->where('created_at', '>=', $from);
+        $repeatPurchases = Order::whereNotNull('invite_user_id')
+            ->where('type', 1)
+            ->where('status', 3)
+            ->whereNotIn('id', $firstCompletedPlanOrderIds())
+            ->where('created_at', '>=', $from);
         $renewals = Order::whereNotNull('invite_user_id')->where('type', 2)->where('status', 3)->where('created_at', '>=', $from);
+        $planChanges = Order::whereNotNull('invite_user_id')->where('type', 3)->where('status', 3)->where('created_at', '>=', $from);
         $rewards = ReferralReward::where('created_at', '>=', $from);
         $trend = [];
         for ($i = 0; $i < $days; $i++) {
             $start = $from + $i * 86400; $end = $start + 86400;
-            $trend[] = ['date' => date('Y-m-d', $start), 'visits' => (clone $visits)->whereBetween('created_at', [$start, $end - 1])->count(), 'registrations' => (clone $registrations)->whereBetween('created_at', [$start, $end - 1])->count(), 'first_orders' => (clone $firstOrders)->whereBetween('created_at', [$start, $end - 1])->count(), 'renewals' => (clone $renewals)->whereBetween('created_at', [$start, $end - 1])->count()];
+            $trend[] = [
+                'date' => date('Y-m-d', $start),
+                'visits' => (clone $visits)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'registrations' => (clone $registrations)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'first_orders' => (clone $firstOrders)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'repeat_purchases' => (clone $repeatPurchases)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'renewals' => (clone $renewals)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'plan_changes' => (clone $planChanges)->whereBetween('created_at', [$start, $end - 1])->count(),
+            ];
         }
         $aggregate = function (array $rows, string $format) {
             return collect($rows)->groupBy(function ($row) use ($format) { return date($format, strtotime($row['date'])); })->map(function ($items, $key) {
-                return ['date'=>$key,'visits'=>$items->sum('visits'),'registrations'=>$items->sum('registrations'),'first_orders'=>$items->sum('first_orders'),'renewals'=>$items->sum('renewals')];
+                return [
+                    'date' => $key,
+                    'visits' => $items->sum('visits'),
+                    'registrations' => $items->sum('registrations'),
+                    'first_orders' => $items->sum('first_orders'),
+                    'repeat_purchases' => $items->sum('repeat_purchases'),
+                    'renewals' => $items->sum('renewals'),
+                    'plan_changes' => $items->sum('plan_changes'),
+                ];
             })->values();
         };
-        $revenue = (int)(clone $firstOrders)->sum('total_amount');
+        $revenue = (int)(clone $completedPlanOrders)->sum('total_amount');
         $rewardCost = (int)(clone $rewards)->whereIn('reward_type', ['balance', 'commission_balance'])->where('status', 'granted')->sum('reward_value');
-        $firstBuyers = (clone $firstOrders)->distinct()->count('user_id');
-        $renewalUsers = (clone $renewals)->distinct()->count('user_id');
+        $cohortFirstBuyers = Order::whereIn('id', $firstCompletedPlanOrderIds())
+            ->whereIn('user_id', $registrationUserIds())
+            ->count();
+        $renewalUsers = Order::where('type', 2)
+            ->where('status', 3)
+            ->whereIn('user_id', $registrationUserIds())
+            ->distinct()
+            ->count('user_id');
+        $registrationCount = (clone $registrations)->count();
         return response(['data' => [
-            'summary' => ['visits' => (clone $visits)->count(), 'registrations' => (clone $registrations)->count(), 'verified' => config('v2board.email_verify') ? (clone $registrations)->count() : null, 'first_orders' => (clone $firstOrders)->count(), 'renewal_users' => $renewalUsers, 'renewal_rate' => $firstBuyers ? round($renewalUsers * 100 / $firstBuyers, 2) : 0, 'pending_rewards' => (clone $rewards)->where('status', 'pending')->count(), 'reversed_rewards' => (clone $rewards)->where('status', 'reversed')->count(), 'revenue' => $revenue, 'reward_cost' => $rewardCost, 'roi' => $rewardCost ? round(($revenue - $rewardCost) / $rewardCost, 2) : null],
+            'summary' => [
+                'visits' => (clone $visits)->count(),
+                'registrations' => $registrationCount,
+                'verified' => config('v2board.email_verify') ? $registrationCount : null,
+                'first_orders' => (clone $firstOrders)->count(),
+                'first_purchase_users' => $cohortFirstBuyers,
+                'registration_to_first_rate' => $registrationCount ? round($cohortFirstBuyers * 100 / $registrationCount, 2) : 0,
+                'renewal_users' => $renewalUsers,
+                'renewal_rate' => $cohortFirstBuyers ? round($renewalUsers * 100 / $cohortFirstBuyers, 2) : 0,
+                'pending_rewards' => (clone $rewards)->where('status', 'pending')->count(),
+                'reversed_rewards' => (clone $rewards)->where('status', 'reversed')->count(),
+                'revenue' => $revenue,
+                'reward_cost' => $rewardCost,
+                'roi' => $rewardCost ? round(($revenue - $rewardCost) / $rewardCost, 2) : null,
+            ],
             'trend' => $trend,
             'weekly_trend' => $aggregate($trend, 'o-W'),
             'monthly_trend' => $aggregate($trend, 'Y-m'),
             'channels' => ReferralVisit::where('created_at', '>=', $from)->select('channel', DB::raw('COUNT(*) visits'), DB::raw('COUNT(user_id) registrations'))->groupBy('channel')->orderBy('visits', 'DESC')->get(),
-            'plans' => Order::whereNotNull('invite_user_id')->where('type', 1)->where('status', 3)->where('created_at', '>=', $from)->select('plan_id', DB::raw('COUNT(*) orders'), DB::raw('SUM(total_amount) revenue'))->groupBy('plan_id')->orderBy('orders', 'DESC')->get(),
+            'plans' => (clone $completedPlanOrders)->select('plan_id', DB::raw('COUNT(*) orders'), DB::raw('SUM(total_amount) revenue'))->groupBy('plan_id')->orderBy('orders', 'DESC')->get(),
         ]]);
     }
 

@@ -241,12 +241,6 @@
                   <div class="summary-value refund">+{{ currencySymbol }}{{ (refundAmount / 100).toFixed(2) }}</div>
                 </div>
 
-                <div class="summary-divider"></div>
-
-                <div class="summary-row">
-                  <div class="summary-label">{{ $t('order.order_amount') }}</div>
-                  <div class="summary-value">{{ currencySymbol }}{{ (orderAmount / 100).toFixed(2) }}</div>
-                </div>
                 <div class="summary-row" v-if="balanceAmount > 0">
                   <div class="summary-label">{{ $t('order.balance_amount') }}</div>
                   <div class="summary-value discount">-{{ currencySymbol }}{{ (balanceAmount / 100).toFixed(2) }}</div>

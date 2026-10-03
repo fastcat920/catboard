@@ -77,10 +77,6 @@
                 <div class="info-label">{{ $t('payment.refund_amount') }}</div>
                 <div class="info-value refund">+{{ formatAmount(orderDetail.refund_amount) }}</div>
               </div>
-              <div class="info-row subtotal-row" v-if="orderDetail.period !== 'deposit'">
-                <div class="info-label">{{ $t('payment.order_amount') }}</div>
-                <div class="info-value">{{ formatAmount(orderAmountBeforeBalance) }}</div>
-              </div>
               <div class="info-row" v-if="orderDetail.balance_amount !== null && orderDetail.balance_amount !== undefined && orderDetail.balance_amount > 0">
                 <div class="info-label">{{ $t('payment.use_credit') }}</div>
                 <div class="info-value discount">-{{ formatAmount(orderDetail.balance_amount) }}</div>
@@ -90,7 +86,7 @@
                 <div class="info-value fee">{{ formatAmount(handleFeeAmount) }}</div>
               </div>
               <div class="info-row final-row">
-                <div class="info-label">{{ $t('payment.payable_amount') }}</div>
+                <div class="info-label">{{ orderDetail.status === 3 || orderDetail.status === 4 || paymentSuccessful ? $t('payment.paid_amount') : $t('payment.payable_amount') }}</div>
                 <div class="info-value final">{{ formatAmount(totalWithFee) }}</div>
               </div>
             </div>
@@ -936,7 +932,6 @@ export default {
       .info-value { flex: 1; color: var(--text-color); font-weight: 500; font-size: 14px; }
       .trade-no-value { font-size: 10px; }
       .refund { color: var(--success-color); font-weight: 600; }
-      &.subtotal-row { border-top: 1px dashed var(--border-color); padding-top: 15px; }
       &.final-row { border-top: 1px dashed var(--border-color); padding-top: 15px; .final { font-size: 24px; font-weight: 700; color: var(--theme-color); } }
       &.discount-row .discount { color: #f44336; }
     }

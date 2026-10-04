@@ -33,7 +33,10 @@ class ClientRemoteConfigController extends Controller
                 'published' => $published ? $this->configRow($published, true) : null,
                 'versions' => ClientRemoteConfig::orderByDesc('config_version')->limit(50)->get()->map(function ($row) { return $this->configRow($row); }),
                 'targets' => ClientStorageTarget::orderByDesc('is_primary')->orderBy('id')->get()->map(function ($row) { return $this->targetRow($row); }),
-                'publications' => ClientConfigPublication::with('target:id,name,provider')->orderByDesc('id')->limit(100)->get(),
+                'publications' => ClientConfigPublication::with([
+                    'target:id,name,provider',
+                    'config:id,config_version,encryption_mode,change_summary',
+                ])->orderByDesc('id')->limit(100)->get(),
                 'settings' => [
                     'encryption_mode' => $setting->encryption_mode,
                     'has_xor_key' => (bool)$setting->legacy_xor_key_encrypted,

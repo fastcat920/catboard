@@ -432,13 +432,61 @@
             '<section class="client-panel"><div class="client-section-head"><div><h3>发布流水</h3><p>队列状态、远端校验结果和失败原因会保留在这里。</p></div></div><div class="table-responsive"><table class="table table-hover table-vcenter"><thead><tr><th>版本</th><th>目标</th><th>状态</th><th>尝试</th><th>完成时间</th><th>结果</th><th>操作</th></tr></thead><tbody>' +
             (publications.length ? publications.map(function (row) {
                 var version = versions.find(function (item) { return Number(item.id) === Number(row.config_id); });
-                return '<tr><td>v' + esc(version ? version.config_version : row.config_id) + '</td><td><strong>' + esc(row.target ? row.target.name : "已删除目标") + '</strong><small>' + esc(row.target ? providerName(row.target.provider) : "-") + '</small></td><td>' + statusBadge(row.status) + '</td><td>' + esc(row.attempts) + '</td><td>' + dateTime(row.finished_at) + '</td><td class="client-publication-result">' + (row.error ? '<span class="text-danger" title="' + esc(row.error) + '">' + esc(row.error) + '</span>' : (row.public_url ? '<a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">打开配置</a>' : '-')) + '</td><td>' + (row.status === 'failed' ? '<button class="btn btn-sm btn-light" data-retry="' + row.id + '">重试</button>' : '-') + '</td></tr>';
+                var configVersion = row.config ? row.config.config_version : (version ? version.config_version : row.config_id);
+                var actions = '<button class="btn btn-sm btn-light" data-publication-detail="' + row.id + '">详情</button>';
+                if (row.public_url) actions += '<button class="btn btn-sm btn-light" data-publication-copy="' + row.id + '">复制链接</button>';
+                if (row.status === 'failed') actions += '<button class="btn btn-sm btn-primary" data-retry="' + row.id + '">重试</button>';
+                return '<tr><td>v' + esc(configVersion) + '</td><td><strong>' + esc(row.target ? row.target.name : "已删除目标") + '</strong><small>' + esc(row.target ? providerName(row.target.provider) : "-") + '</small></td><td>' + statusBadge(row.status) + '</td><td>' + esc(row.attempts) + '</td><td>' + dateTime(row.finished_at) + '</td><td class="client-publication-result">' + (row.error ? '<span class="text-danger" title="' + esc(row.error) + '">' + esc(row.error) + '</span>' : (row.public_url ? '<a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">打开配置</a>' : '-')) + '</td><td><div class="client-row-actions">' + actions + '</div></td></tr>';
             }).join("") : '<tr><td colspan="7" class="text-center text-muted p-4">暂无发布记录</td></tr>') + '</tbody></table></div></section>');
         root.querySelectorAll("[data-clone]").forEach(function (button) { button.onclick = function () { cloneVersion(Number(button.dataset.clone)); }; });
         root.querySelectorAll("[data-edit-version]").forEach(function (button) { button.onclick = function () { editVersion(Number(button.dataset.editVersion)); }; });
         root.querySelectorAll("[data-drop-version]").forEach(function (button) { button.onclick = function () { dropVersion(Number(button.dataset.dropVersion)); }; });
         root.querySelectorAll("[data-publish]").forEach(function (button) { button.onclick = function () { openPublish(Number(button.dataset.publish)); }; });
         root.querySelectorAll("[data-retry]").forEach(function (button) { button.onclick = function () { retryPublication(Number(button.dataset.retry)); }; });
+        root.querySelectorAll("[data-publication-detail]").forEach(function (button) { button.onclick = function () {
+            var row = publications.find(function (item) { return Number(item.id) === Number(button.dataset.publicationDetail); });
+            if (row) showPublicationDetail(row);
+        }; });
+        root.querySelectorAll("[data-publication-copy]").forEach(function (button) { button.onclick = function () {
+            var row = publications.find(function (item) { return Number(item.id) === Number(button.dataset.publicationCopy); });
+            if (row && row.public_url) copyText(row.public_url);
+        }; });
+    }
+
+    function showPublicationDetail(row) {
+        var configVersion = row.config ? row.config.config_version : row.config_id;
+        var details = [
+            ["配置版本", "v" + configVersion],
+            ["发布目标", row.target ? row.target.name : "已删除目标"],
+            ["云服务商", row.target ? providerName(row.target.provider) : "-"],
+            ["当前状态", statusName(row.status)],
+            ["执行次数", row.attempts || 0],
+            ["对象路径", row.object_key || "-"],
+            ["开始时间", dateTime(row.started_at)],
+            ["完成时间", dateTime(row.finished_at)],
+            ["ETag", row.etag || "-"],
+            ["SHA-256", row.checksum || "-"],
+        ];
+        var body = '<div class="client-publication-detail">' + details.map(function (item) {
+            return '<div><span>' + esc(item[0]) + '</span><strong>' + esc(item[1]) + '</strong></div>';
+        }).join("") + '</div>' +
+            (row.public_url ? '<div class="client-publication-block"><span>公开地址</span><a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">' + esc(row.public_url) + '</a></div>' : '') +
+            (row.error ? '<div class="client-publication-block is-error"><span>失败原因</span><p>' + esc(row.error) + '</p></div>' : '');
+        var footer = '<button class="btn btn-light" data-close>关闭</button>' +
+            (row.public_url ? '<button class="btn btn-light" data-copy-detail>复制链接</button>' : '') +
+            (row.status === 'failed' ? '<button class="btn btn-primary" data-retry-detail>重新发布</button>' : '');
+        var modal = makeModal("发布详情", body, footer);
+        var copyButton = modal.querySelector("[data-copy-detail]");
+        if (copyButton) copyButton.onclick = function () { copyText(row.public_url); };
+        var retryButton = modal.querySelector("[data-retry-detail]");
+        if (retryButton) retryButton.onclick = function () {
+            retryButton.disabled = true;
+            api("/publication/retry", { method: "POST", body: JSON.stringify({ id: row.id }) }).then(function () {
+                modal.remove();
+                toast("任务已重新进入队列");
+                load();
+            }).catch(function (error) { alert(error.message); retryButton.disabled = false; });
+        };
     }
 
     function openPublish(configId) {
@@ -492,6 +540,9 @@
 
     function providerName(value) { return ({ aliyun_oss: "阿里云 OSS", tencent_cos: "腾讯云 COS", ucloud_us3: "UCloud US3" })[value] || value; }
     function modeName(value) { return ({ xor_base64: "XOR + Base64", signed_xor_v2: "签名加密 v2", plain: "明文 JSON" })[value] || value; }
+    function statusName(value) {
+        return ({ draft: "草稿", publishing: "发布中", published: "已发布", partial: "部分失败", archived: "历史版本", queued: "等待队列", success: "成功", failed: "失败" })[value] || value;
+    }
     function statusBadge(value) {
         var map = { draft: ["草稿", "secondary"], publishing: ["发布中", "warning"], published: ["已发布", "success"], partial: ["部分失败", "danger"], archived: ["历史版本", "light"], queued: ["等待队列", "warning"], success: ["成功", "success"], failed: ["失败", "danger"] };
         var item = map[value] || [value, "secondary"];

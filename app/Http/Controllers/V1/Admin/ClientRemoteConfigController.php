@@ -191,12 +191,27 @@ class ClientRemoteConfigController extends Controller
             throw ValidationException::withMessages(['target' => '上传测试失败：' . $error->getMessage()]);
         }
         $url = $storage->publicUrlFor($target, $key);
+        $verificationError = null;
         try {
             $storage->verifyPublicObject($url, $body);
         } catch (\Throwable $error) {
-            throw ValidationException::withMessages(['target' => '文件已上传，但公开读取失败：' . $error->getMessage() . '。请确认 Bucket 未开启“阻止公共访问”，且 AccessKey 具有设置对象 ACL 的权限。']);
+            $verificationError = $error;
         }
-        return response(['data' => ['success' => true, 'url' => $url]]);
+        $cleanupError = null;
+        try {
+            $storage->deleteObject($target, $key);
+        } catch (\Throwable $error) {
+            $cleanupError = $error;
+        }
+        if ($verificationError) {
+            $cleanupMessage = $cleanupError ? '；此外，测试文件未能自动删除：' . $cleanupError->getMessage() : '';
+            throw ValidationException::withMessages(['target' => '文件已上传，但公开读取失败：' . $verificationError->getMessage() . '。请确认 Bucket 未开启“阻止公共访问”，且 AccessKey 具有设置对象 ACL 的权限' . $cleanupMessage . '。']);
+        }
+        return response(['data' => [
+            'success' => true,
+            'url' => $url,
+            'cleanup_warning' => $cleanupError ? $cleanupError->getMessage() : null,
+        ]]);
     }
 
     public function preview(Request $request, ClientConfigCryptoService $crypto)

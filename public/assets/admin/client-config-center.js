@@ -55,7 +55,12 @@
     }
 
     function isRoute() {
-        return location.hash === "#/client-config" || location.pathname === "/client-config";
+        return location.hash === "#/client-config";
+    }
+
+    function routeUrl() {
+        var securePath = String((window.settings && window.settings.secure_path) || "").replace(/^\/+|\/+$/g, "");
+        return "/" + securePath + "/#/client-config";
     }
 
     function closeOthers() {
@@ -317,11 +322,15 @@
         setContent('<section class="client-panel"><div class="client-section-head"><div><h3>云存储目标</h3><p>支持阿里云 OSS、腾讯云 COS 和 UCloud US3，可同时发布到多个地址。</p></div><button class="btn btn-primary" data-add-target>新增目标</button></div>' +
             '<div class="table-responsive"><table class="table table-hover table-vcenter"><thead><tr><th>名称</th><th>服务商</th><th>Bucket / Endpoint</th><th>固定地址</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
             (rows.length ? rows.map(function (row) {
-                return '<tr><td><strong>' + esc(row.name) + '</strong>' + (row.is_primary ? '<span class="badge badge-primary ml-2">主目标</span>' : '') + '</td><td>' + providerName(row.provider) + '</td><td><span>' + esc(row.bucket) + '</span><small>' + esc(row.endpoint) + '</small></td><td><a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">' + esc(row.object_key) + '</a></td><td><span class="badge badge-' + (row.enabled ? 'success' : 'secondary') + '">' + (row.enabled ? '启用' : '停用') + '</span><small>' + esc(row.access_key_hint) + '</small></td><td><div class="client-row-actions"><button class="btn btn-sm btn-light" data-test="' + row.id + '">测试</button><button class="btn btn-sm btn-light" data-edit="' + row.id + '">编辑</button><button class="btn btn-sm btn-light text-danger" data-drop="' + row.id + '">删除</button></div></td></tr>';
+                return '<tr><td><strong>' + esc(row.name) + '</strong>' + (row.is_primary ? '<span class="badge badge-primary ml-2">主目标</span>' : '') + '</td><td>' + providerName(row.provider) + '</td><td><span>' + esc(row.bucket) + '</span><small>' + esc(row.endpoint) + '</small></td><td><a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">' + esc(row.object_key) + '</a></td><td><span class="badge badge-' + (row.enabled ? 'success' : 'secondary') + '">' + (row.enabled ? '启用' : '停用') + '</span><small>' + esc(row.access_key_hint) + '</small></td><td><div class="client-row-actions"><button class="btn btn-sm btn-light" data-test="' + row.id + '">测试</button><button class="btn btn-sm btn-light" data-copy-url="' + row.id + '">复制链接</button><button class="btn btn-sm btn-light" data-edit="' + row.id + '">编辑</button><button class="btn btn-sm btn-light text-danger" data-drop="' + row.id + '">删除</button></div></td></tr>';
             }).join("") : '<tr><td colspan="6" class="text-center text-muted p-4">尚未配置云存储目标</td></tr>') + '</tbody></table></div></section>');
         root.querySelector("[data-add-target]").onclick = function () { editTarget(null); };
         root.querySelectorAll("[data-edit]").forEach(function (button) { button.onclick = function () { editTarget(rows.find(function (row) { return String(row.id) === button.dataset.edit; })); }; });
         root.querySelectorAll("[data-test]").forEach(function (button) { button.onclick = function () { testTarget(Number(button.dataset.test), button); }; });
+        root.querySelectorAll("[data-copy-url]").forEach(function (button) { button.onclick = function () {
+            var row = rows.find(function (item) { return String(item.id) === button.dataset.copyUrl; });
+            if (row) copyText(row.public_url);
+        }; });
         root.querySelectorAll("[data-drop]").forEach(function (button) { button.onclick = function () { dropTarget(Number(button.dataset.drop)); }; });
     }
 
@@ -385,7 +394,10 @@
     function testTarget(id, button) {
         button.disabled = true;
         button.textContent = "测试中…";
-        api("/target/test", { method: "POST", body: JSON.stringify({ id: id }) }).then(function () { toast("连接和公开读取测试通过"); }).catch(function (error) { alert(error.message); }).finally(function () { button.disabled = false; button.textContent = "测试"; });
+        api("/target/test", { method: "POST", body: JSON.stringify({ id: id }) }).then(function (payload) {
+            if (payload.data.cleanup_warning) alert("连接测试通过，但测试文件未能自动删除：" + payload.data.cleanup_warning);
+            else toast("连接测试通过，测试文件已自动清理");
+        }).catch(function (error) { alert(error.message); }).finally(function () { button.disabled = false; button.textContent = "测试"; });
     }
 
     function dropTarget(id) {
@@ -474,7 +486,28 @@
     }
     function copyText(value) {
         if (!value) return;
-        navigator.clipboard.writeText(value).then(function () { toast("已复制"); }).catch(function () { alert("复制失败，请手动复制"); });
+        function fallbackCopy() {
+            var input = document.createElement("textarea");
+            input.value = value;
+            input.setAttribute("readonly", "readonly");
+            input.style.position = "fixed";
+            input.style.opacity = "0";
+            document.body.appendChild(input);
+            input.select();
+            input.setSelectionRange(0, input.value.length);
+            try {
+                if (!document.execCommand("copy")) throw new Error("copy failed");
+                toast("链接已复制");
+            } catch (error) {
+                window.prompt("请手动复制链接", value);
+            }
+            input.remove();
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(value).then(function () { toast("链接已复制"); }).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
     }
     function toast(message) {
         var node = document.createElement("div");
@@ -503,7 +536,9 @@
         else nav.appendChild(item);
         item.querySelector("a").onclick = function (event) {
             event.preventDefault();
-            if (location.hash !== "#/client-config") history.pushState({}, "", "/#/client-config");
+            if (location.hash !== "#/client-config" || location.pathname.replace(/\/+$/, "") !== routeUrl().split("/#/")[0]) {
+                history.pushState({}, "", routeUrl());
+            }
             open();
         };
         return true;

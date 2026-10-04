@@ -46,6 +46,25 @@ class ClientConfigStorageService
         }
     }
 
+    public function deleteObject(ClientStorageTarget $target, string $objectKey): void
+    {
+        $accessKey = $this->decrypt($target->access_key_id_encrypted, 'AccessKey ID');
+        $secretKey = $this->decrypt($target->secret_key_encrypted, 'SecretKey');
+        if ($target->provider === 'aliyun_oss') {
+            $this->deleteAliyun($target, $objectKey, $accessKey, $secretKey);
+            return;
+        }
+        if ($target->provider === 'tencent_cos') {
+            $this->deleteTencent($target, $objectKey, $accessKey, $secretKey);
+            return;
+        }
+        if ($target->provider === 'ucloud_us3') {
+            $this->deleteUcloud($target, $objectKey, $accessKey, $secretKey);
+            return;
+        }
+        throw new \RuntimeException('不支持的云存储类型');
+    }
+
     public function publicUrlFor(ClientStorageTarget $target, string $objectKey): string
     {
         $baseKey = ltrim((string)$target->object_key, '/');
@@ -147,6 +166,62 @@ class ClientConfigStorageService
         return $this->put($url, $headers, $body);
     }
 
+    private function deleteAliyun(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
+    {
+        list($url, $host) = $this->targetAddress($target, $objectKey, 'oss');
+        $date = gmdate('D, d M Y H:i:s \G\M\T');
+        $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
+        $token = $this->optionalDecrypt($target->security_token_encrypted);
+        $canonicalHeaders = $token ? 'x-oss-security-token:' . $token . "\n" : '';
+        $stringToSign = "DELETE\n\n\n{$date}\n{$canonicalHeaders}{$canonicalResource}";
+        $headers = [
+            'Host' => $host,
+            'Date' => $date,
+            'Authorization' => 'OSS ' . $accessKey . ':' . base64_encode(hash_hmac('sha1', $stringToSign, $secretKey, true)),
+        ];
+        if ($token) $headers['x-oss-security-token'] = $token;
+        $this->delete($url, $headers);
+    }
+
+    private function deleteTencent(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
+    {
+        list($url, $host, $path) = $this->targetAddress($target, $objectKey, 'cos');
+        $now = time();
+        $keyTime = $now . ';' . ($now + 600);
+        $signedHeaders = ['host' => strtolower($host)];
+        $token = $this->optionalDecrypt($target->security_token_encrypted);
+        if ($token) $signedHeaders['x-cos-security-token'] = $token;
+        ksort($signedHeaders);
+        $canonicalHeaders = implode('&', array_map(function ($key) use ($signedHeaders) {
+            return rawurlencode($key) . '=' . rawurlencode($signedHeaders[$key]);
+        }, array_keys($signedHeaders)));
+        $headerList = implode(';', array_keys($signedHeaders));
+        $httpString = "delete\n{$path}\n\n{$canonicalHeaders}\n";
+        $signKey = hash_hmac('sha1', $keyTime, $secretKey);
+        $stringToSign = "sha1\n{$keyTime}\n" . sha1($httpString) . "\n";
+        $signature = hash_hmac('sha1', $stringToSign, $signKey);
+        $authorization = 'q-sign-algorithm=sha1&q-ak=' . rawurlencode($accessKey)
+            . '&q-sign-time=' . $keyTime . '&q-key-time=' . $keyTime
+            . '&q-header-list=' . $headerList . '&q-url-param-list=&q-signature=' . $signature;
+        $headers = ['Host' => $host, 'Authorization' => $authorization];
+        if ($token) $headers['x-cos-security-token'] = $token;
+        $this->delete($url, $headers);
+    }
+
+    private function deleteUcloud(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
+    {
+        list($url, $host) = $this->targetAddress($target, $objectKey, 'us3');
+        $date = gmdate('D, d M Y H:i:s \G\M\T');
+        $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
+        $stringToSign = "DELETE\n\n\n{$date}\n{$canonicalResource}";
+        $headers = [
+            'Host' => $host,
+            'Date' => $date,
+            'Authorization' => 'UCloud ' . $accessKey . ':' . base64_encode(hash_hmac('sha1', $stringToSign, $secretKey, true)),
+        ];
+        $this->delete($url, $headers);
+    }
+
     private function targetAddress(ClientStorageTarget $target, string $objectKey, string $provider): array
     {
         $rawEndpoint = trim((string)$target->endpoint);
@@ -176,6 +251,16 @@ class ClientConfigStorageService
             throw new \RuntimeException('云存储上传失败（HTTP ' . $status . '）：' . mb_substr($message, 0, 500));
         }
         return ['etag' => trim($response->getHeaderLine('ETag'), '"'), 'status' => $status];
+    }
+
+    private function delete(string $url, array $headers): void
+    {
+        $response = $this->client->delete($url, ['headers' => $headers]);
+        $status = $response->getStatusCode();
+        if (($status < 200 || $status >= 300) && $status !== 404) {
+            $message = trim((string)$response->getBody());
+            throw new \RuntimeException('测试文件清理失败（HTTP ' . $status . '）：' . mb_substr($message, 0, 500));
+        }
     }
 
     private function encodePath(string $value): string

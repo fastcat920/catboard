@@ -106,9 +106,6 @@ class CreateClientRemoteConfigCenter extends Migration
             'gateway_urls' => [],
             'update' => [
                 'schema_version' => 2,
-                'changelog' => '',
-                'latest' => [],
-                'min_version' => '',
                 'platforms' => array_reduce(['android', 'windows', 'macos', 'linux', 'ios', 'tvos'], function ($rows, $platform) {
                     $rows[$platform] = [
                         'enabled' => false,
@@ -126,7 +123,6 @@ class CreateClientRemoteConfigCenter extends Migration
                 'crisp_proxy_url' => '',
                 'crisp_website_id' => '',
                 'invite_domain' => '',
-                'salesmartly_token' => '',
                 'telegram_group' => '',
                 'website' => [],
             ],
@@ -141,7 +137,6 @@ class CreateClientRemoteConfigCenter extends Migration
                 'traffic_details_enabled' => true,
             ],
             'latency' => ['display_discount_percent' => 0],
-            'ticket' => ['imgbb_api_key' => ''],
         ];
     }
 }

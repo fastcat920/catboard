@@ -50,12 +50,10 @@ class ClientRemoteConfigController extends Controller
             'content.gateway_urls' => 'nullable|array|max:20',
             'content.gateway_urls.*' => 'required|url|max:1000',
             'content.update' => 'required|array',
-            'content.update.schema_version' => 'nullable|integer|min:1|max:100',
-            'content.update.latest' => 'nullable|array',
-            'content.update.platforms' => 'nullable|array',
+            'content.update.schema_version' => 'required|integer|in:2',
+            'content.update.platforms' => 'required|array|min:1',
             'content.contact' => 'required|array',
             'content.features' => 'required|array',
-            'content.ticket' => 'required|array',
             'content.latency.display_discount_percent' => 'nullable|integer|min:0|max:90',
             'encryption_mode' => 'required|in:xor_base64,plain,signed_xor_v2',
             'change_summary' => 'nullable|string|max:500',
@@ -262,10 +260,8 @@ class ClientRemoteConfigController extends Controller
                 $contact['telegram_group'] ?? ($contact['telegram'] ?? ''),
             ]
         );
-        foreach (['latest', 'platforms'] as $group) {
-            foreach ((array)($content['update'][$group] ?? []) as $platform) {
-                $urls[] = is_array($platform) ? ($platform['url'] ?? '') : '';
-            }
+        foreach ((array)($content['update']['platforms'] ?? []) as $platform) {
+            $urls[] = is_array($platform) ? ($platform['url'] ?? '') : '';
         }
         foreach ($urls as $url) {
             $url = trim((string)$url);
@@ -283,7 +279,12 @@ class ClientRemoteConfigController extends Controller
 
         $contact = (array)($content['contact'] ?? []);
         $contact['website'] = array_values(array_filter(array_map('trim', (array)($contact['website'] ?? []))));
+        unset($contact['salesmartly_token']);
         $content['contact'] = $contact;
+        if (isset($content['ticket']) && is_array($content['ticket'])) {
+            unset($content['ticket']['imgbb_api_key']);
+            if ($content['ticket'] === []) unset($content['ticket']);
+        }
 
         $featureKeys = [
             'balance_enabled',
@@ -314,7 +315,6 @@ class ClientRemoteConfigController extends Controller
         $platformRows = (array)($update['platforms'] ?? []);
         $supportedPlatforms = ['android', 'windows', 'macos', 'linux', 'ios', 'tvos'];
         $normalizedPlatforms = [];
-        $normalizedLegacy = [];
         foreach ($supportedPlatforms as $platform) {
             $hasPlatformRow = array_key_exists($platform, $platformRows) && is_array($platformRows[$platform]);
             $row = $hasPlatformRow ? $platformRows[$platform] : [];
@@ -330,11 +330,21 @@ class ClientRemoteConfigController extends Controller
             if (is_string($changelog)) $changelog = ['zh_CN' => $changelog];
             if (!is_array($changelog)) $changelog = [];
 
+            $isAppStore = in_array($platform, ['ios', 'tvos'], true);
+            if (!$isAppStore) $appId = '';
+            if ($isAppStore) $url = '';
+            if ($enabled && $version === '') {
+                throw ValidationException::withMessages(['content.update.platforms.' . $platform => strtoupper($platform) . ' 启用后必须填写最新版本']);
+            }
+            if ($enabled && $isAppStore && $appId === '') {
+                throw ValidationException::withMessages(['content.update.platforms.' . $platform => strtoupper($platform) . ' 启用后必须填写商店 ID']);
+            }
+            if ($enabled && !$isAppStore && $url === '') {
+                throw ValidationException::withMessages(['content.update.platforms.' . $platform => strtoupper($platform) . ' 启用后必须填写下载地址']);
+            }
             $normalizedRow = [
                 'enabled' => $enabled,
-                'source' => in_array(($row['source'] ?? ''), ['direct', 'app_store'], true)
-                    ? $row['source']
-                    : (in_array($platform, ['ios', 'tvos'], true) ? 'app_store' : 'direct'),
+                'source' => $isAppStore ? 'app_store' : 'direct',
                 'latest_version' => $version,
                 'min_supported_version' => trim((string)($row['min_supported_version'] ?? '')),
                 'url' => $url,
@@ -346,24 +356,10 @@ class ClientRemoteConfigController extends Controller
             ];
             if ($appId !== '') $normalizedRow['app_id'] = $appId;
             $normalizedPlatforms[$platform] = $normalizedRow;
-
-            $legacyUrl = $url;
-            if ($legacyUrl === '' && $appId !== '') {
-                $legacyUrl = 'https://apps.apple.com/app/' . (strpos($appId, 'id') === 0 ? $appId : 'id' . $appId);
-            }
-            if ($enabled && $version !== '' && $legacyUrl !== '') {
-                $normalizedLegacy[$platform] = [
-                    'version' => $version,
-                    'url' => $legacyUrl,
-                    'force' => $force,
-                ];
-            }
         }
         $update['schema_version'] = 2;
-        $update['min_version'] = trim((string)($update['min_version'] ?? ''));
-        $update['changelog'] = trim((string)($update['changelog'] ?? ''));
-        $update['latest'] = $normalizedLegacy;
         $update['platforms'] = $normalizedPlatforms;
+        unset($update['latest'], $update['min_version'], $update['changelog'], $update['_comment_legacy']);
         $content['update'] = $update;
 
         return $content;

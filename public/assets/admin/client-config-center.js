@@ -16,10 +16,10 @@
         traffic_details_enabled: "流量明细",
     };
     var platforms = [
-        { key: "android", label: "Android", legacy: true },
-        { key: "windows", label: "Windows", legacy: true },
-        { key: "macos", label: "macOS", legacy: true },
-        { key: "linux", label: "Linux", legacy: true },
+        { key: "android", label: "Android" },
+        { key: "windows", label: "Windows" },
+        { key: "macos", label: "macOS" },
+        { key: "linux", label: "Linux" },
         { key: "ios", label: "iOS", appStore: true },
         { key: "tvos", label: "tvOS", appStore: true },
     ];
@@ -155,21 +155,21 @@
         var legacy = legacyRows[platform.key] || {};
         var hasNewRow = Object.prototype.hasOwnProperty.call(platformRows, platform.key);
         var enabled = hasNewRow ? row.enabled !== false : Boolean(row.latest_version || row.version || legacy.version || legacy.url);
-        var source = row.source || (platform.appStore ? "app_store" : "direct");
         var changelog = row.changelog || {};
         if (typeof changelog === "string") changelog = { zh_CN: changelog };
         return '<article class="client-platform-card" data-platform="' + platform.key + '">' +
-            '<div class="client-platform-card-head"><div><strong>' + platform.label + '</strong><small>' + (platform.legacy ? '自动兼容旧版客户端' : '新版客户端平台') + '</small></div>' +
+            '<div class="client-platform-card-head"><div><strong>' + platform.label + '</strong><small>' + (platform.appStore ? '通过应用商店更新' : '通过安装包地址直接更新') + '</small></div>' +
             '<label class="client-switch"><input type="checkbox" name="enabled_' + platform.key + '"' + (enabled ? ' checked' : '') + '><span>启用</span></label></div>' +
             '<div class="client-grid cols-2">' +
-            '<label class="client-field"><span>发布来源</span><select class="form-control" name="source_' + platform.key + '"><option value="direct"' + (source === 'direct' ? ' selected' : '') + '>直接下载</option><option value="app_store"' + (source === 'app_store' ? ' selected' : '') + '>App Store</option></select></label>' +
+            '<div class="client-readonly-field"><span>更新方式</span><strong>' + (platform.appStore ? '应用商店' : '直接下载') + '</strong></div>' +
             field("最新版本", "latest_version_" + platform.key, row.latest_version || row.version || legacy.version || "") +
             field("最低支持版本", "min_supported_version_" + platform.key, row.min_supported_version || "", "text", "低于该版本时强制升级") +
-            field("下载地址", "url_" + platform.key, row.url || legacy.url || "", "url", "允许 HTTP 或 HTTPS") +
-            field("App Store ID", "app_id_" + platform.key, row.app_id || "", "text", "仅 App Store 来源需要填写") +
-            '<label class="client-check client-force-check"><input type="checkbox" name="force_' + platform.key + '"' + ((row.force === true || (!hasNewRow && legacy.force === true)) ? ' checked' : '') + '><span>发现新版本时强制更新</span></label>' +
-            textarea("中文更新说明", "changelog_zh_" + platform.key, changelog.zh_CN || changelog['zh-CN'] || "", 3) +
-            textarea("英文更新说明", "changelog_en_" + platform.key, changelog.en_US || changelog['en-US'] || "", 3) +
+            (platform.appStore
+                ? field("商店 ID", "app_id_" + platform.key, row.app_id || "", "text", "例如 123456789 或 id123456789")
+                : field("下载地址", "url_" + platform.key, row.url || legacy.url || "", "url", "允许 HTTP 或 HTTPS")) +
+            '<label class="client-check client-force-check span-2"><input type="checkbox" name="force_' + platform.key + '"' + ((row.force === true || (!hasNewRow && legacy.force === true)) ? ' checked' : '') + '><span>发现新版本时强制更新</span></label>' +
+            textarea("中文更新说明", "changelog_zh_" + platform.key, changelog.zh_CN || changelog['zh-CN'] || "", 3, "", "span-2") +
+            textarea("英文更新说明", "changelog_en_" + platform.key, changelog.en_US || changelog['en-US'] || "", 3, "", "span-2") +
             '</div></article>';
     }
 
@@ -181,7 +181,6 @@
         var platformRows = update.platforms || {};
         var contact = content.contact || {};
         var features = content.features || {};
-        var ticket = content.ticket || {};
         var latency = content.latency || {};
         var settings = state.settings || {};
         var sourceLabel = state.draft ? "草稿" : (state.published ? "已发布版本（保存时会创建新草稿）" : "新配置");
@@ -193,16 +192,11 @@
             textarea("面板 API 地址（每行一个）", "domains", lines(content.domains), 4, "支持 HTTP/HTTPS，顺序即客户端尝试顺序", "span-2") +
             textarea("网关地址（每行一个）", "gateway_urls", lines(content.gateway_urls || content.gateway_url), 4, "用于订阅和网关服务，支持 HTTP/HTTPS", "span-2") +
             '</div></section>' +
-            '<section class="client-panel"><div class="client-section-head"><div><h3>版本更新</h3><p>新版客户端读取平台配置；保存时自动同步旧版 latest，无需重复填写。</p></div><span class="badge badge-primary">兼容新旧客户端</span></div>' +
-            '<div class="client-grid cols-2 client-legacy-update">' +
-            field("旧版最低客户端版本", "min_version", update.min_version || "", "text", "旧版客户端共用；新版使用各平台最低版本") +
-            '<div class="client-readonly-field"><span>配置结构版本</span><strong>2</strong><small>系统自动生成 update.schema_version</small></div>' +
-            textarea("旧版统一更新说明", "changelog", update.changelog || "", 3, "旧版无法区分语言，可填写中英文合并内容", "span-2") +
-            '</div><div class="client-platform-list">' + platforms.map(function (platform) { return platformEditor(platform, platformRows, latest); }).join("") + '</div></section>' +
-            '<section class="client-panel"><div class="client-section-head"><div><h3>联系与服务</h3><p>敏感服务令牌会进入远程配置，请仅使用客户端可公开的受限令牌。</p></div></div><div class="client-grid cols-2">' +
+            '<section class="client-panel"><div class="client-section-head"><div><h3>版本更新</h3><p>仅生成新版 platforms 配置，各平台独立设置版本、最低版本和双语更新说明。</p></div><span class="badge badge-primary">新版客户端</span></div>' +
+            '<div class="client-platform-list">' + platforms.map(function (platform) { return platformEditor(platform, platformRows, latest); }).join("") + '</div></section>' +
+            '<section class="client-panel"><div class="client-section-head"><div><h3>联系与服务</h3><p>配置官网、邀请链接、群组和 Crisp 客服连接信息。</p></div></div><div class="client-grid cols-2">' +
             textarea("官网地址（每行一个）", "website", lines(contact.website), 3, "客户端会按顺序尝试打开", "span-2") + field("邀请链接域名", "invite_domain", contact.invite_domain || "", "url", "允许 HTTP 或 HTTPS") + field("Telegram 群组", "telegram_group", contact.telegram_group || contact.telegram || "") +
-            field("Crisp Website ID", "crisp_website_id", contact.crisp_website_id || "") + field("Crisp 代理地址", "crisp_proxy_url", contact.crisp_proxy_url || "") +
-            field("Salesmartly Token", "salesmartly_token", contact.salesmartly_token || "", "password") + field("图床 API Key", "imgbb_api_key", ticket.imgbb_api_key || "", "password") + '</div></section>' +
+            field("Crisp Website ID", "crisp_website_id", contact.crisp_website_id || "") + field("Crisp 代理地址", "crisp_proxy_url", contact.crisp_proxy_url || "") + '</div></section>' +
             '<section class="client-panel"><div class="client-section-head"><div><h3>功能开关</h3><p>控制客户端入口显示，不替代服务端权限校验。</p></div></div><div class="client-feature-grid">' + Object.keys(featureLabels).map(function (key) {
                 return '<label><input type="checkbox" name="feature_' + key + '"' + checked(featureValue(features, key)) + '><span>' + featureLabels[key] + '</span></label>';
             }).join("") + '</div></section>' +
@@ -241,18 +235,16 @@
     function buildContent(form, current) {
         var source = current && current.content ? current.content : {};
         var content = JSON.parse(JSON.stringify(source || {}));
-        var latest = {};
         var platformRows = {};
         platforms.forEach(function (platform) {
             var key = platform.key;
             var enabled = form["enabled_" + key].checked;
-            var sourceType = form["source_" + key].value;
             var version = form["latest_version_" + key].value.trim();
-            var url = form["url_" + key].value.trim();
-            var appId = form["app_id_" + key].value.trim();
+            var url = platform.appStore ? "" : form["url_" + key].value.trim();
+            var appId = platform.appStore ? form["app_id_" + key].value.trim() : "";
             var row = {
                 enabled: enabled,
-                source: sourceType,
+                source: platform.appStore ? "app_store" : "direct",
                 latest_version: version,
                 min_supported_version: form["min_supported_version_" + key].value.trim(),
                 url: url,
@@ -264,13 +256,6 @@
             };
             if (appId) row.app_id = appId;
             platformRows[key] = row;
-            if (enabled && version && (url || appId)) {
-                latest[key] = {
-                    version: version,
-                    url: url || (appId ? "https://apps.apple.com/app/" + (appId.indexOf("id") === 0 ? appId : "id" + appId) : ""),
-                    force: row.force,
-                };
-            }
         });
         var features = {};
         Object.keys(featureLabels).forEach(function (key) { features[key] = form["feature_" + key].checked; });
@@ -282,22 +267,26 @@
         delete content.gateway_url;
         content.update = Object.assign({}, source.update || {}, {
             schema_version: 2,
-            min_version: form.min_version.value.trim(),
-            changelog: form.changelog.value.trim(),
-            latest: latest,
             platforms: platformRows,
         });
+        delete content.update.latest;
+        delete content.update.min_version;
+        delete content.update.changelog;
+        delete content.update._comment_legacy;
         content.contact = Object.assign({}, source.contact || {}, {
             crisp_proxy_url: form.crisp_proxy_url.value.trim(),
             crisp_website_id: form.crisp_website_id.value.trim(),
             invite_domain: form.invite_domain.value.trim(),
-            salesmartly_token: form.salesmartly_token.value.trim(),
             telegram_group: form.telegram_group.value.trim(),
             website: splitLines(form.website.value),
         });
+        delete content.contact.salesmartly_token;
         content.features = features;
         content.latency = Object.assign({}, source.latency || {}, { display_discount_percent: Math.max(0, Math.min(90, Number(form.display_discount_percent.value) || 0)) });
-        content.ticket = Object.assign({}, source.ticket || {}, { imgbb_api_key: form.imgbb_api_key.value.trim() });
+        if (content.ticket) {
+            delete content.ticket.imgbb_api_key;
+            if (!Object.keys(content.ticket).length) delete content.ticket;
+        }
         return content;
     }
 

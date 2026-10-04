@@ -183,7 +183,7 @@ class ClientRemoteConfigController extends Controller
     {
         $data = $request->validate(['id' => 'required|integer|exists:v2_client_storage_target,id']);
         $target = ClientStorageTarget::findOrFail($data['id']);
-        $key = preg_replace('#[^/]+$#', '.fastcat-connection-test.txt', ltrim($target->object_key, '/'));
+        $key = preg_replace('#[^/]+$#', 'connection-test.txt', ltrim($target->object_key, '/'));
         $body = 'FastCat storage connection test ' . gmdate('c');
         try {
             $storage->upload($target, $key, $body);

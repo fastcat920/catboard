@@ -17,10 +17,15 @@ use Illuminate\Validation\ValidationException;
 
 class ClientRemoteConfigController extends Controller
 {
-    public function overview()
+    public function overview(Request $request)
     {
         $setting = ClientConfigSetting::current();
-        $draft = ClientRemoteConfig::whereIn('status', ['draft', 'partial'])->orderByDesc('config_version')->first();
+        $draft = null;
+        $editId = (int)$request->query('edit_id', 0);
+        if ($editId > 0) {
+            $draft = ClientRemoteConfig::where('id', $editId)->where('status', 'draft')->first();
+        }
+        if (!$draft) $draft = ClientRemoteConfig::where('status', 'draft')->orderByDesc('config_version')->first();
         $published = ClientRemoteConfig::where('status', 'published')->orderByDesc('config_version')->first();
         return response([
             'data' => [
@@ -96,6 +101,16 @@ class ClientRemoteConfigController extends Controller
         return response(['data' => $this->configRow($row, true)]);
     }
 
+    public function dropVersion(Request $request)
+    {
+        $data = $request->validate(['id' => 'required|integer|exists:v2_client_config,id']);
+        $row = ClientRemoteConfig::findOrFail($data['id']);
+        if ($row->status !== 'draft') abort(422, '只有未发布的草稿可以删除');
+        if ($row->publications()->exists()) abort(422, '该草稿已有发布记录，不能删除');
+        $row->delete();
+        return response(['data' => true]);
+    }
+
     public function saveSettings(Request $request, ClientConfigCryptoService $crypto)
     {
         $data = $request->validate([
@@ -120,7 +135,7 @@ class ClientRemoteConfigController extends Controller
         ]]);
     }
 
-    public function saveTarget(Request $request)
+    public function saveTarget(Request $request, ClientConfigStorageService $storage)
     {
         $data = $request->validate([
             'id' => 'nullable|integer|exists:v2_client_storage_target,id',
@@ -132,7 +147,7 @@ class ClientRemoteConfigController extends Controller
             'endpoint' => ['required', 'string', 'max:255', 'regex:/^(https?:\/\/)?[a-z0-9.-]+(?::[0-9]+)?$/i'],
             'bucket' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9][a-z0-9.-]*$/i'],
             'object_key' => ['required', 'string', 'max:500', 'regex:/^[^?#]+$/'],
-            'public_url' => 'required|url|max:1000',
+            'public_url' => 'nullable|url|max:1000',
             'access_key_id' => 'nullable|string|max:500',
             'secret_key' => 'nullable|string|max:1000',
             'security_token' => 'nullable|string|max:2000',
@@ -141,8 +156,12 @@ class ClientRemoteConfigController extends Controller
         if (!$target->exists && (empty($data['access_key_id']) || empty($data['secret_key']))) {
             throw ValidationException::withMessages(['access_key_id' => '新建目标时必须填写访问密钥']);
         }
-        foreach (['name','provider','enabled','is_primary','region','endpoint','bucket','object_key','public_url'] as $field) {
+        foreach (['name','provider','enabled','is_primary','region','endpoint','bucket','object_key'] as $field) {
             $target->{$field} = $data[$field] ?? null;
+        }
+        $target->public_url = trim((string)($data['public_url'] ?? ''));
+        if ($target->public_url === '') {
+            $target->public_url = $storage->defaultPublicUrlFor($target, $target->object_key);
         }
         if (!empty($data['access_key_id'])) $target->access_key_id_encrypted = Crypt::encryptString($data['access_key_id']);
         if (!empty($data['secret_key'])) $target->secret_key_encrypted = Crypt::encryptString($data['secret_key']);
@@ -174,8 +193,15 @@ class ClientRemoteConfigController extends Controller
 
     public function preview(Request $request, ClientConfigCryptoService $crypto)
     {
-        $data = $request->validate(['id' => 'required|integer|exists:v2_client_config,id']);
+        $data = $request->validate([
+            'id' => 'required|integer|exists:v2_client_config,id',
+            'encryption_mode' => 'required|in:xor_base64,plain,signed_xor_v2',
+        ]);
         $row = ClientRemoteConfig::findOrFail($data['id']);
+        $row->encryption_mode = $data['encryption_mode'];
+        if ($data['encryption_mode'] === 'signed_xor_v2') {
+            $crypto->ensureSigningKeyPair(ClientConfigSetting::current());
+        }
         $payload = $crypto->encode($row);
         return response(['data' => [
             'payload' => $payload,

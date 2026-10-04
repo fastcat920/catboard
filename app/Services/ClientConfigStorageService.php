@@ -56,6 +56,13 @@ class ClientConfigStorageService
         return rtrim($public, '/') . '/' . $this->encodePath($objectKey);
     }
 
+    public function defaultPublicUrlFor(ClientStorageTarget $target, string $objectKey): string
+    {
+        $provider = $target->provider === 'tencent_cos' ? 'cos' : ($target->provider === 'ucloud_us3' ? 'us3' : 'oss');
+        list($url) = $this->targetAddress($target, $objectKey, $provider);
+        return $url;
+    }
+
     public function versionedObjectKey(ClientStorageTarget $target, int $version): string
     {
         $key = ltrim((string)$target->object_key, '/');

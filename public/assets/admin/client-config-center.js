@@ -5,6 +5,7 @@
     var activeTab = "editor";
     var state = null;
     var poller = null;
+    var editingConfigId = null;
     var featureLabels = {
         balance_enabled: "钱包余额",
         devices_enabled: "设备管理",
@@ -103,8 +104,11 @@
 
     function load() {
         setContent('<div class="client-config-loading">加载中…</div>');
-        api("/overview").then(function (payload) {
+        var path = "/overview" + (editingConfigId ? "?edit_id=" + encodeURIComponent(editingConfigId) : "");
+        api(path).then(function (payload) {
             state = payload.data;
+            if (editingConfigId && (!state.draft || Number(state.draft.id) !== Number(editingConfigId))) editingConfigId = null;
+            if (root) root.querySelectorAll("[data-tab]").forEach(function (item) { item.classList.toggle("active", item.dataset.tab === activeTab); });
             renderTab();
             if ((state.publications || []).some(function (item) { return item.status === "queued" || item.status === "publishing"; })) startPolling();
             else stopPolling();
@@ -227,7 +231,7 @@
         };
         root.querySelector("[data-preview]").onclick = function () {
             if (!state.draft) return alert("请先保存草稿，再预览最终输出");
-            api("/preview", { method: "POST", body: JSON.stringify({ id: state.draft.id }) }).then(showPreview).catch(function (error) { alert(error.message); });
+            api("/preview", { method: "POST", body: JSON.stringify({ id: state.draft.id, encryption_mode: form.encryption_mode.value }) }).then(showPreview).catch(function (error) { alert(error.message); });
         };
         root.querySelector("[data-copy-public]").onclick = function () { copyText(settings.signing_public_key || ""); };
     }
@@ -323,27 +327,59 @@
 
     function editTarget(row) {
         row = row || {};
+        var automaticPublicUrl = defaultTargetPublicUrl(row);
+        var hasCustomPublicUrl = Boolean(row.public_url && automaticPublicUrl && row.public_url !== automaticPublicUrl);
         var body = '<form data-target-form><div class="client-grid cols-2">' +
             field("目标名称", "name", row.name || "") +
             '<label class="client-field"><span>云服务商</span><select class="form-control" name="provider"><option value="aliyun_oss">阿里云 OSS</option><option value="tencent_cos">腾讯云 COS</option><option value="ucloud_us3">UCloud US3</option></select></label>' +
             field("区域", "region", row.region || "", "text", "腾讯云可用于自动生成 Endpoint，例如 ap-guangzhou") + field("Endpoint", "endpoint", row.endpoint || "", "text", "支持主机名、HTTP 或 HTTPS 地址") +
             field("Bucket", "bucket", row.bucket || "") + field("对象路径", "object_key", row.object_key || "config.json") +
-            '<label class="client-field span-2"><span>客户端公开访问地址</span><input class="form-control" name="public_url" value="' + esc(row.public_url || "") + '" placeholder="https://bucket.endpoint/config.json" required><small>允许 HTTP 或 HTTPS，且必须能被客户端匿名读取，用于发布后完整性校验。</small></label>' +
+            '<div class="client-readonly-field span-2"><span>自动生成的公开访问地址</span><strong data-generated-public-url>' + esc(automaticPublicUrl || "填写 Endpoint、Bucket 和对象路径后自动生成") + '</strong><small>后台会使用该地址进行发布校验，客户端也通过该地址读取配置。</small></div>' +
+            '<label class="client-check span-2"><input type="checkbox" name="custom_public_url" ' + (hasCustomPublicUrl ? 'checked' : '') + '><span>使用 CDN 或自定义公开地址</span></label>' +
+            '<label class="client-field span-2" data-custom-public-url ' + (hasCustomPublicUrl ? '' : 'hidden') + '><span>自定义公开访问地址</span><input class="form-control" name="public_url" value="' + esc(hasCustomPublicUrl ? row.public_url : "") + '" placeholder="https://config.example.com/client/config.json"><small>允许 HTTP 或 HTTPS，必须指向相同的对象路径并支持匿名读取。</small></label>' +
             field("AccessKey ID", "access_key_id", "", "password", row.has_credentials ? "已安全保存，留空保持不变" : "必填") + field("SecretKey", "secret_key", "", "password", row.has_credentials ? "已安全保存，留空保持不变" : "必填") +
             field("临时安全令牌", "security_token", "", "password", "仅使用临时密钥时填写") +
             '<div class="client-toggle-stack"><label class="client-check"><input type="checkbox" name="enabled" ' + (row.enabled === false ? '' : 'checked') + '><span>启用目标</span></label><label class="client-check"><input type="checkbox" name="is_primary" ' + (row.is_primary ? 'checked' : '') + '><span>设为主目标</span></label></div></div></form>';
         var modal = makeModal(row.id ? "编辑云存储目标" : "新增云存储目标", body, '<button class="btn btn-light" data-close>取消</button><button class="btn btn-primary" data-save>保存</button>');
         var form = modal.querySelector("[data-target-form]");
         form.provider.value = row.provider || "aliyun_oss";
+        var generatedPublicUrl = modal.querySelector("[data-generated-public-url]");
+        var customPublicUrlField = modal.querySelector("[data-custom-public-url]");
+        function syncPublicUrl() {
+            var url = defaultTargetPublicUrl({ endpoint: form.endpoint.value, bucket: form.bucket.value, object_key: form.object_key.value });
+            generatedPublicUrl.textContent = url || "填写 Endpoint、Bucket 和对象路径后自动生成";
+        }
+        [form.endpoint, form.bucket, form.object_key].forEach(function (input) { input.addEventListener("input", syncPublicUrl); });
+        form.custom_public_url.onchange = function () {
+            customPublicUrlField.hidden = !form.custom_public_url.checked;
+            if (!form.custom_public_url.checked) form.public_url.value = "";
+        };
         modal.querySelector("[data-save]").onclick = function () {
             var button = this;
             button.disabled = true;
             var payload = { id: row.id || null };
-            ["name","provider","region","endpoint","bucket","object_key","public_url","access_key_id","secret_key","security_token"].forEach(function (key) { payload[key] = form[key].value.trim(); });
+            ["name","provider","region","endpoint","bucket","object_key","access_key_id","secret_key","security_token"].forEach(function (key) { payload[key] = form[key].value.trim(); });
+            payload.public_url = form.custom_public_url.checked ? form.public_url.value.trim() : "";
+            if (form.custom_public_url.checked && !payload.public_url) {
+                button.disabled = false;
+                return alert("请填写自定义公开访问地址");
+            }
             payload.enabled = form.enabled.checked ? 1 : 0;
             payload.is_primary = form.is_primary.checked ? 1 : 0;
             api("/target/save", { method: "POST", body: JSON.stringify(payload) }).then(function () { modal.remove(); toast("云存储目标已保存"); load(); }).catch(function (error) { alert(error.message); button.disabled = false; });
         };
+    }
+
+    function defaultTargetPublicUrl(row) {
+        var endpoint = String(row.endpoint || "").trim();
+        var bucket = String(row.bucket || "").trim();
+        var objectKey = String(row.object_key || "").trim().replace(/^\/+/, "");
+        if (!endpoint || !bucket || !objectKey) return "";
+        var scheme = endpoint.toLowerCase().indexOf("http://") === 0 ? "http" : "https";
+        endpoint = endpoint.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+        var host = endpoint.toLowerCase().indexOf(bucket.toLowerCase() + ".") === 0 ? endpoint : bucket + "." + endpoint;
+        var path = objectKey.split("/").map(function (part) { return encodeURIComponent(part); }).join("/");
+        return scheme + "://" + host + "/" + path;
     }
 
     function testTarget(id, button) {
@@ -361,7 +397,12 @@
         var versions = state.versions || [];
         var publications = state.publications || [];
         setContent('<section class="client-panel"><div class="client-section-head"><div><h3>配置版本</h3><p>发布会先保存不可变版本文件，再更新客户端使用的固定地址。</p></div></div><div class="table-responsive"><table class="table table-hover table-vcenter"><thead><tr><th>版本</th><th>说明</th><th>格式</th><th>状态</th><th>发布时间</th><th>操作</th></tr></thead><tbody>' + versions.map(function (row) {
-            return '<tr><td><strong>v' + esc(row.config_version) + '</strong></td><td>' + esc(row.change_summary || "-") + '</td><td>' + modeName(row.encryption_mode) + '</td><td>' + statusBadge(row.status) + '</td><td>' + dateTime(row.published_at) + '</td><td><div class="client-row-actions"><button class="btn btn-sm btn-light" data-clone="' + row.id + '">创建新草稿</button><button class="btn btn-sm btn-primary" data-publish="' + row.id + '" ' + (row.status === 'publishing' ? 'disabled' : '') + '>发布</button></div></td></tr>';
+            var isDraft = row.status === 'draft';
+            var actions = isDraft
+                ? '<button class="btn btn-sm btn-light" data-edit-version="' + row.id + '">编辑</button><button class="btn btn-sm btn-light text-danger" data-drop-version="' + row.id + '">删除</button>'
+                : '<button class="btn btn-sm btn-light" data-clone="' + row.id + '">创建新草稿</button>';
+            actions += '<button class="btn btn-sm btn-primary" data-publish="' + row.id + '" ' + (row.status === 'publishing' ? 'disabled' : '') + '>发布</button>';
+            return '<tr><td><strong>v' + esc(row.config_version) + '</strong></td><td>' + esc(row.change_summary || "-") + '</td><td>' + modeName(row.encryption_mode) + '</td><td>' + statusBadge(row.status) + '</td><td>' + dateTime(row.published_at) + '</td><td><div class="client-row-actions">' + actions + '</div></td></tr>';
         }).join("") + '</tbody></table></div></section>' +
             '<section class="client-panel"><div class="client-section-head"><div><h3>发布流水</h3><p>队列状态、远端校验结果和失败原因会保留在这里。</p></div></div><div class="table-responsive"><table class="table table-hover table-vcenter"><thead><tr><th>版本</th><th>目标</th><th>状态</th><th>尝试</th><th>完成时间</th><th>结果</th><th>操作</th></tr></thead><tbody>' +
             (publications.length ? publications.map(function (row) {
@@ -369,6 +410,8 @@
                 return '<tr><td>v' + esc(version ? version.config_version : row.config_id) + '</td><td><strong>' + esc(row.target ? row.target.name : "已删除目标") + '</strong><small>' + esc(row.target ? providerName(row.target.provider) : "-") + '</small></td><td>' + statusBadge(row.status) + '</td><td>' + esc(row.attempts) + '</td><td>' + dateTime(row.finished_at) + '</td><td class="client-publication-result">' + (row.error ? '<span class="text-danger" title="' + esc(row.error) + '">' + esc(row.error) + '</span>' : (row.public_url ? '<a href="' + esc(row.public_url) + '" target="_blank" rel="noopener">打开配置</a>' : '-')) + '</td><td>' + (row.status === 'failed' ? '<button class="btn btn-sm btn-light" data-retry="' + row.id + '">重试</button>' : '-') + '</td></tr>';
             }).join("") : '<tr><td colspan="7" class="text-center text-muted p-4">暂无发布记录</td></tr>') + '</tbody></table></div></section>');
         root.querySelectorAll("[data-clone]").forEach(function (button) { button.onclick = function () { cloneVersion(Number(button.dataset.clone)); }; });
+        root.querySelectorAll("[data-edit-version]").forEach(function (button) { button.onclick = function () { editVersion(Number(button.dataset.editVersion)); }; });
+        root.querySelectorAll("[data-drop-version]").forEach(function (button) { button.onclick = function () { dropVersion(Number(button.dataset.dropVersion)); }; });
         root.querySelectorAll("[data-publish]").forEach(function (button) { button.onclick = function () { openPublish(Number(button.dataset.publish)); }; });
         root.querySelectorAll("[data-retry]").forEach(function (button) { button.onclick = function () { retryPublication(Number(button.dataset.retry)); }; });
     }
@@ -390,7 +433,22 @@
     }
 
     function cloneVersion(id) {
-        api("/version/clone", { method: "POST", body: JSON.stringify({ id: id }) }).then(function () { activeTab = "editor"; toast("已创建新草稿"); load(); }).catch(function (error) { alert(error.message); });
+        api("/version/clone", { method: "POST", body: JSON.stringify({ id: id }) }).then(function (payload) { editingConfigId = payload.data.id; activeTab = "editor"; toast("已创建新草稿"); load(); }).catch(function (error) { alert(error.message); });
+    }
+
+    function editVersion(id) {
+        editingConfigId = id;
+        activeTab = "editor";
+        load();
+    }
+
+    function dropVersion(id) {
+        if (!confirm("确认删除这个未发布草稿？删除后无法恢复。")) return;
+        api("/version/drop", { method: "POST", body: JSON.stringify({ id: id }) }).then(function () {
+            if (Number(editingConfigId) === Number(id)) editingConfigId = null;
+            toast("草稿已删除");
+            load();
+        }).catch(function (error) { alert(error.message); });
     }
 
     function retryPublication(id) {

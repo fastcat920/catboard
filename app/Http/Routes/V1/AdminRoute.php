@@ -212,6 +212,7 @@ class AdminRoute
             $router->get ('/client-config/overview', 'V1\\Admin\\ClientRemoteConfigController@overview');
             $router->post('/client-config/draft/save', 'V1\\Admin\\ClientRemoteConfigController@saveDraft');
             $router->post('/client-config/version/clone', 'V1\\Admin\\ClientRemoteConfigController@cloneVersion');
+            $router->post('/client-config/version/drop', 'V1\\Admin\\ClientRemoteConfigController@dropVersion');
             $router->post('/client-config/settings/save', 'V1\\Admin\\ClientRemoteConfigController@saveSettings');
             $router->post('/client-config/target/save', 'V1\\Admin\\ClientRemoteConfigController@saveTarget');
             $router->post('/client-config/target/drop', 'V1\\Admin\\ClientRemoteConfigController@dropTarget');

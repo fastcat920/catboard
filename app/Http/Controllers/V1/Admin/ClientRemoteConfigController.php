@@ -185,9 +185,17 @@ class ClientRemoteConfigController extends Controller
         $target = ClientStorageTarget::findOrFail($data['id']);
         $key = preg_replace('#[^/]+$#', '.fastcat-connection-test.txt', ltrim($target->object_key, '/'));
         $body = 'FastCat storage connection test ' . gmdate('c');
-        $storage->upload($target, $key, $body);
+        try {
+            $storage->upload($target, $key, $body);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['target' => '上传测试失败：' . $error->getMessage()]);
+        }
         $url = $storage->publicUrlFor($target, $key);
-        $storage->verifyPublicObject($url, $body);
+        try {
+            $storage->verifyPublicObject($url, $body);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['target' => '文件已上传，但公开读取失败：' . $error->getMessage() . '。请确认 Bucket 未开启“阻止公共访问”，且 AccessKey 具有设置对象 ACL 的权限。']);
+        }
         return response(['data' => ['success' => true, 'url' => $url]]);
     }
 

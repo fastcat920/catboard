@@ -79,7 +79,12 @@ class ClientConfigStorageService
         $contentMd5 = base64_encode(md5($body, true));
         $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
         $token = $this->optionalDecrypt($target->security_token_encrypted);
-        $canonicalHeaders = $token ? 'x-oss-security-token:' . $token . "\n" : '';
+        $ossHeaders = [];
+        if ($this->usesAutomaticPublicUrl($target)) $ossHeaders['x-oss-object-acl'] = 'public-read';
+        if ($token) $ossHeaders['x-oss-security-token'] = $token;
+        ksort($ossHeaders);
+        $canonicalHeaders = '';
+        foreach ($ossHeaders as $name => $value) $canonicalHeaders .= $name . ':' . $value . "\n";
         $stringToSign = "PUT\n{$contentMd5}\n{$contentType}\n{$date}\n{$canonicalHeaders}{$canonicalResource}";
         $headers = [
             'Host' => $host,
@@ -88,6 +93,7 @@ class ClientConfigStorageService
             'Content-Type' => $contentType,
             'Authorization' => 'OSS ' . $accessKey . ':' . base64_encode(hash_hmac('sha1', $stringToSign, $secretKey, true)),
         ];
+        if ($this->usesAutomaticPublicUrl($target)) $headers['x-oss-object-acl'] = 'public-read';
         if ($token) $headers['x-oss-security-token'] = $token;
         return $this->put($url, $headers, $body);
     }
@@ -104,6 +110,7 @@ class ClientConfigStorageService
             'content-type' => $contentType,
             'host' => strtolower($host),
         ];
+        if ($this->usesAutomaticPublicUrl($target)) $signedHeaders['x-cos-acl'] = 'public-read';
         $token = $this->optionalDecrypt($target->security_token_encrypted);
         if ($token) $signedHeaders['x-cos-security-token'] = $token;
         ksort($signedHeaders);
@@ -119,6 +126,7 @@ class ClientConfigStorageService
             . '&q-sign-time=' . $keyTime . '&q-key-time=' . $keyTime
             . '&q-header-list=' . $headerList . '&q-url-param-list=&q-signature=' . $signature;
         $headers = ['Host' => $host, 'Content-Type' => $contentType, 'Content-MD5' => $contentMd5, 'Authorization' => $authorization];
+        if ($this->usesAutomaticPublicUrl($target)) $headers['x-cos-acl'] = 'public-read';
         if ($token) $headers['x-cos-security-token'] = $token;
         return $this->put($url, $headers, $body);
     }
@@ -152,6 +160,11 @@ class ClientConfigStorageService
         $host = strpos($endpoint, $target->bucket . '.') === 0 ? $endpoint : $target->bucket . '.' . $endpoint;
         $path = '/' . $this->encodePath($objectKey);
         return [$scheme . '://' . $host . $path, $host, $path];
+    }
+
+    private function usesAutomaticPublicUrl(ClientStorageTarget $target): bool
+    {
+        return rtrim((string)$target->public_url, '/') === rtrim($this->defaultPublicUrlFor($target, $target->object_key), '/');
     }
 
     private function put(string $url, array $headers, string $body): array

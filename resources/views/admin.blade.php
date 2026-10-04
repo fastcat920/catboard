@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/assets/referral-growth.css?v={{$version}}-{{filemtime(public_path('assets/referral-growth.css'))}}">
     <link rel="stylesheet" href="/assets/admin/coupon-center.css?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.css'))}}">
     <link rel="stylesheet" href="/assets/admin/marketing-activity.css?v={{$version}}-{{filemtime(public_path('assets/admin/marketing-activity.css'))}}">
+    <link rel="stylesheet" href="/assets/admin/client-config-center.css?v={{$version}}-{{filemtime(public_path('assets/admin/client-config-center.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     <title>{{$title}}</title>
@@ -40,6 +41,7 @@
 <script src="/assets/admin/referral-admin.js?v={{$version}}-{{filemtime(public_path('assets/admin/referral-admin.js'))}}"></script>
 <script src="/assets/admin/coupon-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.js'))}}"></script>
 <script src="/assets/admin/marketing-activity.js?v={{$version}}-{{filemtime(public_path('assets/admin/marketing-activity.js'))}}"></script>
+<script src="/assets/admin/client-config-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/client-config-center.js'))}}"></script>
 </body>
 
 </html>

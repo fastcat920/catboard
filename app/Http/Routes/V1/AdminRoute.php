@@ -208,6 +208,17 @@ class AdminRoute
             $router->get ('/theme/getThemes', 'V1\\Admin\\ThemeController@getThemes');
             $router->post('/theme/saveThemeConfig', 'V1\\Admin\\ThemeController@saveThemeConfig');
             $router->post('/theme/getThemeConfig', 'V1\\Admin\\ThemeController@getThemeConfig');
+            // Client remote configuration center
+            $router->get ('/client-config/overview', 'V1\\Admin\\ClientRemoteConfigController@overview');
+            $router->post('/client-config/draft/save', 'V1\\Admin\\ClientRemoteConfigController@saveDraft');
+            $router->post('/client-config/version/clone', 'V1\\Admin\\ClientRemoteConfigController@cloneVersion');
+            $router->post('/client-config/settings/save', 'V1\\Admin\\ClientRemoteConfigController@saveSettings');
+            $router->post('/client-config/target/save', 'V1\\Admin\\ClientRemoteConfigController@saveTarget');
+            $router->post('/client-config/target/drop', 'V1\\Admin\\ClientRemoteConfigController@dropTarget');
+            $router->post('/client-config/target/test', 'V1\\Admin\\ClientRemoteConfigController@testTarget');
+            $router->post('/client-config/preview', 'V1\\Admin\\ClientRemoteConfigController@preview');
+            $router->post('/client-config/publish', 'V1\\Admin\\ClientRemoteConfigController@publish');
+            $router->post('/client-config/publication/retry', 'V1\\Admin\\ClientRemoteConfigController@retryPublication');
             // Node security
             $router->get ('/security/dashboard', 'V1\\Admin\\NodeSecurityController@dashboard');
             $router->get ('/security/events', 'V1\\Admin\\NodeSecurityController@events');

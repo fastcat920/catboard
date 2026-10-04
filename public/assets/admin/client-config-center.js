@@ -341,12 +341,14 @@
         var body = '<form data-target-form><div class="client-grid cols-2">' +
             field("目标名称", "name", row.name || "") +
             '<label class="client-field"><span>云服务商</span><select class="form-control" name="provider"><option value="aliyun_oss">阿里云 OSS</option><option value="tencent_cos">腾讯云 COS</option><option value="ucloud_us3">UCloud US3</option></select></label>' +
-            field("区域", "region", row.region || "", "text", "腾讯云可用于自动生成 Endpoint，例如 ap-guangzhou") + field("Endpoint", "endpoint", row.endpoint || "", "text", "支持主机名、HTTP 或 HTTPS 地址") +
-            field("Bucket", "bucket", row.bucket || "") + field("对象路径", "object_key", row.object_key || "config.json") +
+            field("Endpoint", "endpoint", row.endpoint || "", "text", "填写云存储控制台提供的地域访问地址，支持 HTTP 或 HTTPS") +
+            field("Bucket", "bucket", row.bucket || "") +
+            '<label class="client-field span-2"><span>对象路径</span><input class="form-control" name="object_key" type="text" value="' + esc(row.object_key || "config.json") + '"></label>' +
             '<div class="client-readonly-field span-2"><span>自动生成的公开访问地址</span><strong data-generated-public-url>' + esc(automaticPublicUrl || "填写 Endpoint、Bucket 和对象路径后自动生成") + '</strong><small>后台会将配置对象设为公共读并使用该地址校验；如果 Bucket 开启了“阻止公共访问”，测试会失败。</small></div>' +
             '<label class="client-check span-2"><input type="checkbox" name="custom_public_url" ' + (hasCustomPublicUrl ? 'checked' : '') + '><span>使用 CDN 或自定义公开地址</span></label>' +
             '<label class="client-field span-2" data-custom-public-url ' + (hasCustomPublicUrl ? '' : 'hidden') + '><span>自定义公开访问地址</span><input class="form-control" name="public_url" value="' + esc(hasCustomPublicUrl ? row.public_url : "") + '" placeholder="https://config.example.com/client/config.json"><small>允许 HTTP 或 HTTPS，必须指向相同的对象路径并支持匿名读取。</small></label>' +
-            field("AccessKey ID", "access_key_id", "", "password", row.has_credentials ? "已安全保存，留空保持不变" : "必填") + field("SecretKey", "secret_key", "", "password", row.has_credentials ? "已安全保存，留空保持不变" : "必填") +
+            '<label class="client-field"><span data-access-key-label>AccessKey ID</span><input class="form-control" name="access_key_id" type="password" value=""><small>' + (row.has_credentials ? "已安全保存，留空保持不变" : "必填") + '</small></label>' +
+            '<label class="client-field"><span data-secret-key-label>AccessKey Secret</span><input class="form-control" name="secret_key" type="password" value=""><small>' + (row.has_credentials ? "已安全保存，留空保持不变" : "必填") + '</small></label>' +
             field("临时安全令牌", "security_token", "", "password", "仅使用临时密钥时填写") +
             '<div class="client-toggle-stack"><label class="client-check"><input type="checkbox" name="enabled" ' + (row.enabled === false ? '' : 'checked') + '><span>启用目标</span></label><label class="client-check"><input type="checkbox" name="is_primary" ' + (row.is_primary ? 'checked' : '') + '><span>设为主目标</span></label></div></div></form>';
         var modal = makeModal(row.id ? "编辑云存储目标" : "新增云存储目标", body, '<button class="btn btn-light" data-close>取消</button><button class="btn btn-primary" data-save>保存</button>');
@@ -354,11 +356,22 @@
         form.provider.value = row.provider || "aliyun_oss";
         var generatedPublicUrl = modal.querySelector("[data-generated-public-url]");
         var customPublicUrlField = modal.querySelector("[data-custom-public-url]");
+        function syncCredentialLabels() {
+            var labels = {
+                aliyun_oss: ["AccessKey ID", "AccessKey Secret"],
+                tencent_cos: ["SecretId", "SecretKey"],
+                ucloud_us3: ["公钥", "私钥"],
+            }[form.provider.value] || ["AccessKey ID", "SecretKey"];
+            modal.querySelector("[data-access-key-label]").textContent = labels[0];
+            modal.querySelector("[data-secret-key-label]").textContent = labels[1];
+        }
         function syncPublicUrl() {
             var url = defaultTargetPublicUrl({ endpoint: form.endpoint.value, bucket: form.bucket.value, object_key: form.object_key.value });
             generatedPublicUrl.textContent = url || "填写 Endpoint、Bucket 和对象路径后自动生成";
         }
         [form.endpoint, form.bucket, form.object_key].forEach(function (input) { input.addEventListener("input", syncPublicUrl); });
+        form.provider.addEventListener("change", syncCredentialLabels);
+        syncCredentialLabels();
         form.custom_public_url.onchange = function () {
             customPublicUrlField.hidden = !form.custom_public_url.checked;
             if (!form.custom_public_url.checked) form.public_url.value = "";
@@ -367,7 +380,7 @@
             var button = this;
             button.disabled = true;
             var payload = { id: row.id || null };
-            ["name","provider","region","endpoint","bucket","object_key","access_key_id","secret_key","security_token"].forEach(function (key) { payload[key] = form[key].value.trim(); });
+            ["name","provider","endpoint","bucket","object_key","access_key_id","secret_key","security_token"].forEach(function (key) { payload[key] = form[key].value.trim(); });
             payload.public_url = form.custom_public_url.checked ? form.public_url.value.trim() : "";
             if (form.custom_public_url.checked && !payload.public_url) {
                 button.disabled = false;

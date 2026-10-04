@@ -143,7 +143,6 @@ class ClientRemoteConfigController extends Controller
             'provider' => 'required|in:aliyun_oss,tencent_cos,ucloud_us3',
             'enabled' => 'required|boolean',
             'is_primary' => 'required|boolean',
-            'region' => 'nullable|string|max:100',
             'endpoint' => ['required', 'string', 'max:255', 'regex:/^(https?:\/\/)?[a-z0-9.-]+(?::[0-9]+)?$/i'],
             'bucket' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9][a-z0-9.-]*$/i'],
             'object_key' => ['required', 'string', 'max:500', 'regex:/^[^?#]+$/'],
@@ -154,11 +153,12 @@ class ClientRemoteConfigController extends Controller
         ]);
         $target = !empty($data['id']) ? ClientStorageTarget::findOrFail($data['id']) : new ClientStorageTarget();
         if (!$target->exists && (empty($data['access_key_id']) || empty($data['secret_key']))) {
-            throw ValidationException::withMessages(['access_key_id' => '新建目标时必须填写访问密钥']);
+            throw ValidationException::withMessages(['access_key_id' => '新建目标时必须填写完整的密钥信息']);
         }
-        foreach (['name','provider','enabled','is_primary','region','endpoint','bucket','object_key'] as $field) {
+        foreach (['name','provider','enabled','is_primary','endpoint','bucket','object_key'] as $field) {
             $target->{$field} = $data[$field] ?? null;
         }
+        $target->region = null;
         $target->public_url = trim((string)($data['public_url'] ?? ''));
         if ($target->public_url === '') {
             $target->public_url = $storage->defaultPublicUrlFor($target, $target->object_key);
@@ -205,7 +205,10 @@ class ClientRemoteConfigController extends Controller
         }
         if ($verificationError) {
             $cleanupMessage = $cleanupError ? '；此外，测试文件未能自动删除：' . $cleanupError->getMessage() : '';
-            throw ValidationException::withMessages(['target' => '文件已上传，但公开读取失败：' . $verificationError->getMessage() . '。请确认 Bucket 未开启“阻止公共访问”，且 AccessKey 具有设置对象 ACL 的权限' . $cleanupMessage . '。']);
+            $permissionHint = $target->provider === 'ucloud_us3'
+                ? '请确认当前地域支持单文件权限控制，且公钥/私钥属于 Bucket 创建账户并具有 PutObjectAcl 权限'
+                : '请确认 Bucket 未开启“阻止公共访问”，且访问密钥具有设置对象 ACL 的权限';
+            throw ValidationException::withMessages(['target' => '文件已上传，但公开读取失败：' . $verificationError->getMessage() . '。' . $permissionHint . $cleanupMessage . '。']);
         }
         return response(['data' => [
             'success' => true,

@@ -17,8 +17,9 @@ class ClientConfigStorageService
 
     public function upload(ClientStorageTarget $target, string $objectKey, string $body): array
     {
-        $accessKey = $this->decrypt($target->access_key_id_encrypted, 'AccessKey ID');
-        $secretKey = $this->decrypt($target->secret_key_encrypted, 'SecretKey');
+        list($accessKeyLabel, $secretKeyLabel) = $this->credentialLabels($target);
+        $accessKey = $this->decrypt($target->access_key_id_encrypted, $accessKeyLabel);
+        $secretKey = $this->decrypt($target->secret_key_encrypted, $secretKeyLabel);
         if ($target->provider === 'aliyun_oss') {
             return $this->uploadAliyun($target, $objectKey, $body, $accessKey, $secretKey);
         }
@@ -48,8 +49,9 @@ class ClientConfigStorageService
 
     public function deleteObject(ClientStorageTarget $target, string $objectKey): void
     {
-        $accessKey = $this->decrypt($target->access_key_id_encrypted, 'AccessKey ID');
-        $secretKey = $this->decrypt($target->secret_key_encrypted, 'SecretKey');
+        list($accessKeyLabel, $secretKeyLabel) = $this->credentialLabels($target);
+        $accessKey = $this->decrypt($target->access_key_id_encrypted, $accessKeyLabel);
+        $secretKey = $this->decrypt($target->secret_key_encrypted, $secretKeyLabel);
         if ($target->provider === 'aliyun_oss') {
             $this->deleteAliyun($target, $objectKey, $accessKey, $secretKey);
             return;
@@ -77,8 +79,11 @@ class ClientConfigStorageService
 
     public function defaultPublicUrlFor(ClientStorageTarget $target, string $objectKey): string
     {
-        $provider = $target->provider === 'tencent_cos' ? 'cos' : ($target->provider === 'ucloud_us3' ? 'us3' : 'oss');
-        list($url) = $this->targetAddress($target, $objectKey, $provider);
+        if ($target->provider === 'ucloud_us3') {
+            list($url) = $this->ucloudNativeAddress($target, $objectKey);
+            return $url;
+        }
+        list($url) = $this->targetAddress($target, $objectKey);
         return $url;
     }
 
@@ -92,7 +97,7 @@ class ClientConfigStorageService
 
     private function uploadAliyun(ClientStorageTarget $target, string $objectKey, string $body, string $accessKey, string $secretKey): array
     {
-        list($url, $host, $path) = $this->targetAddress($target, $objectKey, 'oss');
+        list($url, $host, $path) = $this->targetAddress($target, $objectKey);
         $date = gmdate('D, d M Y H:i:s \G\M\T');
         $contentType = 'application/octet-stream';
         $contentMd5 = base64_encode(md5($body, true));
@@ -119,7 +124,7 @@ class ClientConfigStorageService
 
     private function uploadTencent(ClientStorageTarget $target, string $objectKey, string $body, string $accessKey, string $secretKey): array
     {
-        list($url, $host, $path) = $this->targetAddress($target, $objectKey, 'cos');
+        list($url, $host, $path) = $this->targetAddress($target, $objectKey);
         $now = time();
         $keyTime = $now . ';' . ($now + 600);
         $contentType = 'application/octet-stream';
@@ -152,7 +157,7 @@ class ClientConfigStorageService
 
     private function uploadUcloud(ClientStorageTarget $target, string $objectKey, string $body, string $accessKey, string $secretKey): array
     {
-        list($url, $host) = $this->targetAddress($target, $objectKey, 'us3');
+        list($url, $host) = $this->ucloudNativeAddress($target, $objectKey);
         $date = gmdate('D, d M Y H:i:s \G\M\T');
         $contentType = 'application/octet-stream';
         $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
@@ -163,12 +168,79 @@ class ClientConfigStorageService
             'Content-Type' => $contentType,
             'Authorization' => 'UCloud ' . $accessKey . ':' . base64_encode(hash_hmac('sha1', $stringToSign, $secretKey, true)),
         ];
-        return $this->put($url, $headers, $body);
+        $result = $this->put($url, $headers, $body);
+        if ($this->usesAutomaticPublicUrl($target)) {
+            try {
+                $this->setUcloudPublicReadAcl($target, $objectKey, $accessKey, $secretKey);
+            } catch (\Throwable $error) {
+                try {
+                    $this->deleteUcloud($target, $objectKey, $accessKey, $secretKey);
+                } catch (\Throwable $cleanupError) {
+                    throw new \RuntimeException($error->getMessage() . '；已上传的私有文件未能自动删除：' . $cleanupError->getMessage(), 0, $error);
+                }
+                throw $error;
+            }
+        }
+        return $result;
+    }
+
+    private function setUcloudPublicReadAcl(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
+    {
+        list($url, $host, $path) = $this->ucloudS3Address($target, $objectKey);
+        $amzDate = gmdate('Ymd\THis\Z');
+        $dateStamp = substr($amzDate, 0, 8);
+        $region = 'us-east-1';
+        $service = 's3';
+        $payloadHash = hash('sha256', '');
+        $signedHeaders = [
+            'host' => strtolower($host),
+            'x-amz-acl' => 'public-read',
+            'x-amz-content-sha256' => $payloadHash,
+            'x-amz-date' => $amzDate,
+        ];
+        $token = $this->optionalDecrypt($target->security_token_encrypted);
+        if ($token) $signedHeaders['x-amz-security-token'] = $token;
+        ksort($signedHeaders);
+
+        $canonicalHeaders = '';
+        foreach ($signedHeaders as $name => $value) {
+            $canonicalHeaders .= $name . ':' . trim(preg_replace('/\s+/', ' ', $value)) . "\n";
+        }
+        $signedHeaderNames = implode(';', array_keys($signedHeaders));
+        $canonicalRequest = "PUT\n{$path}\nacl=\n{$canonicalHeaders}\n{$signedHeaderNames}\n{$payloadHash}";
+        $credentialScope = $dateStamp . '/' . $region . '/' . $service . '/aws4_request';
+        $stringToSign = "AWS4-HMAC-SHA256\n{$amzDate}\n{$credentialScope}\n" . hash('sha256', $canonicalRequest);
+        $dateKey = hash_hmac('sha256', $dateStamp, 'AWS4' . $secretKey, true);
+        $regionKey = hash_hmac('sha256', $region, $dateKey, true);
+        $serviceKey = hash_hmac('sha256', $service, $regionKey, true);
+        $signingKey = hash_hmac('sha256', 'aws4_request', $serviceKey, true);
+        $signature = hash_hmac('sha256', $stringToSign, $signingKey);
+
+        $headers = [
+            'Host' => $host,
+            'x-amz-acl' => 'public-read',
+            'x-amz-content-sha256' => $payloadHash,
+            'x-amz-date' => $amzDate,
+            'Authorization' => 'AWS4-HMAC-SHA256 Credential=' . $accessKey . '/' . $credentialScope
+                . ', SignedHeaders=' . $signedHeaderNames . ', Signature=' . $signature,
+        ];
+        if ($token) $headers['x-amz-security-token'] = $token;
+
+        $response = $this->client->put($url . '?acl', ['headers' => $headers, 'body' => '']);
+        $status = $response->getStatusCode();
+        if ($status < 200 || $status >= 300) {
+            $message = trim((string)$response->getBody());
+            throw new \RuntimeException(
+                'UCloud 单文件公有读设置失败（HTTP ' . $status . '）：'
+                . mb_substr($message, 0, 500)
+                . '。请确认当前地域支持 PutObjectAcl，且公钥/私钥属于 Bucket 创建账户'
+            );
+        }
     }
 
     private function deleteAliyun(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
     {
-        list($url, $host) = $this->targetAddress($target, $objectKey, 'oss');
+        list($url, $host) = $this->targetAddress($target, $objectKey);
         $date = gmdate('D, d M Y H:i:s \G\M\T');
         $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
         $token = $this->optionalDecrypt($target->security_token_encrypted);
@@ -185,7 +257,7 @@ class ClientConfigStorageService
 
     private function deleteTencent(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
     {
-        list($url, $host, $path) = $this->targetAddress($target, $objectKey, 'cos');
+        list($url, $host, $path) = $this->targetAddress($target, $objectKey);
         $now = time();
         $keyTime = $now . ';' . ($now + 600);
         $signedHeaders = ['host' => strtolower($host)];
@@ -210,7 +282,7 @@ class ClientConfigStorageService
 
     private function deleteUcloud(ClientStorageTarget $target, string $objectKey, string $accessKey, string $secretKey): void
     {
-        list($url, $host) = $this->targetAddress($target, $objectKey, 'us3');
+        list($url, $host) = $this->ucloudNativeAddress($target, $objectKey);
         $date = gmdate('D, d M Y H:i:s \G\M\T');
         $canonicalResource = '/' . $target->bucket . '/' . ltrim($objectKey, '/');
         $stringToSign = "DELETE\n\n\n{$date}\n{$canonicalResource}";
@@ -222,17 +294,62 @@ class ClientConfigStorageService
         $this->delete($url, $headers);
     }
 
-    private function targetAddress(ClientStorageTarget $target, string $objectKey, string $provider): array
+    private function targetAddress(ClientStorageTarget $target, string $objectKey): array
     {
         $rawEndpoint = trim((string)$target->endpoint);
         $scheme = stripos($rawEndpoint, 'http://') === 0 ? 'http' : 'https';
         $endpoint = preg_replace('#^https?://#i', '', $rawEndpoint);
         $endpoint = rtrim($endpoint, '/');
-        if ($endpoint === '') {
-            if ($provider === 'cos' && $target->region) $endpoint = 'cos.' . $target->region . '.myqcloud.com';
-            else throw new \RuntimeException('云存储 Endpoint 不能为空');
-        }
+        if ($endpoint === '') throw new \RuntimeException('云存储 Endpoint 不能为空');
         $host = strpos($endpoint, $target->bucket . '.') === 0 ? $endpoint : $target->bucket . '.' . $endpoint;
+        $path = '/' . $this->encodePath($objectKey);
+        return [$scheme . '://' . $host . $path, $host, $path];
+    }
+
+    private function ucloudS3Address(ClientStorageTarget $target, string $objectKey): array
+    {
+        $rawEndpoint = trim((string)$target->endpoint);
+        $scheme = stripos($rawEndpoint, 'http://') === 0 ? 'http' : 'https';
+        $endpoint = preg_replace('#^https?://#i', '', $rawEndpoint);
+        $endpoint = rtrim($endpoint, '/');
+        $bucketPrefix = $target->bucket . '.';
+        if (stripos($endpoint, $bucketPrefix) === 0) {
+            $endpoint = substr($endpoint, strlen($bucketPrefix));
+        }
+        if (stripos($endpoint, 'internal.') === 0) {
+            $base = substr($endpoint, strlen('internal.'));
+            if (stripos($base, 's3-') !== 0) $base = 's3-' . $base;
+            $endpoint = 'internal.' . $base;
+        } elseif (stripos($endpoint, 's3-') !== 0) {
+            $endpoint = 's3-' . $endpoint;
+        }
+        if (!preg_match('/^(?:internal\.)?s3-[a-z0-9-]+\.ufileos\.com(?::[0-9]+)?$/i', $endpoint)) {
+            throw new \RuntimeException('无法根据当前 Endpoint 生成 UCloud S3 Endpoint，请填写类似 hk.ufileos.com 或 s3-hk.ufileos.com 的官方地域地址');
+        }
+        $host = $endpoint;
+        $path = '/' . rawurlencode($target->bucket) . '/' . $this->encodePath($objectKey);
+        return [$scheme . '://' . $host . $path, $host, $path];
+    }
+
+    private function ucloudNativeAddress(ClientStorageTarget $target, string $objectKey): array
+    {
+        $rawEndpoint = trim((string)$target->endpoint);
+        $scheme = stripos($rawEndpoint, 'http://') === 0 ? 'http' : 'https';
+        $endpoint = preg_replace('#^https?://#i', '', $rawEndpoint);
+        $endpoint = rtrim($endpoint, '/');
+        $bucketPrefix = $target->bucket . '.';
+        if (stripos($endpoint, $bucketPrefix) === 0) {
+            $endpoint = substr($endpoint, strlen($bucketPrefix));
+        }
+        if (stripos($endpoint, 'internal.s3-') === 0) {
+            $endpoint = 'internal.' . substr($endpoint, strlen('internal.s3-'));
+        } elseif (stripos($endpoint, 's3-') === 0) {
+            $endpoint = substr($endpoint, strlen('s3-'));
+        }
+        if (!preg_match('/^(?:internal\.)?[a-z0-9-]+\.ufileos\.com(?::[0-9]+)?$/i', $endpoint)) {
+            throw new \RuntimeException('UCloud Endpoint 格式不正确，请填写类似 hk.ufileos.com 或 s3-hk.ufileos.com 的官方地域地址');
+        }
+        $host = $target->bucket . '.' . $endpoint;
         $path = '/' . $this->encodePath($objectKey);
         return [$scheme . '://' . $host . $path, $host, $path];
     }
@@ -266,6 +383,13 @@ class ClientConfigStorageService
     private function encodePath(string $value): string
     {
         return implode('/', array_map('rawurlencode', explode('/', ltrim($value, '/'))));
+    }
+
+    private function credentialLabels(ClientStorageTarget $target): array
+    {
+        if ($target->provider === 'tencent_cos') return ['SecretId', 'SecretKey'];
+        if ($target->provider === 'ucloud_us3') return ['公钥', '私钥'];
+        return ['AccessKey ID', 'AccessKey Secret'];
     }
 
     private function decrypt(?string $value, string $label): string

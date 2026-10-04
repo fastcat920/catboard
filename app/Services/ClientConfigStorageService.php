@@ -134,7 +134,9 @@ class ClientConfigStorageService
 
     private function targetAddress(ClientStorageTarget $target, string $objectKey, string $provider): array
     {
-        $endpoint = preg_replace('#^https?://#i', '', trim((string)$target->endpoint));
+        $rawEndpoint = trim((string)$target->endpoint);
+        $scheme = stripos($rawEndpoint, 'http://') === 0 ? 'http' : 'https';
+        $endpoint = preg_replace('#^https?://#i', '', $rawEndpoint);
         $endpoint = rtrim($endpoint, '/');
         if ($endpoint === '') {
             if ($provider === 'cos' && $target->region) $endpoint = 'cos.' . $target->region . '.myqcloud.com';
@@ -142,7 +144,7 @@ class ClientConfigStorageService
         }
         $host = strpos($endpoint, $target->bucket . '.') === 0 ? $endpoint : $target->bucket . '.' . $endpoint;
         $path = '/' . $this->encodePath($objectKey);
-        return ['https://' . $host . $path, $host, $path];
+        return [$scheme . '://' . $host . $path, $host, $path];
     }
 
     private function put(string $url, array $headers, string $body): array

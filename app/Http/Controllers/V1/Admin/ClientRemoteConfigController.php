@@ -47,10 +47,16 @@ class ClientRemoteConfigController extends Controller
             'content.panel_type' => 'required|string|max:50',
             'content.domains' => 'required|array|min:1|max:20',
             'content.domains.*' => 'required|url|max:1000',
+            'content.gateway_urls' => 'nullable|array|max:20',
+            'content.gateway_urls.*' => 'required|url|max:1000',
             'content.update' => 'required|array',
+            'content.update.schema_version' => 'nullable|integer|min:1|max:100',
+            'content.update.latest' => 'nullable|array',
+            'content.update.platforms' => 'nullable|array',
             'content.contact' => 'required|array',
             'content.features' => 'required|array',
             'content.ticket' => 'required|array',
+            'content.latency.display_discount_percent' => 'nullable|integer|min:0|max:90',
             'encryption_mode' => 'required|in:xor_base64,plain,signed_xor_v2',
             'change_summary' => 'nullable|string|max:500',
         ]);
@@ -62,7 +68,7 @@ class ClientRemoteConfigController extends Controller
             $row->config_version = ((int)ClientRemoteConfig::max('config_version')) + 1;
             $row->status = 'draft';
         }
-        $content = $data['content'];
+        $content = $this->normalizeContent($data['content']);
         $content['config_version'] = (string)$row->config_version;
         $row->content_json = $crypto->canonicalJson($content);
         $row->checksum = $crypto->checksum($content);
@@ -125,7 +131,7 @@ class ClientRemoteConfigController extends Controller
             'enabled' => 'required|boolean',
             'is_primary' => 'required|boolean',
             'region' => 'nullable|string|max:100',
-            'endpoint' => ['required', 'string', 'max:255', 'regex:/^(https:\/\/)?[a-z0-9.-]+(?::[0-9]+)?$/i'],
+            'endpoint' => ['required', 'string', 'max:255', 'regex:/^(https?:\/\/)?[a-z0-9.-]+(?::[0-9]+)?$/i'],
             'bucket' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9][a-z0-9.-]*$/i'],
             'object_key' => ['required', 'string', 'max:500', 'regex:/^[^?#]+$/'],
             'public_url' => 'required|url|max:1000',
@@ -133,9 +139,6 @@ class ClientRemoteConfigController extends Controller
             'secret_key' => 'nullable|string|max:1000',
             'security_token' => 'nullable|string|max:2000',
         ]);
-        if (stripos($data['public_url'], 'https://') !== 0) {
-            throw ValidationException::withMessages(['public_url' => '公开访问地址必须使用 HTTPS']);
-        }
         $target = !empty($data['id']) ? ClientStorageTarget::findOrFail($data['id']) : new ClientStorageTarget();
         if (!$target->exists && (empty($data['access_key_id']) || empty($data['secret_key']))) {
             throw ValidationException::withMessages(['access_key_id' => '新建目标时必须填写访问密钥']);
@@ -247,16 +250,122 @@ class ClientRemoteConfigController extends Controller
 
     private function validateRemoteUrls(array $content): void
     {
-        $urls = array_merge((array)($content['domains'] ?? []), [
-            $content['contact']['crisp_proxy_url'] ?? '',
-            $content['contact']['website'] ?? '',
-            $content['contact']['telegram_group'] ?? '',
-        ]);
-        foreach ((array)($content['update']['latest'] ?? []) as $platform) $urls[] = $platform['url'] ?? '';
-        foreach ($urls as $url) {
-            if ($url !== '' && stripos((string)$url, 'https://') !== 0) {
-                throw ValidationException::withMessages(['content' => '远程配置中的网络地址必须使用 HTTPS：' . $url]);
+        $contact = (array)($content['contact'] ?? []);
+        $urls = array_merge(
+            (array)($content['domains'] ?? []),
+            (array)($content['gateway_urls'] ?? []),
+            (array)($content['gateway_url'] ?? []),
+            (array)($contact['website'] ?? []),
+            [
+                $contact['crisp_proxy_url'] ?? '',
+                $contact['invite_domain'] ?? '',
+                $contact['telegram_group'] ?? ($contact['telegram'] ?? ''),
+            ]
+        );
+        foreach (['latest', 'platforms'] as $group) {
+            foreach ((array)($content['update'][$group] ?? []) as $platform) {
+                $urls[] = is_array($platform) ? ($platform['url'] ?? '') : '';
             }
         }
+        foreach ($urls as $url) {
+            $url = trim((string)$url);
+            if ($url !== '' && (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $url))) {
+                throw ValidationException::withMessages(['content' => '远程配置中的网络地址必须是有效的 HTTP 或 HTTPS 地址：' . $url]);
+            }
+        }
+    }
+
+    private function normalizeContent(array $content): array
+    {
+        $content['api_prefix'] = trim((string)($content['api_prefix'] ?? '/api/v1')) ?: '/api/v1';
+        $content['gateway_urls'] = array_values(array_filter(array_map('trim', (array)($content['gateway_urls'] ?? ($content['gateway_url'] ?? [])))));
+        unset($content['gateway_url']);
+
+        $contact = (array)($content['contact'] ?? []);
+        $contact['website'] = array_values(array_filter(array_map('trim', (array)($contact['website'] ?? []))));
+        $content['contact'] = $contact;
+
+        $featureKeys = [
+            'balance_enabled',
+            'devices_enabled',
+            'gift_card_enabled',
+            'join_group_enabled',
+            'knowledge_base_enabled',
+            'orders_enabled',
+            'tickets_enabled',
+            'traffic_details_enabled',
+        ];
+        $incomingFeatures = (array)($content['features'] ?? []);
+        $features = [];
+        foreach ($featureKeys as $key) {
+            $legacyKey = preg_replace('/_enabled$/', '', $key);
+            $features[$key] = array_key_exists($key, $incomingFeatures)
+                ? (bool)$incomingFeatures[$key]
+                : (array_key_exists($legacyKey, $incomingFeatures) ? (bool)$incomingFeatures[$legacyKey] : true);
+        }
+        $content['features'] = $features;
+
+        $content['latency'] = [
+            'display_discount_percent' => max(0, min(90, (int)($content['latency']['display_discount_percent'] ?? 0))),
+        ];
+
+        $update = (array)($content['update'] ?? []);
+        $legacyRows = (array)($update['latest'] ?? []);
+        $platformRows = (array)($update['platforms'] ?? []);
+        $supportedPlatforms = ['android', 'windows', 'macos', 'linux', 'ios', 'tvos'];
+        $normalizedPlatforms = [];
+        $normalizedLegacy = [];
+        foreach ($supportedPlatforms as $platform) {
+            $hasPlatformRow = array_key_exists($platform, $platformRows) && is_array($platformRows[$platform]);
+            $row = $hasPlatformRow ? $platformRows[$platform] : [];
+            $legacy = isset($legacyRows[$platform]) && is_array($legacyRows[$platform]) ? $legacyRows[$platform] : [];
+            $version = trim((string)($row['latest_version'] ?? $row['version'] ?? $legacy['version'] ?? ''));
+            $url = trim((string)($row['url'] ?? $legacy['url'] ?? ''));
+            $appId = trim((string)($row['app_id'] ?? ''));
+            $enabled = $hasPlatformRow
+                ? (($row['enabled'] ?? true) === true)
+                : ($version !== '' || $url !== '');
+            $force = ($row['force'] ?? $legacy['force'] ?? false) === true;
+            $changelog = $row['changelog'] ?? [];
+            if (is_string($changelog)) $changelog = ['zh_CN' => $changelog];
+            if (!is_array($changelog)) $changelog = [];
+
+            $normalizedRow = [
+                'enabled' => $enabled,
+                'source' => in_array(($row['source'] ?? ''), ['direct', 'app_store'], true)
+                    ? $row['source']
+                    : (in_array($platform, ['ios', 'tvos'], true) ? 'app_store' : 'direct'),
+                'latest_version' => $version,
+                'min_supported_version' => trim((string)($row['min_supported_version'] ?? '')),
+                'url' => $url,
+                'force' => $force,
+                'changelog' => [
+                    'zh_CN' => trim((string)($changelog['zh_CN'] ?? $changelog['zh-CN'] ?? '')),
+                    'en_US' => trim((string)($changelog['en_US'] ?? $changelog['en-US'] ?? '')),
+                ],
+            ];
+            if ($appId !== '') $normalizedRow['app_id'] = $appId;
+            $normalizedPlatforms[$platform] = $normalizedRow;
+
+            $legacyUrl = $url;
+            if ($legacyUrl === '' && $appId !== '') {
+                $legacyUrl = 'https://apps.apple.com/app/' . (strpos($appId, 'id') === 0 ? $appId : 'id' . $appId);
+            }
+            if ($enabled && $version !== '' && $legacyUrl !== '') {
+                $normalizedLegacy[$platform] = [
+                    'version' => $version,
+                    'url' => $legacyUrl,
+                    'force' => $force,
+                ];
+            }
+        }
+        $update['schema_version'] = 2;
+        $update['min_version'] = trim((string)($update['min_version'] ?? ''));
+        $update['changelog'] = trim((string)($update['changelog'] ?? ''));
+        $update['latest'] = $normalizedLegacy;
+        $update['platforms'] = $normalizedPlatforms;
+        $content['update'] = $update;
+
+        return $content;
     }
 }

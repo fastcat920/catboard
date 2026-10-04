@@ -101,36 +101,46 @@ class CreateClientRemoteConfigCenter extends Migration
         return [
             'config_version' => '1',
             'panel_type' => 'v2board',
+            'api_prefix' => '/api/v1',
             'domains' => [],
+            'gateway_urls' => [],
             'update' => [
+                'schema_version' => 2,
                 'changelog' => '',
-                'latest' => [
-                    'android' => ['url' => '', 'version' => ''],
-                    'linux' => ['url' => '', 'version' => ''],
-                    'macos' => ['url' => '', 'version' => ''],
-                    'windows' => ['url' => '', 'version' => ''],
-                ],
+                'latest' => [],
                 'min_version' => '',
+                'platforms' => array_reduce(['android', 'windows', 'macos', 'linux', 'ios', 'tvos'], function ($rows, $platform) {
+                    $rows[$platform] = [
+                        'enabled' => false,
+                        'source' => in_array($platform, ['ios', 'tvos'], true) ? 'app_store' : 'direct',
+                        'latest_version' => '',
+                        'min_supported_version' => '',
+                        'url' => '',
+                        'force' => false,
+                        'changelog' => ['zh_CN' => '', 'en_US' => ''],
+                    ];
+                    return $rows;
+                }, []),
             ],
             'contact' => [
                 'crisp_proxy_url' => '',
                 'crisp_website_id' => '',
+                'invite_domain' => '',
                 'salesmartly_token' => '',
                 'telegram_group' => '',
-                'website' => '',
+                'website' => [],
             ],
             'features' => [
-                'balance' => true,
-                'devices' => true,
-                'gift_card' => true,
-                'invite' => true,
-                'join_group' => true,
-                'knowledge_base' => true,
-                'orders' => true,
-                'purchase' => true,
-                'tickets' => true,
-                'traffic_details' => true,
+                'balance_enabled' => true,
+                'devices_enabled' => true,
+                'gift_card_enabled' => true,
+                'join_group_enabled' => true,
+                'knowledge_base_enabled' => true,
+                'orders_enabled' => true,
+                'tickets_enabled' => true,
+                'traffic_details_enabled' => true,
             ],
+            'latency' => ['display_discount_percent' => 0],
             'ticket' => ['imgbb_api_key' => ''],
         ];
     }

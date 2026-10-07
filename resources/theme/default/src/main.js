@@ -69,6 +69,14 @@ const managedConfig = {
       windows: valueOr(theme.client_link_windows, '/#/docs/3'),
       linux: valueOr(theme.client_link_linux, 'https://github.com/xxx/releases/latest'),
       openwrt: valueOr(theme.client_link_openwrt, 'https://github.com/xxx/releases/latest')
+    },
+    clientVersions: {
+      ios: valueOr(theme.client_version_ios, '2.2.0'),
+      android: valueOr(theme.client_version_android, '3.5.9'),
+      macos: valueOr(theme.client_version_macos, '3.5.9'),
+      windows: valueOr(theme.client_version_windows, '3.5.9'),
+      linux: valueOr(theme.client_version_linux, '3.5.9'),
+      openwrt: valueOr(theme.client_version_openwrt, '3.5.9')
     }
   },
   CUSTOMER_SERVICE_CONFIG: {

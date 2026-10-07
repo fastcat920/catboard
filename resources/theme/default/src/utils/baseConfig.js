@@ -351,6 +351,16 @@ const DEFAULT_CLIENT_CONFIG = {
     openwrt: 'https://github.com/xxx/releases/latest'  // OpenWrt客户端下载链接
   },
 
+  // 首页下载卡片显示的版本号
+  clientVersions: {
+    ios: '2.2.0',
+    android: '3.5.9',
+    macos: '3.5.9',
+    windows: '3.5.9',
+    linux: '3.5.9',
+    openwrt: '3.5.9'
+  },
+
   // ===========================================================
 
   // 订阅导入客户端显示控制

@@ -152,7 +152,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">iOS</div>
-                <div class="option-version">v2.2.0</div>
+                <div class="option-version">{{ getClientVersion('ios') }}</div>
               </div>
             </button>
             <button type="button" class="download-option" v-if="clientConfig.showAndroid" @click="downloadClient('android')">
@@ -161,7 +161,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">Android</div>
-                <div class="option-version">v3.5.9</div>
+                <div class="option-version">{{ getClientVersion('android') }}</div>
               </div>
             </button>
             <button type="button" class="download-option" v-if="clientConfig.showMacOS" @click="downloadClient('macos')">
@@ -170,7 +170,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">MacOS</div>
-                <div class="option-version">v3.5.9</div>
+                <div class="option-version">{{ getClientVersion('macos') }}</div>
               </div>
             </button>
             <button type="button" class="download-option" v-if="clientConfig.showWindows" @click="downloadClient('windows')">
@@ -179,7 +179,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">Windows</div>
-                <div class="option-version">v3.5.9</div>
+                <div class="option-version">{{ getClientVersion('windows') }}</div>
               </div>
             </button>
             <button type="button" class="download-option" v-if="clientConfig.showLinux" @click="downloadClient('linux')">
@@ -188,7 +188,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">Linux</div>
-                <div class="option-version">v3.5.9</div>
+                <div class="option-version">{{ getClientVersion('linux') }}</div>
               </div>
             </button>
             <button type="button" class="download-option" v-if="clientConfig.showOpenWrt" @click="downloadClient('openwrt')">
@@ -197,7 +197,7 @@
               </div>
               <div class="option-info">
                 <div class="option-name">OpenWrt</div>
-                <div class="option-version">v3.5.9</div>
+                <div class="option-version">{{ getClientVersion('openwrt') }}</div>
               </div>
             </button>
           </div>
@@ -817,6 +817,10 @@ export default {
     const goToShop = () => router.push('/shop');
     const goToSupport = () => router.push(window.innerWidth < 905 ? '/mobile/tickets' : '/tickets');
     const getClientDownloadUrl = (platform) => clientConfig.clientLinks?.[platform] || '';
+    const getClientVersion = (platform) => {
+      const version = String(clientConfig.clientVersions?.[platform] || '').trim();
+      return version && !/^v/i.test(version) ? `v${version}` : version;
+    };
     const downloadClient = (platform) => {
       const url = getClientDownloadUrl(platform);
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -928,7 +932,7 @@ export default {
     
     return {
       userStats, userBalance, currencySymbol, userPlan, clientConfig, notices, loading,
-      goToShop, downloadClient, hasPendingItems, router, currentNoticeIndex,
+      goToShop, downloadClient, getClientVersion, hasPendingItems, router, currentNoticeIndex,
       goToSupport, formatDate,
       showNoticeModal, closeNoticeModal, showNoticeDetails, noticeModalStyle,
       openResetTrafficModal, closeResetTrafficModal, confirmTrafficRecovery,

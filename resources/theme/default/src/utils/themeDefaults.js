@@ -266,6 +266,14 @@ const themeDefaults = {
       linux: 'https://github.com/xxx/releases/latest',
       openwrt: 'https://github.com/xxx/releases/latest'
     },
+    clientVersions: {
+      ios: '2.2.0',
+      android: '3.5.9',
+      macos: '3.5.9',
+      windows: '3.5.9',
+      linux: '3.5.9',
+      openwrt: '3.5.9'
+    },
     
     // 订阅导入客户端显示控制 部分面板不支持SingBox导入请您注意检查
 

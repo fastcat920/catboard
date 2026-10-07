@@ -160,6 +160,48 @@
       "default_value": "https://github.com/xxx/releases/latest"
     },
     {
+      "label": "iOS 版本号",
+      "placeholder": "例如 2.2.0",
+      "field_name": "client_version_ios",
+      "field_type": "input",
+      "default_value": "2.2.0"
+    },
+    {
+      "label": "Android 版本号",
+      "placeholder": "例如 3.5.9",
+      "field_name": "client_version_android",
+      "field_type": "input",
+      "default_value": "3.5.9"
+    },
+    {
+      "label": "macOS 版本号",
+      "placeholder": "例如 3.5.9",
+      "field_name": "client_version_macos",
+      "field_type": "input",
+      "default_value": "3.5.9"
+    },
+    {
+      "label": "Windows 版本号",
+      "placeholder": "例如 3.5.9",
+      "field_name": "client_version_windows",
+      "field_type": "input",
+      "default_value": "3.5.9"
+    },
+    {
+      "label": "Linux 版本号",
+      "placeholder": "例如 3.5.9",
+      "field_name": "client_version_linux",
+      "field_type": "input",
+      "default_value": "3.5.9"
+    },
+    {
+      "label": "OpenWrt 版本号",
+      "placeholder": "例如 3.5.9",
+      "field_name": "client_version_openwrt",
+      "field_type": "input",
+      "default_value": "3.5.9"
+    },
+    {
       "label": "启用客服系统",
       "field_name": "customer_service_enabled",
       "field_type": "select",

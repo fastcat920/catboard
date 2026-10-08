@@ -14,6 +14,7 @@ class TicketWithdraw  extends FormRequest
     public function rules()
     {
         return [
+            'withdraw_amount' => 'required|integer|min:1',
             'withdraw_method' => 'required',
             'withdraw_account' => 'required'
         ];
@@ -22,6 +23,9 @@ class TicketWithdraw  extends FormRequest
     public function messages()
     {
         return [
+            'withdraw_amount.required' => __('The withdrawal amount cannot be empty'),
+            'withdraw_amount.integer' => __('The withdrawal amount parameter is wrong'),
+            'withdraw_amount.min' => __('The withdrawal amount parameter is wrong'),
             'withdraw_method.required' => __('The withdrawal method cannot be empty'),
             'withdraw_account.required' => __('The withdrawal account cannot be empty')
         ];

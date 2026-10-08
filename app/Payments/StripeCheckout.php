@@ -49,7 +49,7 @@ class StripeCheckout {
         if (!$exchange) {
             abort(500, __('Currency conversion has timed out, please try again later'));
         }
-        $customFieldName = isset($this->config['stripe_custom_field_name']) ? $this->config['stripe_custom_field_name'] : 'Contact Infomation';
+        $customFieldName = isset($this->config['stripe_custom_field_name']) ? $this->config['stripe_custom_field_name'] : __('Contact information');
 
         $params = [
             'success_url' => $order['return_url'],
@@ -86,7 +86,7 @@ class StripeCheckout {
             $session = Session::create($params);
         } catch (\Exception $e) {
             info($e);
-            abort(500, "Failed to create order. Error: {$e->getMessage}");
+            abort(500, __('Payment gateway request failed'));
         }
         return [
             'type' => 1, // 0:qrcode 1:url

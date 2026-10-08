@@ -9,8 +9,18 @@ class Language
 {
     public function handle($request, Closure $next)
     {
-        if ($request->header('content-language')) {
-            App::setLocale($request->header('content-language'));
+        $requestedLocale = $request->header('x-locale')
+            ?: $request->header('content-language')
+            ?: $request->header('accept-language');
+
+        if (is_string($requestedLocale) && $requestedLocale !== '') {
+            $locale = strtolower(str_replace('_', '-', trim(explode(',', $requestedLocale)[0])));
+
+            if (strpos($locale, 'en') === 0) {
+                App::setLocale('en-US');
+            } elseif (strpos($locale, 'zh') === 0) {
+                App::setLocale('zh-CN');
+            }
         }
         return $next($request);
     }

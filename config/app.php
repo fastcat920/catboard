@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'payment_return_domains' => array_filter(array_map('trim', explode(',', env('PAYMENT_RETURN_DOMAINS', '')))),
+
     'asset_url' => env('ASSET_URL', null),
 
     /*

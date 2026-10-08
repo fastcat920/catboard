@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Services\MailService;
 use App\Services\PlanService;
 use App\Services\OrderService;
+use App\Services\BalanceLedgerService;
 use Illuminate\Console\Command;
 use App\Models\User;
 use App\Models\Order;
@@ -89,6 +90,7 @@ class CheckRenewal extends Command
                     $orderService->setVipDiscount($user);
                     $order->type = 2;
                     
+                    $balanceBefore = (int)$user->balance;
                     $user->balance = $user->balance - $plan[$latestPeriod];
                     $user->expired_at = $this->getTime($latestPeriod, $user->expired_at);
                     if (!$user->save()) {
@@ -100,6 +102,13 @@ class CheckRenewal extends Command
                         DB::rollback();
                         throw new Exception('自动续费失败');
                     }
+                    app(BalanceLedgerService::class)->record([
+                        'user_id' => $user->id, 'type' => 'purchase', 'amount' => -(int)$order->balance_amount,
+                        'balance_before' => $balanceBefore, 'balance_after' => (int)$user->balance,
+                        'source_key' => 'purchase:' . $order->id, 'source_type' => 'order',
+                        'source_id' => $order->id, 'order_id' => $order->id, 'trade_no' => $order->trade_no,
+                        'description' => '自动续费使用余额',
+                    ]);
                     DB::commit();
                     //$mailService->remindAutorenewal($user);
                 } catch (\Exception $e) {

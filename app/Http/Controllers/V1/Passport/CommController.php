@@ -7,6 +7,7 @@ use App\Http\Requests\Passport\CommSendEmailVerify;
 use App\Jobs\SendEmailJob;
 use App\Models\InviteCode;
 use App\Models\User;
+use App\Models\ReferralVisit;
 use App\Utils\CacheKey;
 use App\Utils\Dict;
 use App\Utils\Helper;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use ReCaptcha\ReCaptcha;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 use function PHPUnit\Framework\isEmpty;
 
@@ -101,6 +103,20 @@ class CommController extends Controller
         if ($inviteCode) {
             $inviteCode->pv = $inviteCode->pv + 1;
             $inviteCode->save();
+            if (Schema::hasTable('v2_referral_visit')) {
+                $channel = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$request->input('channel', $request->input('utm_source', 'direct'))) ?: 'direct';
+                $visitor = substr((string)$request->input('visitor_id', ''), 0, 64);
+                $visitorHash = hash('sha256', $visitor ?: $request->ip() . '|' . (string)$request->userAgent());
+                $exists = ReferralVisit::where('invite_code', $inviteCode->code)->where('visitor_hash', $visitorHash)
+                    ->where('created_at', '>=', strtotime('today'))->exists();
+                if (!$exists) ReferralVisit::create([
+                    'invite_code' => $inviteCode->code,
+                    'channel' => substr($channel, 0, 50),
+                    'visitor_hash' => $visitorHash,
+                    'ip_hash' => hash('sha256', (string)$request->ip()),
+                    'created_at' => time(),
+                ]);
+            }
         }
 
         return response([

@@ -50,7 +50,7 @@ class Coinbase {
         $ret = @json_decode($ret_raw, true);
         
         if(empty($ret['data']['hosted_url'])) {
-            abort(500, "error!");
+            abort(500, __('Payment gateway request failed'));
         }
         return [
             'type' => 1,
@@ -70,7 +70,7 @@ class Coinbase {
         $computedSignature = \hash_hmac('sha256', $payload, $this->config['coinbase_webhook_key']);
 
         if (!self::hashEqual($signatureHeader, $computedSignature)) {
-            abort(400, 'HMAC signature does not match');
+            abort(400, __('Payment callback verification failed'));
         }
         
         $out_trade_no = $json_param['event']['data']['metadata']['outTradeNo'];
@@ -126,4 +126,3 @@ class Coinbase {
     }
     
 }
-

@@ -16,7 +16,7 @@ class PaymentService
     {
         $this->method = $method;
         $this->class = '\\App\\Payments\\' . $this->method;
-        if (!class_exists($this->class)) abort(500, 'gate is not found');
+        if (!class_exists($this->class)) abort(500, __('Payment method is not available'));
         if ($id) $payment = Payment::find($id)->toArray();
         if ($uuid) $payment = Payment::where('uuid', $uuid)->first()->toArray();
         $this->config = [];
@@ -32,11 +32,11 @@ class PaymentService
 
     public function notify($params)
     {
-        if (!$this->config['enable']) abort(500, 'gate is not enable');
+        if (!$this->config['enable']) abort(500, __('Payment method is disabled'));
         return $this->payment->notify($params);
     }
 
-    public function pay($order)
+    public function pay($order, $returnUrl)
     {
         // custom notify domain name
         $notifyUrl = url("/api/v1/guest/payment/notify/{$this->method}/{$this->config['uuid']}");
@@ -47,7 +47,7 @@ class PaymentService
 
         return $this->payment->pay([
             'notify_url' => $notifyUrl,
-            'return_url' => url('/#/order/' . $order['trade_no']),
+            'return_url' => $returnUrl,
             'trade_no' => $order['trade_no'],
             'total_amount' => $order['total_amount'],
             'user_id' => $order['user_id'],

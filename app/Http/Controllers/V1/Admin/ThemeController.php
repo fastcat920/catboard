@@ -48,7 +48,7 @@ class ThemeController extends Controller
             'name' => 'required|in:' . join(',', $this->themes)
         ]);
         return response([
-            'data' => config("theme.{$payload['name']}")
+            'data' => (new ThemeService($payload['name']))->resolvedConfig()
         ]);
     }
 

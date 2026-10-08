@@ -32,7 +32,10 @@ class OrderService
         $this->user = User::find($order->user_id);
         if ($order->type == 9) {
             DB::beginTransaction();
-            $this->user->balance += $order->total_amount + $this->getbounus($order->total_amount);
+            $balanceBefore = (int)$this->user->balance;
+            $bonus = $this->getbounus($order->total_amount);
+            $creditedAmount = (int)$order->total_amount + $bonus;
+            $this->user->balance += $creditedAmount;
 
             if (!$this->user->save()) {
                 DB::rollBack();
@@ -43,12 +46,27 @@ class OrderService
                 DB::rollBack();
                 abort(500, '充值失败');
             }
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'deposit',
+                'amount' => $creditedAmount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'deposit:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '余额充值',
+                'meta' => ['paid_amount' => (int)$order->total_amount, 'bonus_amount' => $bonus],
+            ]);
             DB::commit();
             return;
         }
 
         $plan = Plan::find($order->plan_id);
 
+        $refundBalanceBefore = (int)$this->user->balance;
         if ($order->refund_amount) {
             $this->user->balance = $this->user->balance + $order->refund_amount;
         }
@@ -97,8 +115,30 @@ class OrderService
             DB::rollBack();
             abort(500, '开通失败');
         }
+        if ((int)$order->refund_amount > 0) {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'refund',
+                'amount' => (int)$order->refund_amount,
+                'balance_before' => $refundBalanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'order_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '订单差额退回余额',
+            ]);
+        }
+        app(CouponWalletService::class)->consume($order);
+        app(FlashSaleService::class)->complete($order);
 
         DB::commit();
+        try {
+            app(ReferralProgramService::class)->processCompletedOrder($order->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
 
@@ -129,10 +169,12 @@ class OrderService
     public function setVipDiscount(User $user)
     {
         $order = $this->order;
-        if ($user->discount) {
-            $order->discount_amount = $order->discount_amount + ($order->total_amount * ($user->discount / 100));
+        $discountRate = app(ReferralProgramService::class)->memberDiscountRate($user);
+        if ($discountRate) {
+            $vipDiscount = (int)round($order->total_amount * ($discountRate / 100));
+            $order->discount_amount = $order->discount_amount + $vipDiscount;
+            $order->total_amount = $order->total_amount - $vipDiscount;
         }
-        $order->total_amount = $order->total_amount - $order->discount_amount;
     }
 
     public function setInvite(User $user):void
@@ -142,6 +184,8 @@ class OrderService
         $order->invite_user_id = $user->invite_user_id;
         $inviter = User::find($user->invite_user_id);
         if (!$inviter) return;
+        $referralService = app(ReferralProgramService::class);
+        if (!$referralService->inviterCommissionEligible($user)) return;
         $isCommission = false;
         switch ((int)$inviter->commission_type) {
             case 0:
@@ -157,11 +201,9 @@ class OrderService
         }
 
         if (!$isCommission) return;
-        if ($inviter && $inviter->commission_rate) {
-            $order->commission_balance = $order->total_amount * ($inviter->commission_rate / 100);
-        } else {
-            $order->commission_balance = $order->total_amount * (config('v2board.invite_commission', 10) / 100);
-        }
+        $commissionRate = $referralService->commissionRate($inviter);
+        $commissionRate = min($commissionRate, 100);
+        $order->commission_balance = $order->total_amount * ($commissionRate / 100);
     }
 
     private function haveValidOrder(User $user)
@@ -280,12 +322,28 @@ class OrderService
             return false;
         }
         if ($order->balance_amount) {
+            $balanceBefore = (int)User::where('id', $order->user_id)->value('balance');
             $userService = new UserService();
             if (!$userService->addBalance($order->user_id, $order->balance_amount)) {
                 DB::rollBack();
                 return false;
             }
+            $balanceAfter = (int)User::where('id', $order->user_id)->value('balance');
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $order->user_id,
+                'type' => 'refund',
+                'amount' => (int)$order->balance_amount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'order_cancel_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '取消订单退回余额',
+            ]);
         }
+        app(CouponWalletService::class)->release($order);
         DB::commit();
         return true;
     }

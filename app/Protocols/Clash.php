@@ -80,6 +80,7 @@ class Clash
             $config['proxy-groups'][$k]['proxies'] = array_merge($config['proxy-groups'][$k]['proxies'], $proxies);
         }
 
+        \App\Services\NodeEntryPoolService::applyClashFallbackGroups($config, $servers);
         $config['proxy-groups'] = array_filter($config['proxy-groups'], function($group) {
             return $group['proxies'];
         });

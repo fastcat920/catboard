@@ -103,6 +103,9 @@
                     class="form-control" 
                     v-model="formData.verificationCode" 
                     :placeholder="$t('auth.verificationCodePlaceholder')"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="6"
                     :aria-invalid="!!errors.verificationCode"
                     :aria-describedby="errors.verificationCode ? 'register-code-error' : undefined"
                     required
@@ -833,7 +836,7 @@ export default {
         
         // 仅当需要邮箱验证时添加验证码
         if (config.is_email_verify === 1) {
-          registerData.email_code = parseInt(formData.verificationCode);
+          registerData.email_code = String(formData.verificationCode).trim();
         }
         
         // 添加邀请码 (如果有)

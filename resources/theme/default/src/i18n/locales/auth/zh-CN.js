@@ -57,6 +57,7 @@ export default {
     mustAgreeToTerms: '您必须同意服务条款才能注册',
     emailPlaceholder: '请输入邮箱地址',
     emailPrefixPlaceholder: '请输入邮箱前缀',
+    verificationCodePlaceholder: '请输入邮箱验证码',
     codePlaceholder: '请输入验证码',
     newPasswordPlaceholder: '请输入新密码',
     confirmPasswordPlaceholder: '请再次输入新密码',

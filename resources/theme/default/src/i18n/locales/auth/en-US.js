@@ -57,6 +57,7 @@ export default {
     mustAgreeToTerms: 'You must agree to the Terms of Service to register',
     emailPlaceholder: 'Enter email address',
     emailPrefixPlaceholder: 'Enter email prefix',
+    verificationCodePlaceholder: 'Enter email verification code',
     codePlaceholder: 'Enter verification code',
     newPasswordPlaceholder: 'Enter new password',
     confirmPasswordPlaceholder: 'Re-enter new password',

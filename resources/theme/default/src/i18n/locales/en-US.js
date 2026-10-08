@@ -92,7 +92,7 @@ export default {
     passwordTooShort: 'Password must be at least 8 characters',
     emailVerificationSent: 'Verification code has been sent to your email',
     emailVerificationFailed: 'Failed to send verification code',
-    verificationCodePlaceholder: 'Please enter verification code',
+    verificationCodePlaceholder: 'Enter email verification code',
     inviteCodePlaceholder: 'Invite Code (Optional)',
     forgotPasswordTitle: 'Forgot Password',
     forgotPasswordSubtitle: 'We will send a verification code to your email',

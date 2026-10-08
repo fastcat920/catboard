@@ -90,7 +90,10 @@
                 id="verificationCode" 
                 class="form-control" 
                 v-model="formData.verificationCode" 
-                    :placeholder="$t('auth.verificationCodePlaceholder')"
+                :placeholder="$t('auth.verificationCodePlaceholder')"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="6"
                 :aria-invalid="!!errors.verificationCode"
                 :aria-describedby="errors.verificationCode ? 'register-code-error' : undefined"
                 required
@@ -621,7 +624,7 @@ export default {
           email: formData.email,
           password: formData.password
         };
-        if (config.is_email_verify === 1) registerData.email_code = parseInt(formData.verificationCode);
+        if (config.is_email_verify === 1) registerData.email_code = String(formData.verificationCode).trim();
         if (formData.inviteCode) registerData.invite_code = formData.inviteCode;
         if (config.is_recaptcha === 1) {
           const captchaElem = document.querySelector('[name="g-recaptcha-response"]') || document.querySelector('[name="cf-turnstile-response"]');

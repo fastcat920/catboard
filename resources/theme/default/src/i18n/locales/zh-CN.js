@@ -94,7 +94,7 @@ export default {
     passwordTooShort: '密码不能少于 8 位',
     emailVerificationSent: '验证码已发送至您的邮箱',
     emailVerificationFailed: '验证码发送失败',
-    verificationCodePlaceholder: '请输入验证码',
+    verificationCodePlaceholder: '请输入邮箱验证码',
     inviteCodePlaceholder: '请输入邀请码（可选）',
     forgotPasswordTitle: '找回密码',
     forgotPasswordSubtitle: '我们将发送验证码到您的邮箱',

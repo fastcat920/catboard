@@ -61,6 +61,9 @@
                 class="form-control"
                 v-model="formData.verificationCode"
                 :placeholder="$t('auth.verificationCodePlaceholder')"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="6"
                 :aria-invalid="!!errors.verificationCode"
                 :aria-describedby="errors.verificationCode ? 'reset-code-error' : undefined"
               />

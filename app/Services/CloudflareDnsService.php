@@ -28,6 +28,13 @@ class CloudflareDnsService
         return $this->request($account, 'GET', '/user/tokens/verify');
     }
 
+    public static function normalizeToken($token)
+    {
+        $token = trim((string)$token, " \t\n\r\0\x0B\"'");
+        $token = preg_replace('/^(?:Authorization\s*:\s*)?Bearer\s+/i', '', $token);
+        return preg_replace('/\s+/', '', trim((string)$token));
+    }
+
     public function listZones(CloudflareDnsAccount $account)
     {
         $items = [];
@@ -68,15 +75,20 @@ class CloudflareDnsService
     private function request(CloudflareDnsAccount $account, $method, $path, array $options = [])
     {
         try {
-            $token = Crypt::decryptString($account->api_token_encrypted);
+            $token = self::normalizeToken(Crypt::decryptString($account->api_token_encrypted));
         } catch (\Throwable $error) {
             throw new RuntimeException('API Token 无法解密，请重新填写');
+        }
+        if ($token === '') {
+            throw new RuntimeException('API Token 为空，请重新填写');
         }
         $options['headers'] = array_merge($options['headers'] ?? [], [
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-            'Content-Type' => 'application/json',
         ]);
+        if (array_key_exists('json', $options)) {
+            $options['headers']['Content-Type'] = 'application/json';
+        }
         try {
             $response = $this->client->request($method, ltrim($path, '/'), $options);
             $status = $response->getStatusCode();
@@ -91,6 +103,19 @@ class CloudflareDnsService
             $messages = [];
             foreach (($decoded['errors'] ?? []) as $error) {
                 if (!empty($error['message'])) $messages[] = $error['message'];
+                foreach (($error['error_chain'] ?? []) as $nestedError) {
+                    if (!empty($nestedError['message'])) $messages[] = $nestedError['message'];
+                }
+            }
+            $errorCodes = [];
+            foreach (($decoded['errors'] ?? []) as $error) {
+                if (isset($error['code'])) $errorCodes[] = (int)$error['code'];
+                foreach (($error['error_chain'] ?? []) as $nestedError) {
+                    if (isset($nestedError['code'])) $errorCodes[] = (int)$nestedError['code'];
+                }
+            }
+            if (in_array(6003, $errorCodes, true) || in_array(6111, $errorCodes, true)) {
+                $messages = ['API Token 格式无效，请填写 Cloudflare API Token 原文，不要填写 Bearer 前缀或 Global API Key'];
             }
             throw new RuntimeException('Cloudflare 请求失败（HTTP ' . $status . '）：' . ($messages ? implode('；', $messages) : '请检查 Token 权限和请求参数'));
         }

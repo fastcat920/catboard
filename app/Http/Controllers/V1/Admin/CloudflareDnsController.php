@@ -39,7 +39,11 @@ class CloudflareDnsController extends Controller
         $account->enabled = (bool)$data['enabled'];
         $account->is_default = (bool)$data['is_default'];
         if (!empty($data['api_token'])) {
-            $account->api_token_encrypted = Crypt::encryptString(trim($data['api_token']));
+            $token = CloudflareDnsService::normalizeToken($data['api_token']);
+            if ($token === '') {
+                throw ValidationException::withMessages(['api_token' => '请输入有效的 API Token']);
+            }
+            $account->api_token_encrypted = Crypt::encryptString($token);
         }
         if ($account->is_default) {
             CloudflareDnsAccount::where('id', '<>', $account->id ?: 0)->update(['is_default' => false, 'updated_at' => time()]);

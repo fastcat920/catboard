@@ -84,16 +84,34 @@ Route::get('/' . $securePath . '/{path?}', function () use ($securePath) {
         abort(503, '新管理端构建产物不完整');
     }
 
-    return view('admin-next', [
+    // Keep JSON construction out of Blade. Some Laravel 8 Blade compiler
+    // versions cannot reliably parse a multiline @json array expression.
+    $settings = [
         'title' => config('v2board.app_name', 'V2Board'),
-        'theme_sidebar' => config('v2board.frontend_theme_sidebar', 'light'),
-        'theme_header' => config('v2board.frontend_theme_header', 'dark'),
-        'theme_color' => config('v2board.frontend_theme_color', 'default'),
-        'background_url' => config('v2board.frontend_background_url'),
-        'version' => config('app.version'),
-        'logo' => config('v2board.logo'),
+        'host' => '',
         'secure_path' => $securePath,
         'admin_base_path' => '/' . $securePath,
+        'theme' => [
+            'sidebar' => config('v2board.frontend_theme_sidebar', 'light'),
+            'header' => config('v2board.frontend_theme_header', 'dark'),
+            'color' => config('v2board.frontend_theme_color', 'default'),
+        ],
+        'background_url' => config('v2board.frontend_background_url'),
+        'logo' => config('v2board.logo'),
+    ];
+
+    return view('admin-next', [
+        'title' => config('v2board.app_name', 'V2Board'),
+        'version' => config('app.version'),
+        'settings_json' => json_encode(
+            $settings,
+            JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+                | JSON_HEX_TAG
+                | JSON_HEX_AMP
+                | JSON_HEX_APOS
+                | JSON_HEX_QUOT
+        ),
         'admin_entry' => $entry,
     ]);
 })->where('path', '.*');

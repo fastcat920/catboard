@@ -227,7 +227,14 @@ class AdminRoute
             $router->post('/aliyun-dns/account/test', 'V1\\Admin\\AliyunDnsController@testAccount');
             $router->get ('/aliyun-dns/instances', 'V1\\Admin\\AliyunDnsController@instances');
             $router->get ('/aliyun-dns/topology', 'V1\\Admin\\AliyunDnsController@topology');
+            $router->get ('/aliyun-dns/resources', 'V1\\Admin\\AliyunDnsController@resources');
             $router->post('/aliyun-dns/update', 'V1\\Admin\\AliyunDnsController@update');
+            $router->post('/aliyun-dns/pool/save', 'V1\\Admin\\AliyunDnsController@savePool');
+            $router->post('/aliyun-dns/pool/attach', 'V1\\Admin\\AliyunDnsController@attachPool');
+            $router->post('/aliyun-dns/pool/drop', 'V1\\Admin\\AliyunDnsController@dropPool');
+            $router->post('/aliyun-dns/address/save', 'V1\\Admin\\AliyunDnsController@saveAddress');
+            $router->post('/aliyun-dns/address/attach', 'V1\\Admin\\AliyunDnsController@attachAddress');
+            $router->post('/aliyun-dns/address/drop', 'V1\\Admin\\AliyunDnsController@dropAddress');
             // Node security
             $router->get ('/security/dashboard', 'V1\\Admin\\NodeSecurityController@dashboard');
             $router->get ('/security/events', 'V1\\Admin\\NodeSecurityController@events');

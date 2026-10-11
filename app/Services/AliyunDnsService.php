@@ -30,6 +30,24 @@ class AliyunDnsService
         ]);
     }
 
+    public function listAddressPools(AliyunDnsAccount $account)
+    {
+        return $this->request($account, 'ListCloudGtmAddressPools', [
+            'PageNumber' => 1,
+            'PageSize' => 100,
+            'AcceptLanguage' => 'zh-CN',
+        ]);
+    }
+
+    public function listAddresses(AliyunDnsAccount $account)
+    {
+        return $this->request($account, 'ListCloudGtmAddresses', [
+            'PageNumber' => 1,
+            'PageSize' => 100,
+            'AcceptLanguage' => 'zh-CN',
+        ]);
+    }
+
     public function updateInstanceBasic(AliyunDnsAccount $account, array $parameters)
     {
         return $this->request($account, 'UpdateCloudGtmInstanceConfigBasic', $parameters);
@@ -57,6 +75,40 @@ class AliyunDnsService
         ]);
     }
 
+    public function createPool(AliyunDnsAccount $account, array $parameters)
+    {
+        return $this->request($account, 'CreateCloudGtmAddressPool', $parameters);
+    }
+
+    public function updatePoolBasic(AliyunDnsAccount $account, array $parameters)
+    {
+        return $this->request($account, 'UpdateCloudGtmAddressPoolBasicConfig', $parameters);
+    }
+
+    public function updatePoolRemark(AliyunDnsAccount $account, $poolId, $remark)
+    {
+        return $this->request($account, 'UpdateCloudGtmAddressPoolRemark', [
+            'AddressPoolId' => $poolId,
+            'Remark' => $remark,
+        ]);
+    }
+
+    public function deletePool(AliyunDnsAccount $account, $poolId)
+    {
+        return $this->request($account, 'DeleteCloudGtmAddressPool', [
+            'AddressPoolId' => $poolId,
+        ]);
+    }
+
+    public function replaceInstancePools(AliyunDnsAccount $account, $instanceId, $configId, array $pools)
+    {
+        return $this->request($account, 'ReplaceCloudGtmInstanceConfigAddressPool', [
+            'InstanceId' => $instanceId,
+            'ConfigId' => $configId,
+            'AddressPools' => $pools,
+        ]);
+    }
+
     public function updatePoolStrategy(AliyunDnsAccount $account, array $parameters)
     {
         return $this->request($account, 'UpdateCloudGtmAddressPoolLbStrategy', $parameters);
@@ -70,11 +122,53 @@ class AliyunDnsService
         ]);
     }
 
+    public function createAddress(AliyunDnsAccount $account, array $parameters)
+    {
+        return $this->request($account, 'CreateCloudGtmAddress', $parameters);
+    }
+
+    public function updateAddress(AliyunDnsAccount $account, array $parameters)
+    {
+        return $this->request($account, 'UpdateCloudGtmAddress', $parameters);
+    }
+
+    public function updateAddressRemark(AliyunDnsAccount $account, $addressId, $remark)
+    {
+        return $this->request($account, 'UpdateCloudGtmAddressRemark', [
+            'AddressId' => $addressId,
+            'Remark' => $remark,
+        ]);
+    }
+
+    public function updateAddressManualStatus(AliyunDnsAccount $account, $addressId, $mode, $status)
+    {
+        return $this->request($account, 'UpdateCloudGtmAddressManualAvailableStatus', [
+            'AddressId' => $addressId,
+            'AvailableMode' => $mode,
+            'ManualAvailableStatus' => $mode === 'manual' ? $status : null,
+        ]);
+    }
+
+    public function deleteAddress(AliyunDnsAccount $account, $addressId)
+    {
+        return $this->request($account, 'DeleteCloudGtmAddress', [
+            'AddressId' => $addressId,
+        ]);
+    }
+
+    public function replacePoolAddresses(AliyunDnsAccount $account, $poolId, array $addresses)
+    {
+        return $this->request($account, 'ReplaceCloudGtmAddressPoolAddress', [
+            'AddressPoolId' => $poolId,
+            'Addresses' => $addresses,
+        ]);
+    }
+
     public function request(AliyunDnsAccount $account, $action, array $parameters = [])
     {
         $accessKeyId = Crypt::decryptString($account->access_key_id_encrypted);
         $accessKeySecret = Crypt::decryptString($account->access_key_secret_encrypted);
-        $parameters = array_merge([
+        $parameters = $this->flattenParameters(array_merge([
             'Format' => 'JSON',
             'Version' => self::VERSION,
             'AccessKeyId' => $accessKeyId,
@@ -85,12 +179,12 @@ class AliyunDnsService
             'Action' => $action,
             'AcceptLanguage' => 'zh-CN',
             'ClientToken' => bin2hex(random_bytes(16)),
-        ], $parameters);
+        ], $parameters));
         if ($account->security_token_encrypted) {
             $parameters['SecurityToken'] = Crypt::decryptString($account->security_token_encrypted);
         }
         $parameters = array_filter($parameters, function ($value) {
-            return $value !== null && $value !== '';
+            return $value !== null;
         });
         ksort($parameters);
         $canonical = [];
@@ -129,5 +223,30 @@ class AliyunDnsService
     private function percentEncode($value)
     {
         return str_replace('%7E', '~', rawurlencode((string)$value));
+    }
+
+    private function flattenParameters(array $parameters)
+    {
+        $flat = [];
+        foreach ($parameters as $key => $value) {
+            $this->flattenValue((string)$key, $value, $flat);
+        }
+        return $flat;
+    }
+
+    private function flattenValue($key, $value, array &$flat)
+    {
+        if (!is_array($value)) {
+            if (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            }
+            $flat[$key] = $value;
+            return;
+        }
+        $numeric = array_keys($value) === range(0, count($value) - 1);
+        foreach ($value as $index => $child) {
+            $childKey = $key . '.' . ($numeric ? $index + 1 : $index);
+            $this->flattenValue($childKey, $child, $flat);
+        }
     }
 }

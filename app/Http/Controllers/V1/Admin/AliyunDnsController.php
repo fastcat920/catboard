@@ -207,6 +207,328 @@ class AliyunDnsController extends Controller
         return response(['data' => ['success' => true, 'request_id' => $result['RequestId'] ?? null]]);
     }
 
+    public function resources(Request $request, AliyunDnsService $service)
+    {
+        $account = $this->account($request);
+        try {
+            $poolResult = $service->listAddressPools($account);
+            $addressResult = $service->listAddresses($account);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['resources' => $error->getMessage()]);
+        }
+        $pools = array_map(function ($pool) {
+            return [
+                'id' => $pool['AddressPoolId'] ?? '',
+                'name' => $pool['AddressPoolName'] ?? '',
+                'type' => $pool['AddressPoolType'] ?? '',
+                'remark' => $pool['Remark'] ?? '',
+                'enable_status' => $pool['EnableStatus'] ?? '',
+                'health_status' => $pool['HealthStatus'] ?? '',
+                'address_count' => (int)($pool['AddressCount'] ?? count($this->listFrom($pool['Addresses'] ?? [], 'Address'))),
+            ];
+        }, $this->listFrom($poolResult['AddressPools'] ?? [], 'AddressPool'));
+        $addresses = array_map(function ($address) {
+            return [
+                'id' => $address['AddressId'] ?? '',
+                'name' => $address['Name'] ?? '',
+                'type' => $address['Type'] ?? '',
+                'address' => $address['Address'] ?? '',
+                'remark' => $address['Remark'] ?? '',
+                'enable_status' => $address['EnableStatus'] ?? '',
+                'available_status' => $address['AvailableStatus'] ?? '',
+                'health_status' => $address['HealthStatus'] ?? '',
+            ];
+        }, $this->listFrom($addressResult['Addresses'] ?? [], 'Address'));
+        return response(['data' => ['pools' => $pools, 'addresses' => $addresses]]);
+    }
+
+    public function savePool(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'nullable|string|max:200',
+            'name' => 'required|string|max:100',
+            'type' => ['required', Rule::in(['IPv4', 'IPv6', 'domain'])],
+            'remark' => 'nullable|string|max:500',
+            'health_judgement' => ['required', Rule::in(['any_ok', 'p30_ok', 'p50_ok', 'p70_ok', 'all_ok'])],
+            'strategy' => ['required', Rule::in(['round_robin', 'sequence', 'weight', 'source_nearest'])],
+            'sequence_mode' => ['nullable', Rule::in(['preemptive', 'non_preemptive'])],
+            'status' => ['required', Rule::in(['enable', 'disable'])],
+            'weight' => 'nullable|integer|min:1|max:100',
+            'serial_number' => 'nullable|integer|min:1|max:1000',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $poolId = $data['pool_id'] ?? null;
+            $lastResult = [];
+            if (!$poolId) {
+                $lastResult = $service->createPool($account, [
+                    'AddressPoolName' => trim($data['name']),
+                    'AddressPoolType' => $data['type'],
+                    'HealthJudgement' => $data['health_judgement'],
+                    'EnableStatus' => $data['status'],
+                    'Remark' => trim((string)($data['remark'] ?? '')),
+                ]);
+                $poolId = $lastResult['AddressPoolId'] ?? null;
+                if (!$poolId) throw new \RuntimeException('阿里云未返回新地址池 ID');
+            } else {
+                $lastResult = $service->updatePoolBasic($account, [
+                    'AddressPoolId' => $poolId,
+                    'AddressPoolName' => trim($data['name']),
+                    'HealthJudgement' => $data['health_judgement'],
+                ]);
+                $service->updatePoolRemark($account, $poolId, trim((string)($data['remark'] ?? '')));
+            }
+            $service->updatePoolStrategy($account, [
+                'AddressPoolId' => $poolId,
+                'AddressLbStrategy' => $data['strategy'],
+                'SequenceLbStrategyMode' => $data['strategy'] === 'sequence' ? ($data['sequence_mode'] ?? 'preemptive') : null,
+            ]);
+            $service->updatePoolStatus($account, $poolId, $data['status']);
+            if (empty($data['pool_id'])) {
+                $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+                $links = $this->poolLinks($full);
+                $links[] = [
+                    'AddressPoolId' => $poolId,
+                    'WeightValue' => (int)($data['weight'] ?? 100),
+                    'SerialNumber' => (int)($data['serial_number'] ?? (count($links) + 1)),
+                    'RequestSource' => ['default'],
+                ];
+                $lastResult = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $links);
+            } elseif (isset($data['weight']) || isset($data['serial_number'])) {
+                $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+                $links = $this->poolLinks($full);
+                foreach ($links as &$link) {
+                    if ($link['AddressPoolId'] !== $poolId) continue;
+                    if (isset($data['weight'])) $link['WeightValue'] = (int)$data['weight'];
+                    if (isset($data['serial_number'])) $link['SerialNumber'] = (int)$data['serial_number'];
+                }
+                unset($link);
+                $lastResult = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $links);
+            }
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['pool' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'pool_id' => $poolId, 'request_id' => $lastResult['RequestId'] ?? null]]);
+    }
+
+    public function attachPool(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'required|string|max:200',
+            'weight' => 'nullable|integer|min:1|max:100',
+            'serial_number' => 'nullable|integer|min:1|max:1000',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $links = $this->poolLinks($full);
+            foreach ($links as $link) {
+                if ($link['AddressPoolId'] === $data['pool_id']) {
+                    throw new \RuntimeException('该地址池已关联当前接入域名');
+                }
+            }
+            $links[] = [
+                'AddressPoolId' => $data['pool_id'],
+                'WeightValue' => (int)($data['weight'] ?? 100),
+                'SerialNumber' => count($links) + 1,
+                'RequestSource' => ['default'],
+            ];
+            $result = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $links);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['pool' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'request_id' => $result['RequestId'] ?? null]]);
+    }
+
+    public function dropPool(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'required|string|max:200',
+            'delete_resource' => 'required|boolean',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $originalLinks = $this->poolLinks($full);
+            $links = array_values(array_filter($originalLinks, function ($link) use ($data) {
+                return $link['AddressPoolId'] !== $data['pool_id'];
+            }));
+            $result = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $links);
+            if ($data['delete_resource']) {
+                try {
+                    $result = $service->deletePool($account, $data['pool_id']);
+                } catch (\Throwable $deleteError) {
+                    try {
+                        $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $originalLinks);
+                        throw new \RuntimeException('地址池删除失败，已恢复当前域名关联：' . $deleteError->getMessage());
+                    } catch (\RuntimeException $rollbackError) {
+                        if (strpos($rollbackError->getMessage(), '已恢复当前域名关联') === 0) throw $rollbackError;
+                        throw new \RuntimeException('地址池删除失败，且关联恢复失败，请立即到阿里云控制台核对：' . $deleteError->getMessage());
+                    }
+                }
+            }
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['pool' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'request_id' => $result['RequestId'] ?? null]]);
+    }
+
+    public function saveAddress(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'required|string|max:200',
+            'address_id' => 'nullable|string|max:200',
+            'name' => 'required|string|max:100',
+            'type' => ['required', Rule::in(['IPv4', 'IPv6', 'domain'])],
+            'address' => 'required|string|max:253',
+            'remark' => 'nullable|string|max:500',
+            'health_judgement' => ['required', Rule::in(['any_ok', 'p30_ok', 'p50_ok', 'p70_ok', 'all_ok'])],
+            'status' => ['required', Rule::in(['enable', 'disable'])],
+            'available_mode' => ['required', Rule::in(['auto', 'manual'])],
+            'manual_status' => ['nullable', Rule::in(['available', 'unavailable'])],
+            'weight' => 'nullable|integer|min:1|max:100',
+            'serial_number' => 'nullable|integer|min:1|max:1000',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $addressId = $data['address_id'] ?? null;
+            $lastResult = [];
+            if (!$addressId) {
+                $lastResult = $service->createAddress($account, [
+                    'Name' => trim($data['name']),
+                    'Type' => $data['type'],
+                    'Address' => trim($data['address']),
+                    'Remark' => trim((string)($data['remark'] ?? '')),
+                    'EnableStatus' => $data['status'],
+                    'AvailableMode' => $data['available_mode'],
+                    'ManualAvailableStatus' => $data['available_mode'] === 'manual' ? ($data['manual_status'] ?? 'available') : null,
+                    'HealthJudgement' => $data['health_judgement'],
+                ]);
+                $addressId = $lastResult['AddressId'] ?? null;
+                if (!$addressId) throw new \RuntimeException('阿里云未返回新节点地址 ID');
+            } else {
+                $lastResult = $service->updateAddress($account, [
+                    'AddressId' => $addressId,
+                    'Name' => trim($data['name']),
+                    'Address' => trim($data['address']),
+                    'HealthJudgement' => $data['health_judgement'],
+                ]);
+                $service->updateAddressRemark($account, $addressId, trim((string)($data['remark'] ?? '')));
+            }
+            $service->updateAddressManualStatus($account, $addressId, $data['available_mode'], $data['manual_status'] ?? 'available');
+            $service->updateAddressStatus($account, $addressId, $data['status']);
+            if (empty($data['address_id'])) {
+                $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+                $pool = $this->findPool($full, $data['pool_id']);
+                $links = $this->addressLinks($pool);
+                $links[] = [
+                    'AddressId' => $addressId,
+                    'WeightValue' => (int)($data['weight'] ?? 100),
+                    'SerialNumber' => (int)($data['serial_number'] ?? (count($links) + 1)),
+                    'RequestSource' => ['default'],
+                ];
+                $lastResult = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+            } elseif (isset($data['weight']) || isset($data['serial_number'])) {
+                $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+                $pool = $this->findPool($full, $data['pool_id']);
+                $links = $this->addressLinks($pool);
+                foreach ($links as &$link) {
+                    if ($link['AddressId'] !== $addressId) continue;
+                    if (isset($data['weight'])) $link['WeightValue'] = (int)$data['weight'];
+                    if (isset($data['serial_number'])) $link['SerialNumber'] = (int)$data['serial_number'];
+                }
+                unset($link);
+                $lastResult = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+            }
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['address' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'address_id' => $addressId, 'request_id' => $lastResult['RequestId'] ?? null]]);
+    }
+
+    public function attachAddress(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'required|string|max:200',
+            'address_id' => 'required|string|max:200',
+            'weight' => 'nullable|integer|min:1|max:100',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $pool = $this->findPool($full, $data['pool_id']);
+            $links = $this->addressLinks($pool);
+            foreach ($links as $link) {
+                if ($link['AddressId'] === $data['address_id']) {
+                    throw new \RuntimeException('该节点地址已在当前地址池中');
+                }
+            }
+            $links[] = [
+                'AddressId' => $data['address_id'],
+                'WeightValue' => (int)($data['weight'] ?? 100),
+                'SerialNumber' => count($links) + 1,
+                'RequestSource' => ['default'],
+            ];
+            $result = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['address' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'request_id' => $result['RequestId'] ?? null]]);
+    }
+
+    public function dropAddress(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pool_id' => 'required|string|max:200',
+            'address_id' => 'required|string|max:200',
+            'delete_resource' => 'required|boolean',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $pool = $this->findPool($full, $data['pool_id']);
+            $originalLinks = $this->addressLinks($pool);
+            $links = array_values(array_filter($originalLinks, function ($link) use ($data) {
+                return $link['AddressId'] !== $data['address_id'];
+            }));
+            $result = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+            if ($data['delete_resource']) {
+                try {
+                    $result = $service->deleteAddress($account, $data['address_id']);
+                } catch (\Throwable $deleteError) {
+                    try {
+                        $service->replacePoolAddresses($account, $data['pool_id'], $originalLinks);
+                        throw new \RuntimeException('节点删除失败，已恢复当前地址池关联：' . $deleteError->getMessage());
+                    } catch (\RuntimeException $rollbackError) {
+                        if (strpos($rollbackError->getMessage(), '已恢复当前地址池关联') === 0) throw $rollbackError;
+                        throw new \RuntimeException('节点删除失败，且关联恢复失败，请立即到阿里云控制台核对：' . $deleteError->getMessage());
+                    }
+                }
+            }
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['address' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'request_id' => $result['RequestId'] ?? null]]);
+    }
+
     private function account(Request $request)
     {
         $id = (int)$request->query('account_id', 0);
@@ -214,6 +536,15 @@ class AliyunDnsController extends Controller
         $account = $id ? $query->where('id', $id)->first() : $query->orderByDesc('is_default')->orderBy('id')->first();
         if (!$account) {
             throw ValidationException::withMessages(['account' => '请先添加并启用阿里云账号']);
+        }
+        return $account;
+    }
+
+    private function enabledAccount($id)
+    {
+        $account = AliyunDnsAccount::where('enabled', true)->find($id);
+        if (!$account) {
+            throw ValidationException::withMessages(['account' => '阿里云账号不存在或尚未启用']);
         }
         return $account;
     }
@@ -258,16 +589,27 @@ class AliyunDnsController extends Controller
                         'enable_status' => $address['EnableStatus'] ?? '',
                         'available_status' => $address['AvailableStatus'] ?? '',
                         'health_status' => $address['HealthStatus'] ?? '',
+                        'health_judgement' => $address['HealthJudgement'] ?? 'any_ok',
                         'available_mode' => $address['AvailableMode'] ?? '',
                         'manual_available_status' => $address['ManualAvailableStatus'] ?? '',
                         'weight' => $address['WeightValue'] ?? null,
                         'serial_number' => $address['SerialNumber'] ?? null,
+                        'request_source' => $this->stringList($address['RequestSource'] ?? ($address['RequestSources'] ?? [])),
+                        'health_tasks' => array_map(function ($task) {
+                            return [
+                                'port' => $task['Port'] ?? null,
+                                'template_id' => $task['TemplateId'] ?? '',
+                                'template_name' => $task['TemplateName'] ?? '',
+                                'monitor_status' => $task['MonitorStatus'] ?? '',
+                            ];
+                        }, $this->listFrom($address['HealthTasks'] ?? [], 'HealthTask')),
                     ];
                 }
                 $pools[] = [
                     'id' => $pool['AddressPoolId'] ?? '',
                     'name' => $pool['AddressPoolName'] ?? '',
                     'type' => $pool['AddressPoolType'] ?? '',
+                    'remark' => $pool['Remark'] ?? '',
                     'strategy' => $pool['AddressLbStrategy'] ?? '',
                     'sequence_mode' => $pool['SequenceLbStrategyMode'] ?? '',
                     'enable_status' => $pool['EnableStatus'] ?? '',
@@ -276,6 +618,7 @@ class AliyunDnsController extends Controller
                     'health_judgement' => $pool['HealthJudgement'] ?? '',
                     'weight' => $pool['WeightValue'] ?? null,
                     'serial_number' => $pool['SerialNumber'] ?? null,
+                    'request_source' => $this->stringList($pool['RequestSource'] ?? ($pool['RequestSources'] ?? [])),
                     'addresses' => $addresses,
                 ];
             }
@@ -321,6 +664,60 @@ class AliyunDnsController extends Controller
         $zone = trim((string)($row['ScheduleZoneName'] ?? ''));
         if (!$host || $host === '@') return $zone;
         return $host . '.' . $zone;
+    }
+
+    private function poolLinks(array $full)
+    {
+        $links = [];
+        foreach ($this->listFrom($full['AddressPools'] ?? [], 'AddressPool') as $index => $pool) {
+            $poolId = (string)($pool['AddressPoolId'] ?? '');
+            if ($poolId === '') continue;
+            $links[] = [
+                'AddressPoolId' => $poolId,
+                'WeightValue' => max(1, min(100, (int)($pool['WeightValue'] ?? 100))),
+                'SerialNumber' => max(1, (int)($pool['SerialNumber'] ?? ($index + 1))),
+                'RequestSource' => $this->stringList($pool['RequestSource'] ?? ($pool['RequestSources'] ?? ['default'])) ?: ['default'],
+            ];
+        }
+        return $links;
+    }
+
+    private function findPool(array $full, $poolId)
+    {
+        foreach ($this->listFrom($full['AddressPools'] ?? [], 'AddressPool') as $pool) {
+            if ((string)($pool['AddressPoolId'] ?? '') === (string)$poolId) return $pool;
+        }
+        throw new \RuntimeException('当前接入域名中未找到指定地址池，请刷新后重试');
+    }
+
+    private function addressLinks(array $pool)
+    {
+        $links = [];
+        foreach ($this->listFrom($pool['Addresses'] ?? [], 'Address') as $index => $address) {
+            $addressId = (string)($address['AddressId'] ?? '');
+            if ($addressId === '') continue;
+            $links[] = [
+                'AddressId' => $addressId,
+                'WeightValue' => max(1, min(100, (int)($address['WeightValue'] ?? 100))),
+                'SerialNumber' => max(1, (int)($address['SerialNumber'] ?? ($index + 1))),
+                'RequestSource' => $this->stringList($address['RequestSource'] ?? ($address['RequestSources'] ?? ['default'])) ?: ['default'],
+            ];
+        }
+        return $links;
+    }
+
+    private function stringList($value)
+    {
+        if (!is_array($value)) {
+            return trim((string)$value) === '' ? [] : [trim((string)$value)];
+        }
+        if (isset($value['RequestSource'])) $value = $value['RequestSource'];
+        if (!is_array($value)) $value = [$value];
+        $result = [];
+        array_walk_recursive($value, function ($item) use (&$result) {
+            if (is_scalar($item) && trim((string)$item) !== '') $result[] = trim((string)$item);
+        });
+        return array_values(array_unique($result));
     }
 
     private function required(array $data, array $fields)

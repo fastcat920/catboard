@@ -2,7 +2,7 @@
     "use strict";
 
     var root = null;
-    var state = { accounts: [], instances: [], topology: null };
+    var state = { accounts: [], instances: [], topology: null, resources: { pools: [], addresses: [] } };
     var selectedAccountId = null;
     var selectedConfigId = null;
     var selectedNode = null;
@@ -164,7 +164,7 @@
             renderTopologyLayout();
             if (state.topology && state.topology.config_id === selectedConfigId) {
                 renderTree();
-                renderInspector();
+                if (selectedNode) renderInspector();
             } else if (selectedConfigId) {
                 loadTopology(selectedConfigId);
             }
@@ -273,13 +273,15 @@
                 '<span>' + esc(row.record_type || "-") + ' · TTL ' + esc(row.ttl == null ? "-" : row.ttl + "s") + ' · ' + esc(strategyName(row.strategy)) + '</span></button>';
         }).join("");
         content('<div class="dns-toolbar"><label><span>接入账号</span><select class="form-control" data-account>' + accountOptions + '</select></label><div class="dns-toolbar-summary"><strong>' + state.instances.length + '</strong><span>个接入配置</span></div><button class="btn btn-light" data-account-settings><i class="fa fa-cog"></i> 账号设置</button></div>' +
-            (state.instances.length ? '<div class="dns-workspace"><aside class="dns-instance-list" aria-label="接入域名列表">' + instances + '</aside><section class="dns-canvas-wrap"><div class="dns-canvas-head"><div><h3 data-topology-title>选择接入域名</h3><p data-topology-summary>查看完整调度链路</p></div><div class="dns-legend"><span><i class="ok"></i>正常</span><span><i class="warn"></i>警告</span><span><i class="bad"></i>异常</span><span><i class="off"></i>停用</span></div></div><div class="dns-canvas" data-canvas><div class="dns-loading">正在加载拓扑…</div></div></section><aside class="dns-inspector" data-inspector><div class="dns-inspector-empty"><i class="fa fa-mouse-pointer"></i><p>点击拓扑节点查看和修改配置</p></div></aside></div>' : '<div class="dns-empty dns-empty-compact"><div class="dns-empty-icon"><i class="fa fa-project-diagram"></i></div><h3>暂无 GTM 3.0 接入配置</h3><p>当前阿里云账号未返回可管理的接入域名。</p></div>'));
+            (state.instances.length ? '<div class="dns-workspace inspector-closed"><nav class="dns-instance-list" aria-label="接入域名列表">' + instances + '</nav><section class="dns-canvas-wrap"><div class="dns-canvas-head"><div><h3 data-topology-title>选择接入域名</h3><p data-topology-summary>查看完整调度链路</p></div><div class="dns-canvas-tools"><button type="button" class="btn btn-sm btn-primary" data-create-pool><i class="fa fa-plus"></i> 新增地址池</button><button type="button" class="btn btn-sm btn-light" data-attach-pool><i class="fa fa-link"></i> 关联已有</button></div></div><div class="dns-legend dns-legend-bar"><span><i class="ok"></i>正常</span><span><i class="warn"></i>警告</span><span><i class="bad"></i>异常</span><span><i class="off"></i>停用</span></div><div class="dns-canvas" data-canvas><div class="dns-loading">正在加载拓扑…</div></div></section><aside class="dns-inspector" data-inspector hidden></aside></div>' : '<div class="dns-empty dns-empty-compact"><div class="dns-empty-icon"><i class="fa fa-project-diagram"></i></div><h3>暂无 GTM 3.0 接入配置</h3><p>当前阿里云账号未返回可管理的接入域名。</p></div>'));
         root.querySelector("[data-account]").onchange = function (event) {
             selectedAccountId = Number(event.target.value);
             selectedConfigId = null;
             loadInstances();
         };
         root.querySelector("[data-account-settings]").onclick = goAccounts;
+        if (root.querySelector("[data-create-pool]")) root.querySelector("[data-create-pool]").onclick = function () { showPoolDialog(); };
+        if (root.querySelector("[data-attach-pool]")) root.querySelector("[data-attach-pool]").onclick = function () { showResourceDialog("pool"); };
         root.querySelectorAll("[data-config]").forEach(function (button) {
             button.onclick = function () {
                 selectedConfigId = button.dataset.config;
@@ -298,9 +300,9 @@
         api("/topology?account_id=" + encodeURIComponent(selectedAccountId) + "&instance_id=" + encodeURIComponent(instance.instance_id) + "&config_id=" + encodeURIComponent(instance.config_id)).then(function (payload) {
             if (selectedConfigId !== configId) return;
             state.topology = payload.data;
-            selectedNode = { type: "instance", data: state.topology };
+            selectedNode = null;
             renderTree();
-            renderInspector();
+            closeInspector();
         }).catch(function (error) {
             if (canvas) canvas.innerHTML = '<div class="alert alert-danger m-3">' + esc(error.message) + '</div>';
         });
@@ -331,40 +333,72 @@
                 var type = button.dataset.node;
                 if (type === "instance") selectedNode = { type: type, data: topology };
                 else if (type === "pool") selectedNode = { type: type, data: topology.pools[Number(button.dataset.poolIndex)] };
-                else selectedNode = { type: type, data: topology.pools[Number(button.dataset.poolIndex)].addresses[Number(button.dataset.addressIndex)] };
+                else selectedNode = { type: type, data: topology.pools[Number(button.dataset.poolIndex)].addresses[Number(button.dataset.addressIndex)], pool: topology.pools[Number(button.dataset.poolIndex)] };
                 canvas.querySelectorAll("[data-node]").forEach(function (item) { item.classList.remove("selected"); });
                 button.classList.add("selected");
                 renderInspector();
             };
         });
-        var selectedButton = canvas.querySelector('[data-node="' + (selectedNode ? selectedNode.type : "instance") + '"]');
+        var selectedButton = selectedNode ? canvas.querySelector('[data-node="' + selectedNode.type + '"]') : null;
         if (selectedButton) selectedButton.classList.add("selected");
+    }
+
+    function closeInspector() {
+        selectedNode = null;
+        var workspace = root && root.querySelector(".dns-workspace");
+        var host = root && root.querySelector("[data-inspector]");
+        if (workspace) workspace.classList.add("inspector-closed");
+        if (host) {
+            host.hidden = true;
+            host.innerHTML = "";
+        }
+        var canvas = root && root.querySelector("[data-canvas]");
+        if (canvas) canvas.querySelectorAll("[data-node]").forEach(function (item) { item.classList.remove("selected"); });
     }
 
     function renderInspector() {
         var host = root.querySelector("[data-inspector]");
         if (!host || !selectedNode) return;
+        var workspace = root.querySelector(".dns-workspace");
+        if (workspace) workspace.classList.remove("inspector-closed");
+        host.hidden = false;
         var data = selectedNode.data;
+        var closeButton = '<button type="button" class="dns-inspector-close" data-close-inspector aria-label="关闭详情面板" title="关闭">×</button>';
         if (selectedNode.type === "instance") {
-            host.innerHTML = '<div class="dns-inspector-head"><span class="dns-node-type">接入域名</span><h3>' + esc(data.domain || "-") + '</h3><p>' + esc(data.instance_name || data.remark || "GTM 实例配置") + '</p></div>' +
+            host.innerHTML = '<div class="dns-inspector-head">' + closeButton + '<span class="dns-node-type">接入域名</span><h3>' + esc(data.domain || "-") + '</h3><p>' + esc(data.instance_name || data.remark || "GTM 实例配置") + '</p></div>' +
                 detailRows([["运行状态", { html: statusLabel(data) }], ["记录类型", data.record_type || "-"], ["配置 ID", data.config_id || "-"], ["实例 ID", data.instance_id || "-"]]) +
                 '<form data-node-form class="dns-inspector-form"><label><span>全局 TTL（秒）</span><input class="form-control" type="number" min="1" max="86400" name="ttl" value="' + esc(data.ttl || 60) + '"></label>' +
                 strategyFields(data.strategy, data.sequence_mode) + statusFields(data.enable_status) + '<button class="btn btn-primary btn-block" type="submit">保存域名配置</button></form>';
         } else if (selectedNode.type === "pool") {
-            host.innerHTML = '<div class="dns-inspector-head"><span class="dns-node-type">地址池</span><h3>' + esc(data.name || "-") + '</h3><p>' + esc(data.id || "-") + '</p></div>' +
-                detailRows([["健康状态", healthName(data.health_status)], ["可用状态", availableName(data.available_status)], ["地址数量", data.addresses.length], ["健康判定", judgementName(data.health_judgement)]]) +
-                '<form data-node-form class="dns-inspector-form">' + strategyFields(data.strategy, data.sequence_mode) + statusFields(data.enable_status) + '<button class="btn btn-primary btn-block" type="submit">保存地址池配置</button></form>';
+            host.innerHTML = '<div class="dns-inspector-head">' + closeButton + '<span class="dns-node-type">地址池</span><h3>' + esc(data.name || "-") + '</h3><p>' + esc(data.id || "-") + '</p></div>' +
+                detailRows([["健康状态", healthName(data.health_status)], ["可用状态", availableName(data.available_status)], ["地址数量", data.addresses.length], ["地址类型", data.type || "-"]]) +
+                '<form data-node-form class="dns-inspector-form"><label><span>地址池名称</span><input class="form-control" name="name" required maxlength="100" value="' + esc(data.name || "") + '"></label>' +
+                '<label><span>备注</span><textarea class="form-control" name="remark" rows="2" maxlength="500">' + esc(data.remark || "") + '</textarea></label><div class="dns-form-grid"><label><span>调度权重</span><input class="form-control" type="number" min="1" max="100" name="weight" value="' + esc(data.weight || 100) + '"></label><label><span>顺序号</span><input class="form-control" type="number" min="1" max="1000" name="serial_number" value="' + esc(data.serial_number || 1) + '"></label></div>' + judgementField(data.health_judgement) + strategyFields(data.strategy, data.sequence_mode) + statusFields(data.enable_status) +
+                '<button class="btn btn-primary btn-block" type="submit">保存地址池配置</button><div class="dns-inspector-actions"><button class="btn btn-light" type="button" data-create-address><i class="fa fa-plus"></i> 新增节点</button><button class="btn btn-light" type="button" data-attach-address><i class="fa fa-link"></i> 关联已有</button></div><button class="btn btn-outline-danger btn-block" type="button" data-remove-pool>从当前域名移除</button><button class="btn btn-link text-danger btn-block" type="button" data-delete-pool>删除地址池资源</button></form>';
         } else {
-            host.innerHTML = '<div class="dns-inspector-head"><span class="dns-node-type">节点地址</span><h3>' + esc(data.name || data.address || "-") + '</h3><p>' + esc(data.address || "-") + '</p></div>' +
-                detailRows([["健康状态", healthName(data.health_status)], ["可用状态", availableName(data.available_status)], ["地址类型", data.type || "-"], ["调度模式", data.available_mode === "manual" ? "手动" : "自动"]]) +
-                '<form data-node-form class="dns-inspector-form">' + statusFields(data.enable_status) + '<button class="btn btn-primary btn-block" type="submit">保存节点状态</button></form>';
+            host.innerHTML = '<div class="dns-inspector-head">' + closeButton + '<span class="dns-node-type">节点地址</span><h3>' + esc(data.name || data.address || "-") + '</h3><p>' + esc(data.id || "-") + '</p></div>' +
+                detailRows([["健康状态", healthName(data.health_status)], ["可用状态", availableName(data.available_status)], ["地址类型", data.type || "-"], ["健康检查", data.health_tasks && data.health_tasks.length ? data.health_tasks.length + " 项" : "未配置"]]) +
+                '<form data-node-form class="dns-inspector-form"><label><span>节点名称</span><input class="form-control" name="name" required maxlength="100" value="' + esc(data.name || "") + '"></label><label><span>节点地址</span><input class="form-control" name="address" required maxlength="253" value="' + esc(data.address || "") + '"></label><label><span>备注</span><textarea class="form-control" name="remark" rows="2" maxlength="500">' + esc(data.remark || "") + '</textarea></label>' +
+                '<div class="dns-form-grid"><label><span>调度权重</span><input class="form-control" type="number" min="1" max="100" name="weight" value="' + esc(data.weight || 100) + '"></label><label><span>顺序号</span><input class="form-control" type="number" min="1" max="1000" name="serial_number" value="' + esc(data.serial_number || 1) + '"></label></div>' + judgementField(data.health_judgement) + availableModeFields(data.available_mode, data.manual_available_status) + statusFields(data.enable_status) + '<button class="btn btn-primary btn-block" type="submit">保存节点配置</button><button class="btn btn-outline-danger btn-block" type="button" data-remove-address>从当前地址池移除</button><button class="btn btn-link text-danger btn-block" type="button" data-delete-address>删除节点资源</button></form>';
         }
+        host.querySelector("[data-close-inspector]").onclick = closeInspector;
         host.querySelector("[data-node-form]").onsubmit = saveNode;
         var strategy = host.querySelector('[name="strategy"]');
         if (strategy) strategy.onchange = function () {
             var mode = host.querySelector("[data-sequence-mode]");
             if (mode) mode.hidden = strategy.value !== "sequence";
         };
+        var availableMode = host.querySelector('[name="available_mode"]');
+        if (availableMode) availableMode.onchange = function () {
+            var manual = host.querySelector("[data-manual-status]");
+            if (manual) manual.hidden = availableMode.value !== "manual";
+        };
+        if (host.querySelector("[data-create-address]")) host.querySelector("[data-create-address]").onclick = function () { showAddressDialog(data); };
+        if (host.querySelector("[data-attach-address]")) host.querySelector("[data-attach-address]").onclick = function () { showResourceDialog("address", data); };
+        if (host.querySelector("[data-remove-pool]")) host.querySelector("[data-remove-pool]").onclick = function () { dropPool(data, false); };
+        if (host.querySelector("[data-delete-pool]")) host.querySelector("[data-delete-pool]").onclick = function () { dropPool(data, true); };
+        if (host.querySelector("[data-remove-address]")) host.querySelector("[data-remove-address]").onclick = function () { dropAddress(data, selectedNode.pool, false); };
+        if (host.querySelector("[data-delete-address]")) host.querySelector("[data-delete-address]").onclick = function () { dropAddress(data, selectedNode.pool, true); };
     }
 
     function saveNode(event) {
@@ -403,25 +437,36 @@
             var poolStrategy = formField(form, "strategy").value;
             var poolSequenceMode = poolStrategy === "sequence" ? formField(form, "sequence_mode").value : null;
             if (formField(form, "status").value === "disable" && formField(form, "status").value !== pool.enable_status && !confirm("停用地址池后，该池将不再参与解析。确定继续吗？")) return;
-            var poolJobs = [];
-            if (poolStrategy !== pool.strategy || (poolStrategy === "sequence" && poolSequenceMode !== pool.sequence_mode)) poolJobs.push(post("/update", Object.assign({}, body, {
-                operation: "pool_strategy",
+            saveJobs(button, [post("/pool/save", Object.assign(topologyContext(), {
                 pool_id: pool.id,
+                name: formField(form, "name").value.trim(),
+                type: pool.type,
+                remark: formField(form, "remark").value.trim(),
+                health_judgement: formField(form, "health_judgement").value,
                 strategy: poolStrategy,
                 sequence_mode: poolSequenceMode,
-            })));
-            if (formField(form, "status").value !== pool.enable_status) poolJobs.push(post("/update", Object.assign({}, body, { operation: "pool_status", pool_id: pool.id, status: formField(form, "status").value })));
-            if (!poolJobs.length) return toast("配置没有变化");
-            saveJobs(button, poolJobs);
+                status: formField(form, "status").value,
+                weight: Number(formField(form, "weight").value || 100),
+                serial_number: Number(formField(form, "serial_number").value || 1),
+            }))]);
             return;
         }
         var address = selectedNode.data;
         if (formField(form, "status").value === "disable" && formField(form, "status").value !== address.enable_status && !confirm("停用节点后，该地址将不再参与解析。确定继续吗？")) return;
-        if (formField(form, "status").value === address.enable_status) {
-            toast("节点状态没有变化");
-            return;
-        }
-        saveJobs(button, [post("/update", Object.assign({}, body, { operation: "address_status", address_id: address.id, status: formField(form, "status").value }))]);
+        saveJobs(button, [post("/address/save", Object.assign(topologyContext(), {
+            pool_id: selectedNode.pool.id,
+            address_id: address.id,
+            name: formField(form, "name").value.trim(),
+            type: address.type,
+            address: formField(form, "address").value.trim(),
+            remark: formField(form, "remark").value.trim(),
+            health_judgement: formField(form, "health_judgement").value,
+            status: formField(form, "status").value,
+            available_mode: formField(form, "available_mode").value,
+            manual_status: formField(form, "manual_status").value,
+            weight: Number(formField(form, "weight").value || 100),
+            serial_number: Number(formField(form, "serial_number").value || 1),
+        }))]);
     }
 
     function saveJobs(button, jobs) {
@@ -438,10 +483,178 @@
         });
     }
 
+    function topologyContext() {
+        return {
+            account_id: selectedAccountId,
+            instance_id: state.topology.instance_id,
+            config_id: state.topology.config_id,
+        };
+    }
+
+    function expectedPoolType() {
+        var recordType = String((state.topology && state.topology.record_type) || "").toUpperCase();
+        return ({ A: "IPv4", AAAA: "IPv6", CNAME: "domain" })[recordType] || "";
+    }
+
+    function showPoolDialog() {
+        if (!state.topology) return alert("请等待接入域名拓扑加载完成");
+        var suggestedType = expectedPoolType();
+        var modal = createDialog("新增地址池", "创建后将自动关联当前接入域名", '<label><span>地址池名称</span><input class="form-control" name="name" required maxlength="100" placeholder="例如：香港主线路"></label>' +
+            '<div class="dns-form-grid"><label><span>地址类型</span><select class="form-control" name="type"><option value="IPv4" ' + (suggestedType === "IPv4" ? "selected" : "") + '>IPv4</option><option value="IPv6" ' + (suggestedType === "IPv6" ? "selected" : "") + '>IPv6</option><option value="domain" ' + (suggestedType === "domain" ? "selected" : "") + '>域名</option></select></label><label><span>关联权重</span><input class="form-control" type="number" name="weight" min="1" max="100" value="100"></label></div>' +
+            '<label><span>备注</span><textarea class="form-control" name="remark" rows="2" maxlength="500"></textarea></label>' + judgementField("any_ok") + strategyFields("round_robin", "preemptive") + statusFields("enable"), "创建并关联");
+        var form = modal.querySelector("form");
+        bindDynamicFields(modal);
+        form.onsubmit = function (event) {
+            event.preventDefault();
+            var submit = form.querySelector('[type="submit"]');
+            submit.disabled = true;
+            post("/pool/save", Object.assign(topologyContext(), {
+                name: formField(form, "name").value.trim(),
+                type: formField(form, "type").value,
+                remark: formField(form, "remark").value.trim(),
+                health_judgement: formField(form, "health_judgement").value,
+                strategy: formField(form, "strategy").value,
+                sequence_mode: formField(form, "strategy").value === "sequence" ? formField(form, "sequence_mode").value : null,
+                status: formField(form, "status").value,
+                weight: Number(formField(form, "weight").value || 100),
+            })).then(function () {
+                modal.remove();
+                toast("地址池已创建并关联");
+                loadTopology(selectedConfigId);
+            }).catch(function (error) { submit.disabled = false; alert("创建失败：" + error.message); });
+        };
+    }
+
+    function showAddressDialog(pool) {
+        var modal = createDialog("新增节点地址", "创建后将自动加入“" + (pool.name || "当前地址池") + "”", '<div class="dns-form-grid"><label><span>节点名称</span><input class="form-control" name="name" required maxlength="100" placeholder="例如：香港节点 1"></label><label><span>地址类型</span><input class="form-control" value="' + esc(pool.type || "IPv4") + '" disabled><input type="hidden" name="type" value="' + esc(pool.type || "IPv4") + '"></label></div>' +
+            '<label><span>节点地址</span><input class="form-control" name="address" required maxlength="253" placeholder="请输入 IP 地址或域名"></label><label><span>备注</span><textarea class="form-control" name="remark" rows="2" maxlength="500"></textarea></label>' +
+            judgementField("any_ok") + availableModeFields("auto", "available") + statusFields("enable") + '<label><span>地址池内权重</span><input class="form-control" type="number" name="weight" min="1" max="100" value="100"></label>', "创建并加入");
+        var form = modal.querySelector("form");
+        bindDynamicFields(modal);
+        form.onsubmit = function (event) {
+            event.preventDefault();
+            var submit = form.querySelector('[type="submit"]');
+            submit.disabled = true;
+            post("/address/save", Object.assign(topologyContext(), {
+                pool_id: pool.id,
+                name: formField(form, "name").value.trim(),
+                type: formField(form, "type").value,
+                address: formField(form, "address").value.trim(),
+                remark: formField(form, "remark").value.trim(),
+                health_judgement: formField(form, "health_judgement").value,
+                status: formField(form, "status").value,
+                available_mode: formField(form, "available_mode").value,
+                manual_status: formField(form, "manual_status").value,
+                weight: Number(formField(form, "weight").value || 100),
+            })).then(function () {
+                modal.remove();
+                toast("节点地址已创建并加入地址池");
+                loadTopology(selectedConfigId);
+            }).catch(function (error) { submit.disabled = false; alert("创建失败：" + error.message); });
+        };
+    }
+
+    function showResourceDialog(type, pool) {
+        if (!state.topology) return alert("请等待接入域名拓扑加载完成");
+        var title = type === "pool" ? "关联已有地址池" : "关联已有节点";
+        var modal = createDialog(title, "从当前阿里云账号的资源库中选择", '<div class="dns-resource-loading">正在读取资源库…</div>', "关联");
+        var form = modal.querySelector("form");
+        var submit = form.querySelector('[type="submit"]');
+        submit.disabled = true;
+        api("/resources?account_id=" + encodeURIComponent(selectedAccountId)).then(function (payload) {
+            state.resources = payload.data || { pools: [], addresses: [] };
+            var rows = type === "pool" ? state.resources.pools : state.resources.addresses;
+            var used = type === "pool" ? state.topology.pools.map(function (item) { return item.id; }) : pool.addresses.map(function (item) { return item.id; });
+            rows = rows.filter(function (item) {
+                return used.indexOf(item.id) === -1 && (type === "pool" ? (!expectedPoolType() || item.type === expectedPoolType()) : item.type === pool.type);
+            });
+            var body = modal.querySelector(".dns-dialog-body");
+            if (!rows.length) {
+                body.innerHTML = '<div class="dns-table-empty">没有可关联的' + (type === "pool" ? "地址池" : "节点地址") + '</div>';
+                return;
+            }
+            body.innerHTML = '<div class="dns-resource-list">' + rows.map(function (item, index) {
+                return '<label class="dns-resource-item"><input type="radio" name="resource_id" value="' + esc(item.id) + '" ' + (index === 0 ? "checked" : "") + '><span><strong>' + esc(item.name || item.address || "未命名资源") + '</strong><small>' + esc(type === "pool" ? ((item.type || "-") + " · " + Number(item.address_count || 0) + " 个地址") : ((item.address || "-") + " · " + (item.type || "-"))) + '</small></span>' + statusPill(item.enable_status, item.enable_status === "disable" ? "已停用" : "已启用") + '</label>';
+            }).join("") + '</div><label><span>关联权重</span><input class="form-control" type="number" min="1" max="100" name="weight" value="100"></label>';
+            submit.disabled = false;
+        }).catch(function (error) {
+            modal.querySelector(".dns-dialog-body").innerHTML = '<div class="alert alert-danger mb-0">' + esc(error.message) + '</div>';
+        });
+        form.onsubmit = function (event) {
+            event.preventDefault();
+            var chosen = form.querySelector('[name="resource_id"]:checked');
+            if (!chosen) return alert("请选择需要关联的资源");
+            submit.disabled = true;
+            var payload = Object.assign(topologyContext(), { weight: Number(formField(form, "weight").value || 100) });
+            if (type === "pool") payload.pool_id = chosen.value;
+            else {
+                payload.pool_id = pool.id;
+                payload.address_id = chosen.value;
+            }
+            post(type === "pool" ? "/pool/attach" : "/address/attach", payload).then(function () {
+                modal.remove();
+                toast("资源已关联");
+                loadTopology(selectedConfigId);
+            }).catch(function (error) { submit.disabled = false; alert("关联失败：" + error.message); });
+        };
+    }
+
+    function dropPool(pool, deleteResource) {
+        var message = deleteResource ? "将先解除当前域名关联，再删除阿里云地址池资源。若资源被其他配置引用，阿里云会拒绝删除。确定继续吗？" : "确定从当前接入域名移除这个地址池吗？地址池资源本身仍会保留。";
+        if (!confirm(message)) return;
+        post("/pool/drop", Object.assign(topologyContext(), { pool_id: pool.id, delete_resource: deleteResource })).then(function () {
+            toast(deleteResource ? "地址池资源已删除" : "地址池已从当前域名移除");
+            loadTopology(selectedConfigId);
+        }).catch(function (error) { alert("操作失败：" + error.message); });
+    }
+
+    function dropAddress(address, pool, deleteResource) {
+        var message = deleteResource ? "将先从当前地址池移除，再删除阿里云节点资源。若节点被其他地址池引用，阿里云会拒绝删除。确定继续吗？" : "确定从当前地址池移除这个节点吗？节点资源本身仍会保留。";
+        if (!confirm(message)) return;
+        post("/address/drop", Object.assign(topologyContext(), { pool_id: pool.id, address_id: address.id, delete_resource: deleteResource })).then(function () {
+            toast(deleteResource ? "节点资源已删除" : "节点已从当前地址池移除");
+            loadTopology(selectedConfigId);
+        }).catch(function (error) { alert("操作失败：" + error.message); });
+    }
+
+    function createDialog(title, description, body, submitLabel) {
+        var modal = document.createElement("div");
+        modal.className = "dns-modal";
+        modal.innerHTML = '<form class="dns-dialog" aria-label="' + esc(title) + '"><header><div><h3>' + esc(title) + '</h3><p>' + esc(description || "") + '</p></div><button type="button" data-close aria-label="关闭">×</button></header><div class="dns-dialog-body">' + body + '</div><footer><button type="button" class="btn btn-light" data-close>取消</button><button type="submit" class="btn btn-primary">' + esc(submitLabel || "保存") + '</button></footer></form>';
+        document.body.appendChild(modal);
+        modal.querySelectorAll("[data-close]").forEach(function (button) { button.onclick = function () { modal.remove(); }; });
+        modal.onclick = function (event) { if (event.target === modal) modal.remove(); };
+        modal.onkeydown = function (event) { if (event.key === "Escape") modal.remove(); };
+        setTimeout(function () { var first = modal.querySelector("input:not([type=hidden]),select,textarea"); if (first) first.focus(); }, 0);
+        return modal;
+    }
+
+    function bindDynamicFields(host) {
+        var strategy = host.querySelector('[name="strategy"]');
+        if (strategy) strategy.onchange = function () {
+            var mode = host.querySelector("[data-sequence-mode]");
+            if (mode) mode.hidden = strategy.value !== "sequence";
+        };
+        var availableMode = host.querySelector('[name="available_mode"]');
+        if (availableMode) availableMode.onchange = function () {
+            var manual = host.querySelector("[data-manual-status]");
+            if (manual) manual.hidden = availableMode.value !== "manual";
+        };
+    }
+
     function strategyFields(strategy, sequenceMode) {
         var options = [["sequence", "顺序（主备）"], ["round_robin", "轮询"], ["weight", "权重"], ["source_nearest", "来源就近"]];
         return '<label><span>负载均衡策略</span><select class="form-control" name="strategy">' + options.map(function (item) { return '<option value="' + item[0] + '" ' + (strategy === item[0] ? "selected" : "") + '>' + item[1] + '</option>'; }).join("") + '</select></label>' +
             '<label data-sequence-mode ' + (strategy === "sequence" ? "" : "hidden") + '><span>恢复模式</span><select class="form-control" name="sequence_mode"><option value="preemptive" ' + (sequenceMode !== "non_preemptive" ? "selected" : "") + '>抢占模式</option><option value="non_preemptive" ' + (sequenceMode === "non_preemptive" ? "selected" : "") + '>非抢占模式</option></select></label>';
+    }
+
+    function judgementField(value) {
+        var options = [["any_ok", "至少一个健康检查正常"], ["p30_ok", "至少 30% 正常"], ["p50_ok", "至少 50% 正常"], ["p70_ok", "至少 70% 正常"], ["all_ok", "全部正常"]];
+        return '<label><span>健康判定条件</span><select class="form-control" name="health_judgement">' + options.map(function (item) { return '<option value="' + item[0] + '" ' + (value === item[0] ? "selected" : "") + '>' + item[1] + '</option>'; }).join("") + '</select></label>';
+    }
+
+    function availableModeFields(mode, manualStatus) {
+        return '<label><span>探测异常切换方式</span><select class="form-control" name="available_mode"><option value="auto" ' + (mode !== "manual" ? "selected" : "") + '>自动：按健康检查切换</option><option value="manual" ' + (mode === "manual" ? "selected" : "") + '>手动：固定可用状态</option></select></label><label data-manual-status ' + (mode === "manual" ? "" : "hidden") + '><span>手动可用状态</span><select class="form-control" name="manual_status"><option value="available" ' + (manualStatus !== "unavailable" ? "selected" : "") + '>可用</option><option value="unavailable" ' + (manualStatus === "unavailable" ? "selected" : "") + '>不可用</option></select></label>';
     }
 
     function statusFields(status) {

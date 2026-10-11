@@ -16,7 +16,7 @@ class CloudflareDnsService
     public function __construct()
     {
         $this->client = new Client([
-            'base_uri' => self::ENDPOINT,
+            'base_uri' => self::ENDPOINT . '/',
             'timeout' => 15,
             'connect_timeout' => 8,
             'http_errors' => false,
@@ -78,7 +78,7 @@ class CloudflareDnsService
             'Content-Type' => 'application/json',
         ]);
         try {
-            $response = $this->client->request($method, $path, $options);
+            $response = $this->client->request($method, ltrim($path, '/'), $options);
             $status = $response->getStatusCode();
             $decoded = json_decode((string)$response->getBody(), true);
         } catch (\Throwable $error) {

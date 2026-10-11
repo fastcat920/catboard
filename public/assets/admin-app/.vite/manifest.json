@@ -562,7 +562,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-Bz_wYkbn.js",
+    "file": "assets/index-CNtGmoe0.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -602,7 +602,7 @@
       "src/pages/referral/ReferralPage.tsx"
     ],
     "css": [
-      "assets/index-B9cq7vOk.css"
+      "assets/index-C3SfbuBC.css"
     ],
     "assets": [
       "assets/fa-solid-900-BiazUjGD.woff2",
@@ -658,7 +658,7 @@
     "src": "src/assets/fonts/simple-line-icons/Simple-Line-Icons.woff2"
   },
   "src/pages/aliyun-dns/AliyunDnsPage.tsx": {
-    "file": "assets/AliyunDnsPage-mbyuWLVT.js",
+    "file": "assets/AliyunDnsPage-BjKqlPDU.js",
     "name": "AliyunDnsPage",
     "src": "src/pages/aliyun-dns/AliyunDnsPage.tsx",
     "isDynamicEntry": true,

@@ -242,6 +242,119 @@ class AliyunDnsController extends Controller
         return response(['data' => ['pools' => $pools, 'addresses' => $addresses]]);
     }
 
+    public function saveOrder(Request $request, AliyunDnsService $service)
+    {
+        $data = $request->validate([
+            'account_id' => 'required|integer|exists:v2_aliyun_dns_account,id',
+            'instance_id' => 'required|string|max:200',
+            'config_id' => 'required|string|max:200',
+            'pools' => 'present|array',
+            'pools.*.pool_id' => 'required|string|max:200|distinct',
+            'pools.*.serial_number' => 'required|integer|min:1|max:1000',
+            'addresses' => 'present|array',
+            'addresses.*.pool_id' => 'required|string|max:200',
+            'addresses.*.address_id' => 'required|string|max:200',
+            'addresses.*.serial_number' => 'required|integer|min:1|max:1000',
+        ]);
+        $account = $this->enabledAccount($data['account_id']);
+        try {
+            $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $originalPoolLinks = $this->poolLinks($full);
+            $poolOrder = [];
+            foreach ($data['pools'] as $row) {
+                $poolOrder[(string)$row['pool_id']] = (int)$row['serial_number'];
+            }
+            $knownPools = [];
+            $updatedPoolLinks = $originalPoolLinks;
+            foreach ($updatedPoolLinks as &$link) {
+                $poolId = (string)$link['AddressPoolId'];
+                $knownPools[$poolId] = true;
+                if (isset($poolOrder[$poolId])) $link['SerialNumber'] = $poolOrder[$poolId];
+            }
+            unset($link);
+            foreach (array_keys($poolOrder) as $poolId) {
+                if (!isset($knownPools[$poolId])) throw new \RuntimeException('顺序列表中包含未关联的地址池，请刷新后重试');
+            }
+            $this->assertUniqueSerialNumbers($updatedPoolLinks, 'SerialNumber', '地址池');
+            usort($updatedPoolLinks, function ($left, $right) {
+                return $left['SerialNumber'] <=> $right['SerialNumber'];
+            });
+
+            $addressOrderByPool = [];
+            foreach ($data['addresses'] as $row) {
+                $poolId = (string)$row['pool_id'];
+                $addressId = (string)$row['address_id'];
+                if (isset($addressOrderByPool[$poolId][$addressId])) {
+                    throw new \RuntimeException('同一地址池中存在重复节点，请刷新后重试');
+                }
+                $addressOrderByPool[$poolId][$addressId] = (int)$row['serial_number'];
+            }
+
+            $addressChanges = [];
+            foreach ($this->listFrom($full['AddressPools'] ?? [], 'AddressPool') as $pool) {
+                $poolId = (string)($pool['AddressPoolId'] ?? '');
+                if ($poolId === '' || !isset($addressOrderByPool[$poolId])) continue;
+                $originalLinks = $this->addressLinks($pool);
+                $updatedLinks = $originalLinks;
+                $knownAddresses = [];
+                foreach ($updatedLinks as &$link) {
+                    $addressId = (string)$link['AddressId'];
+                    $knownAddresses[$addressId] = true;
+                    if (isset($addressOrderByPool[$poolId][$addressId])) {
+                        $link['SerialNumber'] = $addressOrderByPool[$poolId][$addressId];
+                    }
+                }
+                unset($link);
+                foreach (array_keys($addressOrderByPool[$poolId]) as $addressId) {
+                    if (!isset($knownAddresses[$addressId])) {
+                        throw new \RuntimeException('顺序列表中包含未关联的节点，请刷新后重试');
+                    }
+                }
+                $this->assertUniqueSerialNumbers($updatedLinks, 'SerialNumber', '地址池“' . ($pool['AddressPoolName'] ?? $poolId) . '”中的节点');
+                usort($updatedLinks, function ($left, $right) {
+                    return $left['SerialNumber'] <=> $right['SerialNumber'];
+                });
+                if ($updatedLinks !== $originalLinks) {
+                    $addressChanges[$poolId] = ['before' => $originalLinks, 'after' => $updatedLinks];
+                }
+            }
+            foreach (array_keys($addressOrderByPool) as $poolId) {
+                if (!isset($knownPools[$poolId])) throw new \RuntimeException('顺序列表中包含未关联的地址池，请刷新后重试');
+            }
+
+            $appliedPools = [];
+            $lastResult = [];
+            try {
+                foreach ($addressChanges as $poolId => $change) {
+                    $lastResult = $service->replacePoolAddresses($account, $poolId, $change['after']);
+                    $appliedPools[] = $poolId;
+                }
+                if ($updatedPoolLinks !== $originalPoolLinks) {
+                    $lastResult = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $updatedPoolLinks);
+                }
+            } catch (\Throwable $error) {
+                $rollbackErrors = [];
+                try {
+                    $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $originalPoolLinks);
+                } catch (\Throwable $rollbackError) {
+                    $rollbackErrors[] = $rollbackError->getMessage();
+                }
+                foreach (array_reverse($appliedPools) as $poolId) {
+                    try {
+                        $service->replacePoolAddresses($account, $poolId, $addressChanges[$poolId]['before']);
+                    } catch (\Throwable $rollbackError) {
+                        $rollbackErrors[] = $rollbackError->getMessage();
+                    }
+                }
+                $suffix = $rollbackErrors ? '；部分回滚失败，请到阿里云控制台核对：' . implode('；', $rollbackErrors) : '；已恢复原顺序';
+                throw new \RuntimeException($error->getMessage() . $suffix);
+            }
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['order' => $error->getMessage()]);
+        }
+        return response(['data' => ['success' => true, 'request_id' => $lastResult['RequestId'] ?? null]]);
+    }
+
     public function savePool(Request $request, AliyunDnsService $service)
     {
         $data = $request->validate([
@@ -729,6 +842,16 @@ class AliyunDnsController extends Controller
             ];
         }
         return $links;
+    }
+
+    private function assertUniqueSerialNumbers(array $links, $key, $label)
+    {
+        $numbers = array_map(function ($link) use ($key) {
+            return (int)$link[$key];
+        }, $links);
+        if (count($numbers) !== count(array_unique($numbers))) {
+            throw new \RuntimeException($label . '的顺序号不能重复');
+        }
     }
 
     private function stringList($value)

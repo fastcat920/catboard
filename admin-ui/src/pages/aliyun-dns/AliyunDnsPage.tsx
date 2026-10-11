@@ -5,6 +5,7 @@ import {
     EditOutlined,
     GlobalOutlined,
     LinkOutlined,
+    OrderedListOutlined,
     PlusOutlined,
     ReloadOutlined,
     ThunderboltOutlined,
@@ -47,6 +48,7 @@ import {
     fetchDnsTopology,
     saveDnsAccount,
     saveDnsAddress,
+    saveDnsOrder,
     saveDnsPool,
     testDnsAccount,
     updateDns,
@@ -106,6 +108,10 @@ const contextOf = (accountId: number, topology: DnsInstance) => ({
     instance_id: topology.instance_id,
     config_id: topology.config_id,
 })
+const serialNumber = (value: number | null | undefined, fallback: number) => value ?? fallback
+const bySerialNumber = <T extends { serial_number?: number | null }>(left: T, right: T) =>
+    serialNumber(left.serial_number, Number.MAX_SAFE_INTEGER) -
+    serialNumber(right.serial_number, Number.MAX_SAFE_INTEGER)
 
 function AccountEditor({
     open,
@@ -602,6 +608,157 @@ function NodeEditor({
     )
 }
 
+interface OrderPoolRow {
+    id: string
+    name: string
+    serialNumber: number
+}
+interface OrderAddressRow {
+    id: string
+    poolId: string
+    poolName: string
+    name: string
+    address: string
+    serialNumber: number
+}
+
+function OrderEditor({
+    topology,
+    saving,
+    onClose,
+    onSave,
+}: {
+    topology: DnsInstance
+    saving: boolean
+    onClose: () => void
+    onSave: (data: {
+        pools: Array<{ pool_id: string; serial_number: number }>
+        addresses: Array<{ pool_id: string; address_id: string; serial_number: number }>
+    }) => Promise<void>
+}) {
+    const orderedPools = topology.pools.toSorted(bySerialNumber)
+    const [pools, setPools] = useState<OrderPoolRow[]>(() =>
+        orderedPools.map((pool, index) => ({
+            id: pool.id,
+            name: pool.name,
+            serialNumber: serialNumber(pool.serial_number, index + 1),
+        })),
+    )
+    const [addresses, setAddresses] = useState<OrderAddressRow[]>(() =>
+        orderedPools.flatMap((pool) =>
+            pool.addresses.toSorted(bySerialNumber).map((address, index) => ({
+                id: address.id,
+                poolId: pool.id,
+                poolName: pool.name,
+                name: address.name || address.address,
+                address: address.address,
+                serialNumber: serialNumber(address.serial_number, index + 1),
+            })),
+        ),
+    )
+    const submit = async () => {
+        const duplicatePoolOrder = new Set(pools.map((row) => row.serialNumber)).size !== pools.length
+        if (duplicatePoolOrder) return message.error('地址池顺序号不能重复')
+        for (const pool of pools) {
+            const rows = addresses.filter((row) => row.poolId === pool.id)
+            if (new Set(rows.map((row) => row.serialNumber)).size !== rows.length) {
+                return message.error(`地址池“${pool.name}”中的节点顺序号不能重复`)
+            }
+        }
+        await onSave({
+            pools: pools.map((row) => ({ pool_id: row.id, serial_number: row.serialNumber })),
+            addresses: addresses.map((row) => ({
+                pool_id: row.poolId,
+                address_id: row.id,
+                serial_number: row.serialNumber,
+            })),
+        })
+    }
+    return (
+        <Modal
+            title="调整顺序号"
+            open
+            width={720}
+            onCancel={onClose}
+            onOk={() => void submit()}
+            confirmLoading={saving}
+            okText="保存顺序"
+            cancelText="取消"
+            destroyOnHidden
+        >
+            <Alert
+                className="mb-3"
+                type="info"
+                showIcon
+                message="顺序号越小越优先，仅在顺序（主备）策略下参与调度；地址池之间、同一地址池内的节点分别排序。"
+            />
+            <div className="dns-order-editor">
+                <section>
+                    <Typography.Title level={5}>地址池顺序</Typography.Title>
+                    <div className="dns-order-list">
+                        {pools.map((pool) => (
+                            <div className="dns-order-row" key={pool.id}>
+                                <div>
+                                    <strong>{pool.name}</strong>
+                                    <small>地址池</small>
+                                </div>
+                                <InputNumber
+                                    min={1}
+                                    max={1000}
+                                    value={pool.serialNumber}
+                                    aria-label={`${pool.name}顺序号`}
+                                    onChange={(value) =>
+                                        setPools((rows) =>
+                                            rows.map((row) =>
+                                                row.id === pool.id ? { ...row, serialNumber: Number(value ?? 1) } : row,
+                                            ),
+                                        )
+                                    }
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </section>
+                {pools.map((pool) => {
+                    const rows = addresses.filter((row) => row.poolId === pool.id)
+                    if (!rows.length) return null
+                    return (
+                        <section key={pool.id}>
+                            <Typography.Title level={5}>{pool.name} · 节点顺序</Typography.Title>
+                            <div className="dns-order-list">
+                                {rows.map((address) => (
+                                    <div className="dns-order-row" key={`${address.poolId}:${address.id}`}>
+                                        <div>
+                                            <strong>{address.name}</strong>
+                                            <small>{address.address}</small>
+                                        </div>
+                                        <InputNumber
+                                            min={1}
+                                            max={1000}
+                                            value={address.serialNumber}
+                                            aria-label={`${address.name}顺序号`}
+                                            onChange={(value) =>
+                                                setAddresses((items) =>
+                                                    items.map((item) =>
+                                                        item.poolId === address.poolId && item.id === address.id
+                                                            ? { ...item, serialNumber: Number(value ?? 1) }
+                                                            : item,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )
+                })}
+                {!pools.length && <Empty description="当前接入域名没有可排序的地址池" />}
+            </div>
+        </Modal>
+    )
+}
+
 export default function AliyunDnsPage() {
     const [params, setParams] = useSearchParams()
     const active = params.get('tab') === 'accounts' ? 'accounts' : 'topology'
@@ -612,6 +769,7 @@ export default function AliyunDnsPage() {
     const [configId, setConfigId] = useState('')
     const [topology, setTopology] = useState<DnsInstance | null>(null)
     const [selection, setSelection] = useState<Selection | null>(null)
+    const [orderOpen, setOrderOpen] = useState(false)
     const [loading, setLoading] = useState(true)
     const [poolOpen, setPoolOpen] = useState(false)
     const [addressPool, setAddressPool] = useState<DnsPool | null>(null)
@@ -708,6 +866,21 @@ export default function AliyunDnsPage() {
             setSaving(false)
         }
     }
+    const updateOrder = async (data: {
+        pools: Array<{ pool_id: string; serial_number: number }>
+        addresses: Array<{ pool_id: string; address_id: string; serial_number: number }>
+    }) => {
+        if (!context) return
+        setSaving(true)
+        try {
+            await unwrap(saveDnsOrder({ ...context, ...data }))
+            message.success('顺序号已更新')
+            setOrderOpen(false)
+            await loadTopology()
+        } finally {
+            setSaving(false)
+        }
+    }
     const openAttach = async (type: 'pool' | 'address', pool?: DnsPool) => {
         setAttach({ type, pool })
         setResourceId(undefined)
@@ -759,6 +932,15 @@ export default function AliyunDnsPage() {
         })
     }
     const currentInstance = instances.find((row) => row.config_id === configId)
+    const orderedPools = useMemo(
+        () =>
+            topology
+                ? topology.pools
+                      .toSorted(bySerialNumber)
+                      .map((pool) => ({ ...pool, addresses: pool.addresses.toSorted(bySerialNumber) }))
+                : [],
+        [topology],
+    )
     const availableResources = useMemo(() => {
         if (!attach || !resources || !topology) return []
         if (attach.type === 'pool') {
@@ -836,6 +1018,12 @@ export default function AliyunDnsPage() {
                                                 extra={
                                                     <Space>
                                                         <Button
+                                                            icon={<OrderedListOutlined />}
+                                                            onClick={() => setOrderOpen(true)}
+                                                        >
+                                                            调整顺序
+                                                        </Button>
+                                                        <Button
                                                             type="primary"
                                                             icon={<PlusOutlined />}
                                                             onClick={() => {
@@ -889,7 +1077,7 @@ export default function AliyunDnsPage() {
                                                                 </Tag>
                                                             </button>
                                                             <div className="dns-react-branches">
-                                                                {topology.pools.map((pool) => (
+                                                                {orderedPools.map((pool, poolIndex) => (
                                                                     <div className="dns-react-branch" key={pool.id}>
                                                                         <button
                                                                             type="button"
@@ -905,6 +1093,12 @@ export default function AliyunDnsPage() {
                                                                             <span>
                                                                                 <strong>{pool.name}</strong>
                                                                                 <small>
+                                                                                    顺序{' '}
+                                                                                    {serialNumber(
+                                                                                        pool.serial_number,
+                                                                                        poolIndex + 1,
+                                                                                    )}{' '}
+                                                                                    ·{' '}
                                                                                     {STRATEGY[pool.strategy] ??
                                                                                         pool.strategy}{' '}
                                                                                     · {pool.addresses.length} 个地址
@@ -918,36 +1112,46 @@ export default function AliyunDnsPage() {
                                                                             className={`dns-react-addresses${pool.addresses.length > 1 ? ' has-multiple' : ''}`}
                                                                         >
                                                                             {pool.addresses.length ? (
-                                                                                pool.addresses.map((address) => (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className={`dns-react-node is-${stateColor(address)}`}
-                                                                                        key={address.id}
-                                                                                        onClick={() =>
-                                                                                            setSelection({
-                                                                                                type: 'address',
-                                                                                                data: address,
-                                                                                                pool,
-                                                                                            })
-                                                                                        }
-                                                                                    >
-                                                                                        <CloudServerOutlined />
-                                                                                        <span>
-                                                                                            <strong>
-                                                                                                {address.name ||
-                                                                                                    address.address}
-                                                                                            </strong>
-                                                                                            <small>
-                                                                                                {address.address}
-                                                                                            </small>
-                                                                                        </span>
-                                                                                        <Tag
-                                                                                            color={stateColor(address)}
+                                                                                pool.addresses.map(
+                                                                                    (address, addressIndex) => (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={`dns-react-node is-${stateColor(address)}`}
+                                                                                            key={address.id}
+                                                                                            onClick={() =>
+                                                                                                setSelection({
+                                                                                                    type: 'address',
+                                                                                                    data: address,
+                                                                                                    pool,
+                                                                                                })
+                                                                                            }
                                                                                         >
-                                                                                            {stateName(address)}
-                                                                                        </Tag>
-                                                                                    </button>
-                                                                                ))
+                                                                                            <CloudServerOutlined />
+                                                                                            <span>
+                                                                                                <strong>
+                                                                                                    {address.name ||
+                                                                                                        address.address}
+                                                                                                </strong>
+                                                                                                <small>
+                                                                                                    顺序{' '}
+                                                                                                    {serialNumber(
+                                                                                                        address.serial_number,
+                                                                                                        addressIndex +
+                                                                                                            1,
+                                                                                                    )}{' '}
+                                                                                                    · {address.address}
+                                                                                                </small>
+                                                                                            </span>
+                                                                                            <Tag
+                                                                                                color={stateColor(
+                                                                                                    address,
+                                                                                                )}
+                                                                                            >
+                                                                                                {stateName(address)}
+                                                                                            </Tag>
+                                                                                        </button>
+                                                                                    ),
+                                                                                )
                                                                             ) : (
                                                                                 <div className="dns-react-empty">
                                                                                     暂无节点
@@ -1021,6 +1225,14 @@ export default function AliyunDnsPage() {
                     }}
                     onAttachAddress={(pool) => void openAttach('address', pool)}
                     onRemove={remove}
+                />
+            )}
+            {topology && orderOpen && (
+                <OrderEditor
+                    topology={topology}
+                    saving={saving}
+                    onClose={() => setOrderOpen(false)}
+                    onSave={updateOrder}
                 />
             )}
             <Modal

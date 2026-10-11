@@ -229,6 +229,7 @@ class AdminRoute
             $router->get ('/aliyun-dns/topology', 'V1\\Admin\\AliyunDnsController@topology');
             $router->get ('/aliyun-dns/resources', 'V1\\Admin\\AliyunDnsController@resources');
             $router->post('/aliyun-dns/update', 'V1\\Admin\\AliyunDnsController@update');
+            $router->post('/aliyun-dns/order/save', 'V1\\Admin\\AliyunDnsController@saveOrder');
             $router->post('/aliyun-dns/pool/save', 'V1\\Admin\\AliyunDnsController@savePool');
             $router->post('/aliyun-dns/pool/attach', 'V1\\Admin\\AliyunDnsController@attachPool');
             $router->post('/aliyun-dns/pool/drop', 'V1\\Admin\\AliyunDnsController@dropPool');

@@ -233,9 +233,9 @@
 }
 
 .dns-tree-canvas {
-  min-height: 24rem;
+  min-height: 22rem;
   overflow: auto;
-  padding: 1.5rem;
+  padding: 1rem 0.75rem;
   border-radius: 0.75rem;
   color: var(--ant-color-text);
   background-color: var(--v2b-surface-sunken, var(--ant-color-bg-layout));
@@ -249,25 +249,46 @@
   align-items: start;
   width: max-content;
   min-width: 100%;
-  padding: 0.5rem 1rem 1rem;
+  padding: 0.25rem 0.5rem 0.75rem;
 }
 
 .dns-react-node {
   display: grid;
-  grid-template-columns: auto minmax(8rem, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.75rem;
-  min-width: 15rem;
-  max-width: 22rem;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  width: 12.75rem;
+  min-width: 12.75rem;
+  max-width: 12.75rem;
+  min-height: 3.75rem;
+  padding: 0.625rem 0.7rem;
   border: 1px solid var(--v2b-line-soft, var(--ant-color-border-secondary));
   border-left: 0.25rem solid #52c41a;
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   color: var(--ant-color-text);
   background: var(--ant-color-bg-container);
   text-align: left;
   cursor: pointer;
   position: relative;
+
+  > span {
+    min-width: 0;
+    padding-right: 2.7rem;
+  }
+
+  > .ant-tag {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.4rem;
+    max-width: 3.2rem;
+    margin: 0;
+    padding-inline: 0.3rem;
+    overflow: hidden;
+    font-size: 0.6875rem;
+    line-height: 1.125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &.is-warning {
     border-left-color: #faad14;
@@ -284,9 +305,19 @@
   small {
     display: block;
   }
+  strong,
   small {
-    margin-top: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  strong {
+    font-size: 0.875rem;
+  }
+  small {
+    margin-top: 0.125rem;
     color: var(--ant-color-text-secondary);
+    font-size: 0.75rem;
   }
 }
 
@@ -299,7 +330,7 @@
     position: absolute;
     top: 100%;
     left: 50%;
-    height: 3rem;
+    height: 2rem;
     border-left: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
@@ -309,15 +340,15 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-start;
-  gap: 2rem;
+  gap: 0.75rem;
   position: relative;
-  padding-top: 3rem;
+  padding-top: 2rem;
 
   &::before {
     position: absolute;
     top: 0;
-    right: 18.375rem;
-    left: 18.375rem;
+    right: 13rem;
+    left: 13rem;
     border-top: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
@@ -326,26 +357,26 @@
 .dns-react-branch {
   display: grid;
   justify-items: center;
-  width: 36.75rem;
+  width: 26rem;
   position: relative;
 
   &::before {
     position: absolute;
     bottom: 100%;
     left: 50%;
-    height: 3rem;
+    height: 2rem;
     border-left: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
 
   > .dns-react-node {
-    width: 18rem;
+    width: 12.75rem;
 
     &::after {
       position: absolute;
       top: 100%;
       left: 50%;
-      height: 2.25rem;
+      height: 1.5rem;
       border-left: 2px solid var(--v2b-line, var(--ant-color-border));
       content: '';
     }
@@ -357,17 +388,17 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.5rem;
   width: 100%;
   position: relative;
-  padding-top: 2.25rem;
+  padding-top: 1.5rem;
 
   &::before {
     display: none;
     position: absolute;
     top: 0;
-    right: 9rem;
-    left: 9rem;
+    right: 6.375rem;
+    left: 6.375rem;
     border-top: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
@@ -379,14 +410,14 @@
   .dns-react-node,
   .dns-react-empty {
     z-index: 1;
-    width: 18rem;
+    width: 12.75rem;
     position: relative;
 
     &::before {
       position: absolute;
       bottom: 100%;
       left: 50%;
-      height: 2.25rem;
+      height: 1.5rem;
       border-left: 2px solid var(--v2b-line, var(--ant-color-border));
       content: '';
     }
@@ -395,13 +426,70 @@
 
 .dns-react-empty {
   display: grid;
-  min-height: 4.25rem;
+  min-height: 3.75rem;
   place-items: center;
-  padding: 0.75rem;
+  padding: 0.625rem;
   border: 1px dashed var(--v2b-line-soft, var(--ant-color-border-secondary));
   border-radius: 0.75rem;
   color: var(--ant-color-text-secondary);
   background: color-mix(in srgb, var(--ant-color-bg-container) 72%, transparent);
+}
+
+.dns-order-editor {
+  display: grid;
+  gap: 1rem;
+  max-height: min(62vh, 38rem);
+  padding-right: 0.25rem;
+  overflow-y: auto;
+
+  section {
+    padding: 0.875rem;
+    border: 1px solid var(--v2b-line-soft, var(--ant-color-border-secondary));
+    border-radius: 0.75rem;
+    background: var(--ant-color-bg-container);
+  }
+
+  h5.ant-typography {
+    margin: 0 0 0.65rem;
+  }
+}
+
+.dns-order-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dns-order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--v2b-surface-sunken, var(--ant-color-bg-layout));
+
+  > div,
+  strong,
+  small {
+    min-width: 0;
+  }
+
+  strong,
+  small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    margin-top: 0.125rem;
+    color: var(--ant-color-text-secondary);
+  }
+
+  .ant-input-number {
+    width: 100%;
+  }
 }
 
 .dns-node-editor-title {

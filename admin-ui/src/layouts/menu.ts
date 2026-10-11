@@ -11,6 +11,7 @@ export const MENU: MenuEntry[] = [
   { type: 'item', title: '主题配置', href: '/config/theme', icon: 'si-magic-wand' },
   { type: 'item', title: '客户端配置', href: '/client-config', icon: 'si-cloud-upload' },
   { type: 'item', title: '云解析 DNS', href: '/aliyun-dns', icon: 'si-directions' },
+  { type: 'item', title: 'Cloudflare 解析', href: '/cloudflare-dns', icon: 'si-globe-alt' },
   { type: 'item', title: '云账号管理', href: '/cloud-accounts', icon: 'si-wallet' },
   { type: 'heading', title: '服务器' },
   { type: 'item', title: '节点管理', href: '/server/manage', icon: 'si-layers' },

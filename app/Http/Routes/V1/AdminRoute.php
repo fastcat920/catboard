@@ -237,6 +237,15 @@ class AdminRoute
             $router->post('/aliyun-dns/address/save', 'V1\\Admin\\AliyunDnsController@saveAddress');
             $router->post('/aliyun-dns/address/attach', 'V1\\Admin\\AliyunDnsController@attachAddress');
             $router->post('/aliyun-dns/address/drop', 'V1\\Admin\\AliyunDnsController@dropAddress');
+            // Cloudflare authoritative DNS
+            $router->get ('/cloudflare-dns/overview', 'V1\\Admin\\CloudflareDnsController@overview');
+            $router->post('/cloudflare-dns/account/save', 'V1\\Admin\\CloudflareDnsController@saveAccount');
+            $router->post('/cloudflare-dns/account/test', 'V1\\Admin\\CloudflareDnsController@testAccount');
+            $router->post('/cloudflare-dns/account/drop', 'V1\\Admin\\CloudflareDnsController@dropAccount');
+            $router->get ('/cloudflare-dns/zones', 'V1\\Admin\\CloudflareDnsController@zones');
+            $router->get ('/cloudflare-dns/records', 'V1\\Admin\\CloudflareDnsController@records');
+            $router->post('/cloudflare-dns/record/save', 'V1\\Admin\\CloudflareDnsController@saveRecord');
+            $router->post('/cloudflare-dns/record/drop', 'V1\\Admin\\CloudflareDnsController@dropRecord');
             // Multi-cloud account balance and monthly bill overview
             $router->get ('/cloud-account/overview', 'V1\\Admin\\CloudAccountController@overview');
             $router->post('/cloud-account/save', 'V1\\Admin\\CloudAccountController@save');

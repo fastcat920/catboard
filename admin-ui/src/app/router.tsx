@@ -82,6 +82,7 @@ const routes: RouteObject[] = [
   { path: '/cloud-accounts', ...page(() => import('@/pages/cloud/CloudAccountPage')) },
   { path: '/client-config', ...page(() => import('@/pages/client-config/ClientConfigPage')) },
   { path: '/aliyun-dns', ...page(() => import('@/pages/aliyun-dns/AliyunDnsPage')) },
+  { path: '/cloudflare-dns', ...page(() => import('@/pages/cloudflare-dns/CloudflareDnsPage')) },
   { path: '/marketing', ...page(() => import('@/pages/marketing/MarketingPage')) },
   { path: '/referral', ...page(() => import('@/pages/referral/ReferralPage')) },
   { path: '*', element: <Navigate to="/dashboard" replace /> },

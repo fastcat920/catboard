@@ -602,3 +602,65 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+.catboard-provider.is-cloudflare {
+  width: 2.25rem;
+  background: #f48120;
+  font-size: 0.75rem;
+}
+
+.catboard-section-actions,
+.cloudflare-zone-card,
+.cloudflare-record-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.catboard-section-actions {
+  margin-bottom: 1rem;
+}
+
+.cloudflare-selector-card,
+.cloudflare-zone-card {
+  margin-bottom: 1rem;
+}
+
+.cloudflare-zone-card .ant-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cloudflare-zone-card h4.ant-typography {
+  margin: 0;
+}
+
+.cloudflare-record-toolbar {
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+}
+
+.cloudflare-record-toolbar .ant-select {
+  width: 9rem;
+}
+
+.cloudflare-record-toolbar .ant-input-search {
+  width: min(26rem, 100%);
+}
+
+@media (max-width: 767px) {
+  .catboard-section-actions,
+  .cloudflare-zone-card .ant-card-body,
+  .cloudflare-record-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cloudflare-record-toolbar .ant-select,
+  .cloudflare-record-toolbar .ant-input-search {
+    width: 100%;
+  }
+}

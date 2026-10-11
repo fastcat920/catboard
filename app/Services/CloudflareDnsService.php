@@ -1,0 +1,99 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\CloudflareDnsAccount;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Crypt;
+use RuntimeException;
+
+class CloudflareDnsService
+{
+    const ENDPOINT = 'https://api.cloudflare.com/client/v4';
+
+    private $client;
+
+    public function __construct()
+    {
+        $this->client = new Client([
+            'base_uri' => self::ENDPOINT,
+            'timeout' => 15,
+            'connect_timeout' => 8,
+            'http_errors' => false,
+        ]);
+    }
+
+    public function verifyToken(CloudflareDnsAccount $account)
+    {
+        return $this->request($account, 'GET', '/user/tokens/verify');
+    }
+
+    public function listZones(CloudflareDnsAccount $account)
+    {
+        $items = [];
+        $page = 1;
+        do {
+            $response = $this->request($account, 'GET', '/zones', [
+                'query' => ['page' => $page, 'per_page' => 50, 'order' => 'name', 'direction' => 'asc'],
+            ]);
+            $rows = isset($response['result']) && is_array($response['result']) ? $response['result'] : [];
+            $items = array_merge($items, $rows);
+            $totalPages = (int)($response['result_info']['total_pages'] ?? 1);
+            $page++;
+        } while ($page <= $totalPages);
+
+        return $items;
+    }
+
+    public function listRecords(CloudflareDnsAccount $account, $zoneId, array $query)
+    {
+        return $this->request($account, 'GET', '/zones/' . rawurlencode($zoneId) . '/dns_records', ['query' => $query]);
+    }
+
+    public function createRecord(CloudflareDnsAccount $account, $zoneId, array $payload)
+    {
+        return $this->request($account, 'POST', '/zones/' . rawurlencode($zoneId) . '/dns_records', ['json' => $payload]);
+    }
+
+    public function updateRecord(CloudflareDnsAccount $account, $zoneId, $recordId, array $payload)
+    {
+        return $this->request($account, 'PATCH', '/zones/' . rawurlencode($zoneId) . '/dns_records/' . rawurlencode($recordId), ['json' => $payload]);
+    }
+
+    public function deleteRecord(CloudflareDnsAccount $account, $zoneId, $recordId)
+    {
+        return $this->request($account, 'DELETE', '/zones/' . rawurlencode($zoneId) . '/dns_records/' . rawurlencode($recordId));
+    }
+
+    private function request(CloudflareDnsAccount $account, $method, $path, array $options = [])
+    {
+        try {
+            $token = Crypt::decryptString($account->api_token_encrypted);
+        } catch (\Throwable $error) {
+            throw new RuntimeException('API Token 无法解密，请重新填写');
+        }
+        $options['headers'] = array_merge($options['headers'] ?? [], [
+            'Authorization' => 'Bearer ' . $token,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ]);
+        try {
+            $response = $this->client->request($method, $path, $options);
+            $status = $response->getStatusCode();
+            $decoded = json_decode((string)$response->getBody(), true);
+        } catch (\Throwable $error) {
+            throw new RuntimeException('Cloudflare 连接失败：' . $error->getMessage());
+        }
+        if (!is_array($decoded)) {
+            throw new RuntimeException('Cloudflare 返回了无法识别的数据（HTTP ' . $status . '）');
+        }
+        if ($status < 200 || $status >= 300 || empty($decoded['success'])) {
+            $messages = [];
+            foreach (($decoded['errors'] ?? []) as $error) {
+                if (!empty($error['message'])) $messages[] = $error['message'];
+            }
+            throw new RuntimeException('Cloudflare 请求失败（HTTP ' . $status . '）：' . ($messages ? implode('；', $messages) : '请检查 Token 权限和请求参数'));
+        }
+        return $decoded;
+    }
+}

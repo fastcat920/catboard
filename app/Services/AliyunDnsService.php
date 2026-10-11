@@ -217,6 +217,10 @@ class AliyunDnsService
             $requestId = isset($decoded['RequestId']) ? '，RequestId：' . $decoded['RequestId'] : '';
             throw new RuntimeException($code . '：' . $message . $requestId);
         }
+        if (array_key_exists('Success', $decoded) && $decoded['Success'] !== true) {
+            $requestId = isset($decoded['RequestId']) ? '，RequestId：' . $decoded['RequestId'] : '';
+            throw new RuntimeException('阿里云未完成本次操作' . $requestId);
+        }
         return $decoded;
     }
 

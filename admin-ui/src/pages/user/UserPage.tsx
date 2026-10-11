@@ -13,6 +13,7 @@ import {
   SolutionOutlined,
   StopOutlined,
   UserAddOutlined,
+  UserSwitchOutlined,
   UsergroupAddOutlined,
 } from '@ant-design/icons'
 import { Badge, Button, Dropdown, Tag, Tooltip, type TableColumnsType, type TableProps } from 'antd'
@@ -36,6 +37,7 @@ import { copyText } from '@/utils/clipboard'
 import { formatTime } from '@/utils/format'
 import { setHabit } from '@/utils/storage'
 import { AssignOrderModal } from '../order/AssignOrderModal'
+import { BatchGroupModal } from './BatchGroupModal'
 import { CreateUserModal } from './CreateUserModal'
 import { SendMailModal } from './SendMailModal'
 import { TrafficLogModal } from './TrafficLogModal'
@@ -58,6 +60,7 @@ export default function UserPage() {
   const { data: groups = [] } = useServerGroups()
   // 右键菜单对应的行（原版 this.record）
   const [record, setRecord] = useState<AdminUser | undefined>()
+  const [batchGroupOpen, setBatchGroupOpen] = useState(false)
   const operations = useHoverMenuClose()
   const tips = useLegacyHover()
 
@@ -364,6 +367,15 @@ export default function UserPage() {
                           ),
                         },
                         {
+                          key: 'group',
+                          disabled: !filter.length,
+                          label: (
+                            <a onClick={() => filter.length && setBatchGroupOpen(true)}>
+                              <UserSwitchOutlined /> 批量修改权限组
+                            </a>
+                          ),
+                        },
+                        {
                           key: 'delete',
                           disabled: !filter.length,
                           label: (
@@ -451,6 +463,14 @@ export default function UserPage() {
             />
           </div>
         </div>
+        <BatchGroupModal
+          open={batchGroupOpen}
+          filters={filter}
+          total={pagination.total || 0}
+          groups={groups}
+          onClose={() => setBatchGroupOpen(false)}
+          onSaved={() => void model.fetch()}
+        />
       </Loading>
     </AdminLayout>
   )

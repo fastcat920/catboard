@@ -402,6 +402,8 @@ class AliyunDnsController extends Controller
             'serial_number' => 'nullable|integer|min:1|max:1000',
         ]);
         $account = $this->enabledAccount($data['account_id']);
+        $createdAddressId = null;
+        $createdAddressLinked = false;
         try {
             $addressId = $data['address_id'] ?? null;
             $lastResult = [];
@@ -418,6 +420,7 @@ class AliyunDnsController extends Controller
                 ]);
                 $addressId = $lastResult['AddressId'] ?? null;
                 if (!$addressId) throw new \RuntimeException('阿里云未返回新节点地址 ID');
+                $createdAddressId = $addressId;
             } else {
                 $lastResult = $service->updateAddress($account, [
                     'AddressId' => $addressId,
@@ -440,19 +443,41 @@ class AliyunDnsController extends Controller
                     'RequestSource' => ['default'],
                 ];
                 $lastResult = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+                $createdAddressLinked = true;
             } elseif (isset($data['weight']) || isset($data['serial_number'])) {
                 $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
                 $pool = $this->findPool($full, $data['pool_id']);
                 $links = $this->addressLinks($pool);
+                $linkFound = false;
+                $linkChanged = false;
                 foreach ($links as &$link) {
-                    if ($link['AddressId'] !== $addressId) continue;
-                    if (isset($data['weight'])) $link['WeightValue'] = (int)$data['weight'];
-                    if (isset($data['serial_number'])) $link['SerialNumber'] = (int)$data['serial_number'];
+                    if ((string)$link['AddressId'] !== (string)$addressId) continue;
+                    $linkFound = true;
+                    if (isset($data['weight']) && $link['WeightValue'] !== (int)$data['weight']) {
+                        $link['WeightValue'] = (int)$data['weight'];
+                        $linkChanged = true;
+                    }
+                    if (isset($data['serial_number']) && $link['SerialNumber'] !== (int)$data['serial_number']) {
+                        $link['SerialNumber'] = (int)$data['serial_number'];
+                        $linkChanged = true;
+                    }
                 }
                 unset($link);
-                $lastResult = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+                if (!$linkFound) throw new \RuntimeException('当前地址池中未找到指定节点，请刷新后重试');
+                if ($linkChanged) {
+                    $lastResult = $service->replacePoolAddresses($account, $data['pool_id'], $links);
+                }
             }
         } catch (\Throwable $error) {
+            if ($createdAddressId && !$createdAddressLinked) {
+                try {
+                    $service->deleteAddress($account, $createdAddressId);
+                } catch (\Throwable $cleanupError) {
+                    throw ValidationException::withMessages([
+                        'address' => $error->getMessage() . '；新节点回滚失败，请到阿里云控制台删除未关联节点：' . $createdAddressId,
+                    ]);
+                }
+            }
             throw ValidationException::withMessages(['address' => $error->getMessage()]);
         }
         return response(['data' => ['success' => true, 'address_id' => $addressId, 'request_id' => $lastResult['RequestId'] ?? null]]);
@@ -708,15 +733,25 @@ class AliyunDnsController extends Controller
 
     private function stringList($value)
     {
-        if (!is_array($value)) {
-            return trim((string)$value) === '' ? [] : [trim((string)$value)];
-        }
-        if (isset($value['RequestSource'])) $value = $value['RequestSource'];
-        if (!is_array($value)) $value = [$value];
         $result = [];
-        array_walk_recursive($value, function ($item) use (&$result) {
-            if (is_scalar($item) && trim((string)$item) !== '') $result[] = trim((string)$item);
-        });
+        $collect = function ($item) use (&$collect, &$result) {
+            if (is_array($item)) {
+                foreach ($item as $child) $collect($child);
+                return;
+            }
+            if (!is_scalar($item)) return;
+            $item = trim((string)$item);
+            if ($item === '') return;
+            if ($item[0] === '[' || $item[0] === '{') {
+                $decoded = json_decode($item, true);
+                if (is_array($decoded)) {
+                    $collect($decoded);
+                    return;
+                }
+            }
+            $result[] = $item;
+        };
+        $collect($value);
         return array_values(array_unique($result));
     }
 

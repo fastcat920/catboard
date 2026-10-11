@@ -20,3 +20,8 @@ export const banUsers = (filter: Filter) => post<boolean>(adminPath('/user/ban')
 export const resetUserSecret = (id: number) => post<boolean>(adminPath('/user/resetSecret'), { id })
 export const deleteUser = (id: number) => post<boolean>(adminPath('/user/delUser'), { id })
 export const deleteUsers = (filter: Filter) => post<boolean>(adminPath('/user/allDel'), { filter })
+export const batchGroupUsers = (groupId: number, sourceQuery: string) =>
+  post<{ matched: number; affected: number }>(adminPath('/user/batchGroup'), {
+    group_id: groupId,
+    source_query: sourceQuery,
+  })

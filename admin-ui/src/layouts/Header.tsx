@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { settings } from '@/app/settings'
+import { adminBasePath, settings } from '@/app/settings'
 import { JsLink } from '@/components/JsLink'
 import { useLayoutStore } from '@/stores/layout'
 import { useThemeStore } from '@/stores/theme'
@@ -79,6 +79,14 @@ export function Header({ title, search }: HeaderProps) {
           )}
         </div>
         <div>
+          <a
+            href={`${adminBasePath}/security/dashboard`}
+            className={btn(' mr-1')}
+            title="打开节点安全中心"
+            aria-label="打开节点安全中心"
+          >
+            <i className="fa fa-fw fa-shield-alt" /> <span className="d-none d-xl-inline-block ml-1">节点安全</span>
+          </a>
           {/* 界面风格（原版没有）：放在暗黑模式切换的左边，右侧原有的两个按钮位置不变 */}
           <UiSwitch buttonClassName={btn(' mr-1')} />
           {/* 固定暗色的皮肤不显示暗黑模式切换 */}

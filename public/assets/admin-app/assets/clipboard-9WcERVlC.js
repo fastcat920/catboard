@@ -1,1 +1,0 @@
-import{n as e}from"./staticApi-BnbytbKv.js";import{t}from"./dist-BrN9fxcP.js";function n(n){t(n),e.success(`复制成功`)}export{n as t};

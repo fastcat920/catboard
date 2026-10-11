@@ -4,6 +4,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   FormOutlined,
+  GatewayOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
   UserOutlined,
@@ -28,6 +29,7 @@ import { copyText } from '@/utils/clipboard'
 import { isMobile } from '@/utils/device'
 import { getHabit, setHabit } from '@/utils/storage'
 import { CREATE_MENU, NodeDrawer, TYPE_FILTERS, TypeTag } from './nodeTypes'
+import { EntryPoolDrawer } from './EntryPoolDrawer'
 import { moveNode, toSortPayload } from './utils'
 
 /** 运行状态 → Badge 状态 */
@@ -98,6 +100,7 @@ export default function ServerManagePage() {
   const [pageSize, setPageSize] = useState<number>(() => getHabit<number>('server_manage_page_size') || 10)
   // 右键菜单对应的行（原版 this.record）
   const [contextRecord, setContextRecord] = useState<ServerNode | undefined>()
+  const [entryPoolNode, setEntryPoolNode] = useState<ServerNode | undefined>()
   const mobile = isMobile()
   useLeaveConfirm(sortMode)
   // 与原版一致（key 为 Math.random()）：新建菜单里的抽屉和右键菜单里的编辑抽屉在页面每次重新渲染时都重新创建，
@@ -149,6 +152,15 @@ export default function ServerManagePage() {
               <NodeDrawer type={node.type} record={node} key={node.id}>
                 <EditLabel icon={<EditOutlined />} />
               </NodeDrawer>
+            ),
+          },
+          {
+            key: 'entry-pool',
+            onClick: () => setEntryPoolNode(node),
+            label: (
+              <>
+                <GatewayOutlined /> 入口池
+              </>
             ),
           },
           {
@@ -406,6 +418,11 @@ export default function ServerManagePage() {
                         </NodeDrawer>
                       )}
                     </li>
+                    <li onClick={() => contextRecord && setEntryPoolNode(contextRecord)} className="ant-dropdown-menu-item">
+                      <a>
+                        <GatewayOutlined /> 入口池
+                      </a>
+                    </li>
                     <li onClick={() => copy(contextRecord)} className="ant-dropdown-menu-item">
                       <a>
                         <CopyOutlined /> 复制
@@ -422,6 +439,12 @@ export default function ServerManagePage() {
             )}
           </div>
         </div>
+        <EntryPoolDrawer
+          node={entryPoolNode}
+          open={Boolean(entryPoolNode)}
+          onClose={() => setEntryPoolNode(undefined)}
+          onChanged={() => void refetch()}
+        />
       </Loading>
     </AdminLayout>
   )

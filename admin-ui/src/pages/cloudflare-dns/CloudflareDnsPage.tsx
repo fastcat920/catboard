@@ -76,6 +76,28 @@ function displayRecordContent(record: CloudflareRecord) {
     return record.content
 }
 
+function recordNamePrefix(name: string | undefined, zoneName: string) {
+    const normalizedName = (name ?? '').trim().replace(/\.$/, '')
+    const normalizedZone = zoneName.trim().replace(/\.$/, '')
+    if (!normalizedName || normalizedName.toLowerCase() === normalizedZone.toLowerCase()) return '@'
+    const suffix = `.${normalizedZone.toLowerCase()}`
+    return normalizedName.toLowerCase().endsWith(suffix) ? normalizedName.slice(0, -suffix.length) : normalizedName
+}
+
+function completeRecordName(prefix: string, zoneName: string) {
+    const normalizedPrefix = prefix.trim().replace(/\.$/, '')
+    const normalizedZone = zoneName.trim().replace(/\.$/, '')
+    if (!normalizedPrefix || normalizedPrefix === '@') return normalizedZone
+    const suffix = `.${normalizedZone.toLowerCase()}`
+    if (
+        normalizedPrefix.toLowerCase() === normalizedZone.toLowerCase() ||
+        normalizedPrefix.toLowerCase().endsWith(suffix)
+    ) {
+        return normalizedPrefix
+    }
+    return `${normalizedPrefix}.${normalizedZone}`
+}
+
 interface AccountEditorProps {
     open: boolean
     account: CloudflareAccount | null
@@ -182,7 +204,7 @@ function RecordEditor({ open, accountId, zone, record, onClose, onSaved }: Recor
         if (!open) return
         form.setFieldsValue({
             type: record?.type ?? 'A',
-            name: record?.name ?? zone.name,
+            name: recordNamePrefix(record?.name, zone.name),
             content: record?.content ?? '',
             ttl: record?.ttl ?? 1,
             proxied: record?.proxied ?? false,
@@ -207,6 +229,7 @@ function RecordEditor({ open, accountId, zone, record, onClose, onSaved }: Recor
             await unwrap(
                 saveCloudflareRecord({
                     ...values,
+                    name: completeRecordName(values.name, zone.name),
                     account_id: accountId,
                     zone_id: zone.id,
                     record_id: record?.id,
@@ -245,10 +268,12 @@ function RecordEditor({ open, accountId, zone, record, onClose, onSaved }: Recor
                         <Form.Item
                             name="name"
                             label="记录名称"
-                            rules={[{ required: true, message: '请输入完整记录名称' }]}
+                            extra="根域名填写 @，保存时会自动拼接完整域名"
+                            rules={[{ required: true, message: '请输入记录前缀' }]}
                         >
                             <Input
-                                placeholder={type === 'SRV' ? `例如：_sip._tcp.${zone.name}` : `例如：www.${zone.name}`}
+                                addonAfter={`.${zone.name}`}
+                                placeholder={type === 'SRV' ? '例如：_sip._tcp' : '例如：www'}
                             />
                         </Form.Item>
                     </Col>

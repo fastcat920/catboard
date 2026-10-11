@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/assets/admin/coupon-center.css?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.css'))}}">
     <link rel="stylesheet" href="/assets/admin/marketing-activity.css?v={{$version}}-{{filemtime(public_path('assets/admin/marketing-activity.css'))}}">
     <link rel="stylesheet" href="/assets/admin/client-config-center.css?v={{$version}}-{{filemtime(public_path('assets/admin/client-config-center.css'))}}">
+    <link rel="stylesheet" href="/assets/admin/aliyun-dns.css?v={{$version}}-{{filemtime(public_path('assets/admin/aliyun-dns.css'))}}">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
     <title>{{$title}}</title>
@@ -42,6 +43,7 @@
 <script src="/assets/admin/coupon-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/coupon-center.js'))}}"></script>
 <script src="/assets/admin/marketing-activity.js?v={{$version}}-{{filemtime(public_path('assets/admin/marketing-activity.js'))}}"></script>
 <script src="/assets/admin/client-config-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/client-config-center.js'))}}"></script>
+<script src="/assets/admin/aliyun-dns.js?v={{$version}}-{{filemtime(public_path('assets/admin/aliyun-dns.js'))}}"></script>
 </body>
 
 </html>

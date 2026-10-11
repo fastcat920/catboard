@@ -64,7 +64,7 @@
     }
 
     function closeOthers() {
-        document.querySelectorAll(".referral-admin,.coupon-center-admin,.marketing-admin,.security-admin").forEach(function (node) { node.hidden = true; });
+        document.querySelectorAll(".referral-admin,.coupon-center-admin,.marketing-admin,.security-admin,.aliyun-dns-admin").forEach(function (node) { node.hidden = true; });
     }
 
     function open() {

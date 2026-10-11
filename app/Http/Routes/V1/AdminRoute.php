@@ -220,6 +220,14 @@ class AdminRoute
             $router->post('/client-config/preview', 'V1\\Admin\\ClientRemoteConfigController@preview');
             $router->post('/client-config/publish', 'V1\\Admin\\ClientRemoteConfigController@publish');
             $router->post('/client-config/publication/retry', 'V1\\Admin\\ClientRemoteConfigController@retryPublication');
+            // Alibaba Cloud DNS / GTM 3.0
+            $router->get ('/aliyun-dns/overview', 'V1\\Admin\\AliyunDnsController@overview');
+            $router->post('/aliyun-dns/account/save', 'V1\\Admin\\AliyunDnsController@saveAccount');
+            $router->post('/aliyun-dns/account/drop', 'V1\\Admin\\AliyunDnsController@dropAccount');
+            $router->post('/aliyun-dns/account/test', 'V1\\Admin\\AliyunDnsController@testAccount');
+            $router->get ('/aliyun-dns/instances', 'V1\\Admin\\AliyunDnsController@instances');
+            $router->get ('/aliyun-dns/topology', 'V1\\Admin\\AliyunDnsController@topology');
+            $router->post('/aliyun-dns/update', 'V1\\Admin\\AliyunDnsController@update');
             // Node security
             $router->get ('/security/dashboard', 'V1\\Admin\\NodeSecurityController@dashboard');
             $router->get ('/security/events', 'V1\\Admin\\NodeSecurityController@events');

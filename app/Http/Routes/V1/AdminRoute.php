@@ -228,6 +228,7 @@ class AdminRoute
             $router->get ('/aliyun-dns/instances', 'V1\\Admin\\AliyunDnsController@instances');
             $router->get ('/aliyun-dns/topology', 'V1\\Admin\\AliyunDnsController@topology');
             $router->get ('/aliyun-dns/resources', 'V1\\Admin\\AliyunDnsController@resources');
+            $router->get ('/aliyun-dns/monitor-templates', 'V1\\Admin\\AliyunDnsController@monitorTemplates');
             $router->post('/aliyun-dns/update', 'V1\\Admin\\AliyunDnsController@update');
             $router->post('/aliyun-dns/order/save', 'V1\\Admin\\AliyunDnsController@saveOrder');
             $router->post('/aliyun-dns/pool/save', 'V1\\Admin\\AliyunDnsController@savePool');

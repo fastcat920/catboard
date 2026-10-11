@@ -48,6 +48,15 @@ class AliyunDnsService
         ]);
     }
 
+    public function listMonitorTemplates(AliyunDnsAccount $account)
+    {
+        return $this->request($account, 'ListCloudGtmMonitorTemplates', [
+            'PageNumber' => 1,
+            'PageSize' => 100,
+            'AcceptLanguage' => 'zh-CN',
+        ]);
+    }
+
     public function updateInstanceBasic(AliyunDnsAccount $account, array $parameters)
     {
         return $this->request($account, 'UpdateCloudGtmInstanceConfigBasic', $parameters);

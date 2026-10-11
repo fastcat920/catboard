@@ -27,7 +27,22 @@ export interface DnsAddress {
     manual_available_status: string
     weight?: number | null
     serial_number?: number | null
-    health_tasks: unknown[]
+    health_tasks: DnsHealthTask[]
+}
+export interface DnsHealthTask {
+    port?: number | null
+    template_id: string
+    template_name: string
+    monitor_status: string
+}
+export interface DnsMonitorTemplate {
+    id: string
+    name: string
+    ip_version: string
+    protocol: 'ping' | 'tcp' | 'http' | 'https' | string
+    interval?: number | null
+    timeout?: number | null
+    remark: string
 }
 export interface DnsPool {
     id: string
@@ -99,6 +114,8 @@ export const fetchDnsInstances = (accountId: number) =>
 export const fetchDnsTopology = (accountId: number, instanceId: string, configId: string) =>
     get<DnsInstance>(base('/topology'), { account_id: accountId, instance_id: instanceId, config_id: configId })
 export const fetchDnsResources = (accountId: number) => get<DnsResources>(base('/resources'), { account_id: accountId })
+export const fetchDnsMonitorTemplates = (accountId: number) =>
+    get<{ items: DnsMonitorTemplate[] }>(base('/monitor-templates'), { account_id: accountId })
 export const updateDns = (data: Record<string, unknown>) => post<{ success: boolean }>(base('/update'), data, true)
 export const saveDnsOrder = (data: {
     account_id: number

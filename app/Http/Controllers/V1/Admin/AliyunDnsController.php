@@ -242,6 +242,28 @@ class AliyunDnsController extends Controller
         return response(['data' => ['pools' => $pools, 'addresses' => $addresses]]);
     }
 
+    public function monitorTemplates(Request $request, AliyunDnsService $service)
+    {
+        $account = $this->account($request);
+        try {
+            $result = $service->listMonitorTemplates($account);
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['monitor_templates' => $error->getMessage()]);
+        }
+        $templates = array_map(function ($template) {
+            return [
+                'id' => $template['TemplateId'] ?? '',
+                'name' => $template['Name'] ?? '',
+                'ip_version' => $template['IpVersion'] ?? '',
+                'protocol' => $template['Protocol'] ?? '',
+                'interval' => $template['Interval'] ?? null,
+                'timeout' => $template['Timeout'] ?? null,
+                'remark' => $template['Remark'] ?? '',
+            ];
+        }, $this->listFrom($result['Templates'] ?? [], 'Template'));
+        return response(['data' => ['items' => $templates]]);
+    }
+
     public function saveOrder(Request $request, AliyunDnsService $service)
     {
         $data = $request->validate([
@@ -508,6 +530,9 @@ class AliyunDnsController extends Controller
             'address' => 'required|string|max:253',
             'remark' => 'nullable|string|max:500',
             'health_judgement' => ['required', Rule::in(['any_ok', 'p30_ok', 'p50_ok', 'p70_ok', 'all_ok'])],
+            'health_tasks' => 'sometimes|array|max:5',
+            'health_tasks.*.template_id' => 'required|string|max:200',
+            'health_tasks.*.port' => 'nullable|integer|min:0|max:65535',
             'status' => ['required', Rule::in(['enable', 'disable'])],
             'available_mode' => ['required', Rule::in(['auto', 'manual'])],
             'manual_status' => ['nullable', Rule::in(['available', 'unavailable'])],
@@ -530,17 +555,22 @@ class AliyunDnsController extends Controller
                     'AvailableMode' => $data['available_mode'],
                     'ManualAvailableStatus' => $data['available_mode'] === 'manual' ? ($data['manual_status'] ?? 'available') : null,
                     'HealthJudgement' => $data['health_judgement'],
+                    'HealthTasks' => !empty($data['health_tasks']) ? $this->healthTaskParameters($data['health_tasks']) : null,
                 ]);
                 $addressId = $lastResult['AddressId'] ?? null;
                 if (!$addressId) throw new \RuntimeException('阿里云未返回新节点地址 ID');
                 $createdAddressId = $addressId;
             } else {
-                $lastResult = $service->updateAddress($account, [
+                $parameters = [
                     'AddressId' => $addressId,
                     'Name' => trim($data['name']),
                     'Address' => trim($data['address']),
                     'HealthJudgement' => $data['health_judgement'],
-                ]);
+                ];
+                if (array_key_exists('health_tasks', $data)) {
+                    $parameters['HealthTasks'] = $this->healthTaskParameters($data['health_tasks'], true);
+                }
+                $lastResult = $service->updateAddress($account, $parameters);
                 $service->updateAddressRemark($account, $addressId, trim((string)($data['remark'] ?? '')));
             }
             $service->updateAddressManualStatus($account, $addressId, $data['available_mode'], $data['manual_status'] ?? 'available');
@@ -876,6 +906,19 @@ class AliyunDnsController extends Controller
         };
         $collect($value);
         return array_values(array_unique($result));
+    }
+
+    private function healthTaskParameters(array $tasks, $clearWhenEmpty = false)
+    {
+        if (!$tasks) return $clearWhenEmpty ? [['TemplateId' => '']] : [];
+        return array_map(function ($task) {
+            return [
+                'TemplateId' => trim((string)$task['template_id']),
+                'Port' => array_key_exists('port', $task) && $task['port'] !== null && $task['port'] !== ''
+                    ? (int)$task['port']
+                    : null,
+            ];
+        }, $tasks);
     }
 
     private function required(array $data, array $fields)

@@ -1,10 +1,12 @@
 import {
+    ApartmentOutlined,
     CloseOutlined,
     CloudServerOutlined,
     DeleteOutlined,
     EditOutlined,
     GlobalOutlined,
     LinkOutlined,
+    MinusCircleOutlined,
     OrderedListOutlined,
     PlusOutlined,
     ReloadOutlined,
@@ -43,6 +45,7 @@ import {
     dropDnsAddress,
     dropDnsPool,
     fetchDnsInstances,
+    fetchDnsMonitorTemplates,
     fetchDnsOverview,
     fetchDnsResources,
     fetchDnsTopology,
@@ -55,6 +58,7 @@ import {
     type DnsAccount,
     type DnsAddress,
     type DnsInstance,
+    type DnsMonitorTemplate,
     type DnsPool,
     type DnsResources,
     type DnsStrategy,
@@ -365,11 +369,107 @@ interface AddressForm {
     address: string
     remark?: string
     health_judgement: string
+    health_tasks: Array<{ template_id: string; port?: number | null }>
     status: string
     available_mode: string
     manual_status: string
     weight: number
     serial_number: number
+}
+
+function HealthTaskFields({ templates, addressType }: { templates: DnsMonitorTemplate[]; addressType: string }) {
+    const form = Form.useFormInstance()
+    const compatibleTemplates = templates.filter(
+        (template) => !['IPv4', 'IPv6'].includes(addressType) || template.ip_version === addressType,
+    )
+    const options = compatibleTemplates.map((template) => ({
+        value: template.id,
+        label: `${template.name} · ${template.protocol.toUpperCase()} · ${template.ip_version}`,
+    }))
+    return (
+        <div className="dns-health-tasks">
+            <Typography.Title level={5}>健康探测</Typography.Title>
+            <Typography.Paragraph type="secondary">
+                每个节点最多配置 5 项探测任务；Ping 无需端口，TCP、HTTP 和 HTTPS 请填写服务端口。
+            </Typography.Paragraph>
+            {!compatibleTemplates.length && (
+                <Alert
+                    className="mb-3"
+                    type="warning"
+                    showIcon
+                    message="没有适用于当前地址类型的探测模板"
+                    description="请先在阿里云 GTM 3.0 中创建对应 IP 版本的健康探测模板，再返回这里关联。"
+                />
+            )}
+            <Form.List name="health_tasks">
+                {(fields, { add, remove }) => (
+                    <Space direction="vertical" className="w-100" size="small">
+                        {fields.map((field) => (
+                            <Form.Item noStyle shouldUpdate key={field.key}>
+                                {() => {
+                                    const templateId = form.getFieldValue(['health_tasks', field.name, 'template_id'])
+                                    const template = compatibleTemplates.find((item) => item.id === templateId)
+                                    const isPing = template?.protocol.toLowerCase() === 'ping'
+                                    return (
+                                        <div className="dns-health-task-row">
+                                            <Form.Item
+                                                name={[field.name, 'template_id']}
+                                                rules={[{ required: true, message: '请选择探测模板' }]}
+                                            >
+                                                <Select
+                                                    showSearch
+                                                    optionFilterProp="label"
+                                                    placeholder="选择探测模板"
+                                                    options={options}
+                                                    onChange={(value) => {
+                                                        if (
+                                                            compatibleTemplates
+                                                                .find((item) => item.id === value)
+                                                                ?.protocol.toLowerCase() === 'ping'
+                                                        )
+                                                            form.setFieldValue(
+                                                                ['health_tasks', field.name, 'port'],
+                                                                null,
+                                                            )
+                                                    }}
+                                                />
+                                            </Form.Item>
+                                            <Form.Item name={[field.name, 'port']}>
+                                                <InputNumber
+                                                    min={0}
+                                                    max={65535}
+                                                    disabled={isPing}
+                                                    placeholder={isPing ? '无需端口' : '端口'}
+                                                    className="w-100"
+                                                />
+                                            </Form.Item>
+                                            <Button
+                                                type="text"
+                                                danger
+                                                title="删除探测任务"
+                                                aria-label="删除探测任务"
+                                                icon={<MinusCircleOutlined />}
+                                                onClick={() => remove(field.name)}
+                                            />
+                                        </div>
+                                    )
+                                }}
+                            </Form.Item>
+                        ))}
+                        <Button
+                            block
+                            type="dashed"
+                            icon={<PlusOutlined />}
+                            disabled={!compatibleTemplates.length || fields.length >= 5}
+                            onClick={() => add({ template_id: '', port: null })}
+                        >
+                            添加探测任务{fields.length ? `（${fields.length}/5）` : ''}
+                        </Button>
+                    </Space>
+                )}
+            </Form.List>
+        </div>
+    )
 }
 
 function NodeEditor({
@@ -381,6 +481,7 @@ function NodeEditor({
     onCreateAddress,
     onAttachAddress,
     onRemove,
+    monitorTemplates,
 }: {
     selection: Selection | null
     accountId: number
@@ -390,6 +491,7 @@ function NodeEditor({
     onCreateAddress: (pool: DnsPool) => void
     onAttachAddress: (pool: DnsPool) => void
     onRemove: (selection: Selection, removeResource: boolean) => void
+    monitorTemplates: DnsMonitorTemplate[]
 }) {
     const [form] = Form.useForm<Record<string, unknown>>()
     const [saving, setSaving] = useState(false)
@@ -530,6 +632,9 @@ function NodeEditor({
                             <Form.Item name="health_judgement" label="健康判定">
                                 <Select options={judgementOptions} />
                             </Form.Item>
+                            {selection.type === 'address' && (
+                                <HealthTaskFields templates={monitorTemplates} addressType={selection.data.type} />
+                            )}
                         </>
                     )}
                     {selection.type !== 'address' && (
@@ -775,6 +880,7 @@ export default function AliyunDnsPage() {
     const [addressPool, setAddressPool] = useState<DnsPool | null>(null)
     const [attach, setAttach] = useState<{ type: 'pool' | 'address'; pool?: DnsPool } | null>(null)
     const [resources, setResources] = useState<DnsResources | null>(null)
+    const [monitorTemplates, setMonitorTemplates] = useState<DnsMonitorTemplate[]>([])
     const [poolForm] = Form.useForm<PoolForm>()
     const [addressForm] = Form.useForm<AddressForm>()
     const createAddressMode = Form.useWatch('available_mode', addressForm)
@@ -803,6 +909,10 @@ export default function AliyunDnsPage() {
             setLoading(false)
         }
     }, [])
+    const loadMonitorTemplates = useCallback(async (id: number) => {
+        const result = await unwrap(fetchDnsMonitorTemplates(id))
+        setMonitorTemplates(result.items)
+    }, [])
     const loadTopology = useCallback(async () => {
         const instance = instances.find((row) => row.config_id === configId)
         if (!instance || !accountId) return
@@ -818,12 +928,15 @@ export default function AliyunDnsPage() {
         const timer = window.setTimeout(
             () =>
                 void loadOverview().then((id) => {
-                    if (id) return loadInstances(id)
+                    if (id) {
+                        void loadMonitorTemplates(id)
+                        return loadInstances(id)
+                    }
                 }),
             0,
         )
         return () => window.clearTimeout(timer)
-    }, [loadInstances, loadOverview])
+    }, [loadInstances, loadMonitorTemplates, loadOverview])
     useEffect(() => {
         if (!configId || !instances.length) return
         const timer = window.setTimeout(() => void loadTopology(), 0)
@@ -981,6 +1094,7 @@ export default function AliyunDnsPage() {
                                                 onChange={(id) => {
                                                     setAccountId(id)
                                                     setConfigId('')
+                                                    void loadMonitorTemplates(id)
                                                     void loadInstances(id)
                                                 }}
                                                 options={accounts.map((row) => ({
@@ -1091,7 +1205,7 @@ export default function AliyunDnsPage() {
                                                                                 })
                                                                             }
                                                                         >
-                                                                            <CloudServerOutlined />
+                                                                            <ApartmentOutlined />
                                                                             <span className="dns-react-content">
                                                                                 <span className="dns-react-title-row">
                                                                                     <strong>{pool.name}</strong>
@@ -1142,7 +1256,9 @@ export default function AliyunDnsPage() {
                                                                                                             address,
                                                                                                         )}
                                                                                                     >
-                                                                                                        {stateName(address)}
+                                                                                                        {stateName(
+                                                                                                            address,
+                                                                                                        )}
                                                                                                     </Tag>
                                                                                                 </span>
                                                                                                 <small>
@@ -1221,6 +1337,7 @@ export default function AliyunDnsPage() {
                             address: '',
                             remark: '',
                             health_judgement: 'any_ok',
+                            health_tasks: [],
                             status: 'enable',
                             available_mode: 'auto',
                             manual_status: 'available',
@@ -1231,6 +1348,7 @@ export default function AliyunDnsPage() {
                     }}
                     onAttachAddress={(pool) => void openAttach('address', pool)}
                     onRemove={remove}
+                    monitorTemplates={monitorTemplates}
                 />
             )}
             {topology && orderOpen && (
@@ -1318,6 +1436,7 @@ export default function AliyunDnsPage() {
                     <Form.Item name="health_judgement" label="健康判定">
                         <Select options={judgementOptions} />
                     </Form.Item>
+                    <HealthTaskFields templates={monitorTemplates} addressType={addressPool?.type ?? ''} />
                     <Form.Item name="available_mode" label="切换方式">
                         <Select
                             options={[

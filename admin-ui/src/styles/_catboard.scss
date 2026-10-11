@@ -512,6 +512,34 @@
   }
 }
 
+.dns-health-tasks {
+  margin-block: 0.25rem 1.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--v2b-line-soft, var(--ant-color-border-secondary));
+  border-radius: 0.75rem;
+  background: var(--v2b-surface-sunken, var(--ant-color-bg-layout));
+
+  h5.ant-typography {
+    margin: 0 0 0.25rem;
+  }
+
+  p.ant-typography {
+    margin-bottom: 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+.dns-health-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.25rem 2rem;
+  align-items: start;
+  gap: 0.5rem;
+
+  .ant-form-item {
+    margin-bottom: 0;
+  }
+}
+
 .catboard-account-metrics {
   margin-block: 1rem;
 

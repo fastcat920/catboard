@@ -39,11 +39,11 @@ class AliyunDnsService
         ]);
     }
 
-    public function listAddresses(AliyunDnsAccount $account)
+    public function listAddresses(AliyunDnsAccount $account, $pageNumber = 1, $pageSize = 100)
     {
         return $this->request($account, 'ListCloudGtmAddresses', [
-            'PageNumber' => 1,
-            'PageSize' => 100,
+            'PageNumber' => $pageNumber,
+            'PageSize' => $pageSize,
             'AcceptLanguage' => 'zh-CN',
         ]);
     }

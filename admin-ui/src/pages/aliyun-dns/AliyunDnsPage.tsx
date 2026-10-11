@@ -558,6 +558,7 @@ function NodeEditor({
                         address: values.address,
                         remark: values.remark,
                         health_judgement: values.health_judgement,
+                        health_tasks: values.health_tasks,
                         status: values.status,
                         available_mode: values.available_mode,
                         manual_status: values.manual_status,
@@ -1112,20 +1113,26 @@ export default function AliyunDnsPage() {
                                     {instances.length ? (
                                         <>
                                             <div className="dns-instance-strip">
-                                                {instances.map((item) => (
-                                                    <button
-                                                        type="button"
-                                                        className={item.config_id === configId ? 'active' : ''}
-                                                        key={item.config_id}
-                                                        onClick={() => setConfigId(item.config_id)}
-                                                    >
-                                                        <strong>{item.domain || '未命名域名'}</strong>
-                                                        <span>
-                                                            {item.record_type} · TTL {item.ttl ?? '-'}s ·{' '}
-                                                            {STRATEGY[item.strategy] ?? item.strategy}
-                                                        </span>
-                                                    </button>
-                                                ))}
+                                                {instances.map((item) => {
+                                                    const current = topology?.config_id === item.config_id ? topology : item
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            className={item.config_id === configId ? 'active' : ''}
+                                                            key={item.config_id}
+                                                            onClick={() => setConfigId(item.config_id)}
+                                                        >
+                                                            <span className="dns-instance-title-row">
+                                                                <strong>{item.domain || '未命名域名'}</strong>
+                                                                <Tag color={stateColor(current)}>{stateName(current)}</Tag>
+                                                            </span>
+                                                            <span className="dns-instance-meta">
+                                                                {item.record_type} · TTL {item.ttl ?? '-'}s ·{' '}
+                                                                {STRATEGY[item.strategy] ?? item.strategy}
+                                                            </span>
+                                                        </button>
+                                                    )
+                                                })}
                                             </div>
                                             <Card
                                                 title={topology?.domain ?? currentInstance?.domain ?? '流量拓扑'}

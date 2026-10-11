@@ -131,10 +131,11 @@ class AliyunDnsController extends Controller
         $account = AliyunDnsAccount::where('enabled', true)->findOrFail($data['account_id']);
         try {
             $result = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
+            $addressDetails = $this->addressDetails($account, $service);
         } catch (\Throwable $error) {
             throw ValidationException::withMessages(['topology' => $error->getMessage()]);
         }
-        return response(['data' => $this->configRow($result, true)]);
+        return response(['data' => $this->configRow($result, true, $addressDetails)]);
     }
 
     public function update(Request $request, AliyunDnsService $service)
@@ -741,15 +742,22 @@ class AliyunDnsController extends Controller
         ];
     }
 
-    private function configRow(array $row, $includePools)
+    private function configRow(array $row, $includePools, array $addressDetails = [])
     {
         $pools = [];
         if ($includePools) {
             foreach ($this->listFrom($row['AddressPools'] ?? [], 'AddressPool') as $pool) {
                 $addresses = [];
                 foreach ($this->listFrom($pool['Addresses'] ?? [], 'Address') as $address) {
+                    $addressId = trim((string)($address['AddressId'] ?? ''));
+                    $detail = $addressId !== '' && isset($addressDetails[$addressId]) ? $addressDetails[$addressId] : [];
+                    $healthTasks = $this->listFrom($address['HealthTasks'] ?? [], 'HealthTask');
+                    if (!$healthTasks) {
+                        $healthTasks = $this->listFrom($detail['HealthTasks'] ?? [], 'HealthTask');
+                    }
+                    $address = array_merge($detail, $address);
                     $addresses[] = [
-                        'id' => $address['AddressId'] ?? '',
+                        'id' => $addressId,
                         'name' => $address['Name'] ?? '',
                         'address' => $address['Address'] ?? '',
                         'type' => $address['Type'] ?? '',
@@ -770,7 +778,7 @@ class AliyunDnsController extends Controller
                                 'template_name' => $task['TemplateName'] ?? '',
                                 'monitor_status' => $task['MonitorStatus'] ?? '',
                             ];
-                        }, $this->listFrom($address['HealthTasks'] ?? [], 'HealthTask')),
+                        }, $healthTasks),
                     ];
                 }
                 $pools[] = [
@@ -819,6 +827,22 @@ class AliyunDnsController extends Controller
         if (!is_array($rows) || !$rows) return [];
         if ($this->isAssoc($rows)) return [$rows];
         return array_values(array_filter($rows, 'is_array'));
+    }
+
+    private function addressDetails(AliyunDnsAccount $account, AliyunDnsService $service)
+    {
+        $details = [];
+        $page = 1;
+        do {
+            $result = $service->listAddresses($account, $page, 100);
+            foreach ($this->listFrom($result['Addresses'] ?? [], 'Address') as $address) {
+                $addressId = trim((string)($address['AddressId'] ?? ''));
+                if ($addressId !== '') $details[$addressId] = $address;
+            }
+            $totalPages = max(1, (int)($result['TotalPages'] ?? 1));
+            $page++;
+        } while ($page <= $totalPages);
+        return $details;
     }
 
     private function isAssoc(array $array)

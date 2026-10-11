@@ -14,11 +14,20 @@
         var headers = Object.assign({ Accept: "application/json", "Content-Type": "application/json" }, options.headers || {});
         var authorization = localStorage.getItem("authorization");
         if (authorization) headers.authorization = authorization;
-        return fetch("/api/v1/" + window.settings.secure_path + "/referral" + path, Object.assign({ credentials: "include" }, options, { headers: headers }))
+        var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        var timeout = controller ? setTimeout(function () { controller.abort(); }, 30000) : null;
+        var requestOptions = Object.assign({ credentials: "include" }, options, { headers: headers });
+        if (controller) requestOptions.signal = controller.signal;
+        return fetch("/api/v1/" + window.settings.secure_path + "/referral" + path, requestOptions)
             .then(function (response) { return response.json().then(function (payload) {
                 if (!response.ok) throw new Error(payload.message || "请求失败");
                 return payload;
-            }); });
+            }); })
+            .catch(function (error) {
+                if (error && error.name === "AbortError") throw new Error("数据加载超时，请点击重试");
+                throw error;
+            })
+            .finally(function () { if (timeout) clearTimeout(timeout); });
     }
 
     function money(value) { return (Number(value || 0) / 100).toFixed(2); }
@@ -102,7 +111,15 @@
     }
 
     function content(html) { root.querySelector("[data-content]").innerHTML = html; }
-    function fail(error) { content('<div class="alert alert-danger">' + esc(error.message) + '</div>'); }
+    function fail(error) {
+        content('<div class="alert alert-danger d-flex align-items-center justify-content-between"><span>' + esc(error.message || "数据加载失败") + '</span><button class="btn btn-sm btn-danger ml-3" data-retry>重试</button></div>');
+        var retry = root.querySelector('[data-retry]');
+        if (retry) retry.onclick = function () {
+            clearCache();
+            content('<div class="block-content referral-loading">正在重新加载…</div>');
+            loadTab();
+        };
+    }
     function switchTab(nextTab) {
         if (tab === nextTab) return;
         tab = nextTab;
@@ -116,7 +133,7 @@
 
     function loadOverview() {
         var requestedTab = tab;
-        Promise.all([cachedApi("/dashboard"), api("/funnel?days=30")]).then(function (payloads) {
+        Promise.all([cachedApi("/dashboard"), cachedApi("/funnel?days=30")]).then(function (payloads) {
             if (tab !== requestedTab) return;
             var d = payloads[0].data, funnel = payloads[1].data, s = funnel.summary, trend = funnel.trend || [];
             content('<div class="referral-overview-tools"><button class="btn btn-light" data-refresh><i class="fa fa-sync-alt mr-1"></i>刷新数据</button></div><div class="referral-cards">' + [
@@ -127,7 +144,7 @@
             '<h4 class="mt-4 mb-3">近 30 天邀请注册转化漏斗</h4><div class="referral-cards">' +
             [["链接访问",s.visits],["邀请注册",s.registrations],["邮箱验证",s.verified===null?"未启用验证":s.verified],["真实首购用户",s.first_purchase_users == null?s.first_orders:s.first_purchase_users],["后续续费用户",s.renewal_users],["注册首购转化率",s.registration_to_first_rate+"%"],["首购续费转化率",s.renewal_rate+"%"],["待确认奖励",s.pending_rewards],["已撤销奖励",s.reversed_rewards],["奖励投入产出比",s.roi===null?"-":s.roi]].map(function(x){return '<section class="block block-rounded"><div class="block-content"><small>'+x[0]+'</small><strong>'+x[1]+'</strong></div></section>';}).join('') +
             '</div><div class="row mt-3"><div class="col-lg-8"><h5>每日订单趋势</h5><p class="text-muted small">按行为发生日期统计，因此当天没有新注册，也可能有此前注册的用户完成首购、再次新购、续费或更换套餐。</p>'+table(['日期','访问','注册','真实首购','再次新购','续费','更换套餐'],trend.slice(-30).reverse().map(function(x){return [x.date,x.visits,x.registrations,x.first_orders,x.repeat_purchases||0,x.renewals,x.plan_changes||0];}))+'</div><div class="col-lg-4"><h5>渠道转化排行</h5>'+table(['渠道','访问','注册'],(funnel.channels||[]).map(function(x){return [x.channel,x.visits,x.registrations];}))+'<h5 class="mt-4">套餐转化排行</h5>'+table(['套餐 ID','订单','收入'],(funnel.plans||[]).map(function(x){return [x.plan_id,x.orders,'¥'+money(x.revenue)];}))+'</div></div>');
-            root.querySelector('[data-refresh]').onclick=function(){delete responseCache['/dashboard'];content('<div class="block-content referral-loading">正在刷新…</div>');api('/dashboard?refresh=1').then(function(fresh){responseCache['/dashboard']={time:Date.now(),payload:fresh};loadOverview();}).catch(fail);};
+            root.querySelector('[data-refresh]').onclick=function(){clearCache('/dashboard');clearCache('/funnel?days=30');content('<div class="block-content referral-loading">正在刷新…</div>');api('/dashboard?refresh=1').then(function(fresh){responseCache['/dashboard']={time:Date.now(),payload:fresh};loadOverview();}).catch(fail);};
         }).catch(fail);
     }
 

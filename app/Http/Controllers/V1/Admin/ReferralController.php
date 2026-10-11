@@ -210,6 +210,7 @@ class ReferralController extends Controller
         $firstCompletedPlanOrderIds = function () {
             return Order::where('status', 3)
                 ->whereIn('type', [1, 2, 3])
+                ->whereNotNull('invite_user_id')
                 ->selectRaw('MIN(id)')
                 ->groupBy('user_id');
         };
@@ -233,17 +234,35 @@ class ReferralController extends Controller
         $renewals = Order::whereNotNull('invite_user_id')->where('type', 2)->where('status', 3)->where('created_at', '>=', $from);
         $planChanges = Order::whereNotNull('invite_user_id')->where('type', 3)->where('status', 3)->where('created_at', '>=', $from);
         $rewards = ReferralReward::where('created_at', '>=', $from);
+
+        // 每项指标只执行一次分组查询，避免按 30 天逐日查询产生上百次数据库请求。
+        $dailyCounts = function ($query) use ($from, $days) {
+            $to = $from + $days * 86400;
+            return $query
+                ->where('created_at', '<', $to)
+                ->selectRaw("FLOOR((created_at - {$from}) / 86400) AS day_index, COUNT(*) AS aggregate")
+                ->groupBy('day_index')
+                ->pluck('aggregate', 'day_index')
+                ->map(function ($value) { return (int)$value; })
+                ->all();
+        };
+
+        $dailyVisits = $dailyCounts(clone $visits);
+        $dailyRegistrations = $dailyCounts(clone $registrations);
+        $dailyFirstOrders = $dailyCounts(clone $firstOrders);
+        $dailyRepeatPurchases = $dailyCounts(clone $repeatPurchases);
+        $dailyRenewals = $dailyCounts(clone $renewals);
+        $dailyPlanChanges = $dailyCounts(clone $planChanges);
         $trend = [];
         for ($i = 0; $i < $days; $i++) {
-            $start = $from + $i * 86400; $end = $start + 86400;
             $trend[] = [
-                'date' => date('Y-m-d', $start),
-                'visits' => (clone $visits)->whereBetween('created_at', [$start, $end - 1])->count(),
-                'registrations' => (clone $registrations)->whereBetween('created_at', [$start, $end - 1])->count(),
-                'first_orders' => (clone $firstOrders)->whereBetween('created_at', [$start, $end - 1])->count(),
-                'repeat_purchases' => (clone $repeatPurchases)->whereBetween('created_at', [$start, $end - 1])->count(),
-                'renewals' => (clone $renewals)->whereBetween('created_at', [$start, $end - 1])->count(),
-                'plan_changes' => (clone $planChanges)->whereBetween('created_at', [$start, $end - 1])->count(),
+                'date' => date('Y-m-d', $from + $i * 86400),
+                'visits' => $dailyVisits[$i] ?? 0,
+                'registrations' => $dailyRegistrations[$i] ?? 0,
+                'first_orders' => $dailyFirstOrders[$i] ?? 0,
+                'repeat_purchases' => $dailyRepeatPurchases[$i] ?? 0,
+                'renewals' => $dailyRenewals[$i] ?? 0,
+                'plan_changes' => $dailyPlanChanges[$i] ?? 0,
             ];
         }
         $aggregate = function (array $rows, string $format) {

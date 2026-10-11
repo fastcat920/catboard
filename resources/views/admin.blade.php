@@ -38,6 +38,14 @@
 <div id="root"></div>
 <script src="/assets/admin/vendors.async.js?v={{$version}}"></script>
 <script src="/assets/admin/components.async.js?v={{$version}}"></script>
+<script>
+    (function () {
+        var customRoutes = ['#/client-config', '#/aliyun-dns', '#/cloud-accounts'];
+        if (customRoutes.indexOf(window.location.hash) === -1) return;
+        window.__fastcatCustomAdminRoute = window.location.hash;
+        window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + '#/dashboard');
+    })();
+</script>
 <script src="/assets/admin/umi.js?v={{$version}}-{{filemtime(public_path('assets/admin/umi.js'))}}"></script>
 <script src="/assets/admin/security-entry.js?v={{$version}}-{{filemtime(public_path('assets/admin/security-entry.js'))}}"></script>
 <script src="/assets/admin/referral-admin.js?v={{$version}}-{{filemtime(public_path('assets/admin/referral-admin.js'))}}"></script>
@@ -46,6 +54,19 @@
 <script src="/assets/admin/client-config-center.js?v={{$version}}-{{filemtime(public_path('assets/admin/client-config-center.js'))}}"></script>
 <script src="/assets/admin/aliyun-dns.js?v={{$version}}-{{filemtime(public_path('assets/admin/aliyun-dns.js'))}}"></script>
 <script src="/assets/admin/cloud-account.js?v={{$version}}-{{filemtime(public_path('assets/admin/cloud-account.js'))}}"></script>
+<script>
+    (function restoreCustomAdminRoute(attempt) {
+        var target = window.__fastcatCustomAdminRoute;
+        if (!target) return;
+        if (!document.getElementById('sidebar')) {
+            if (attempt < 200) window.setTimeout(function () { restoreCustomAdminRoute(attempt + 1); }, 50);
+            return;
+        }
+        window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + target);
+        window.__fastcatCustomAdminRoute = null;
+        window.dispatchEvent(new CustomEvent('fastcat:admin-route-ready', { detail: target }));
+    })(0);
+</script>
 </body>
 
 </html>

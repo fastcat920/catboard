@@ -76,6 +76,9 @@
     }
 
     function setMenuActive(active) {
+        if (active) document.querySelectorAll("#sidebar .nav-main-link.active").forEach(function (link) {
+            if (!link.classList.contains("aliyun-dns-menu-link")) link.classList.remove("active");
+        });
         document.querySelectorAll(".aliyun-dns-menu-link").forEach(function (link) {
             link.classList.toggle("active", active);
         });
@@ -737,6 +740,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener("hashchange", syncRoute);
     window.addEventListener("popstate", syncRoute);
+    window.addEventListener("fastcat:admin-route-ready", syncRoute);
     mountSidebarMenu();
     if (isRoute()) setTimeout(open, 0);
 })();

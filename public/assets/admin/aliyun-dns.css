@@ -29,3 +29,4 @@
 @media(max-width:1280px){.dns-workspace:not(.inspector-closed){grid-template-columns:minmax(430px,1fr) 320px}}
 @media(max-width:992px){.dns-workspace,.dns-workspace.inspector-closed,.dns-workspace:not(.inspector-closed){display:grid;grid-template-columns:minmax(0,1fr)}.dns-instance-list{display:flex;flex-wrap:wrap;overflow:visible}.dns-inspector[hidden]{display:none!important}.dns-canvas-tools{justify-content:flex-start}.dns-legend-bar{justify-content:flex-start}}
 @media(max-width:576px){.dns-instance-item{min-width:100%;flex-basis:100%}.dns-canvas-tools{width:100%}.dns-canvas-tools .btn{flex:1}.dns-inspector-actions{grid-template-columns:1fr}.dns-resource-item{align-items:flex-start}.dns-resource-item .dns-status{margin-left:auto}}
+.aliyun-dns-admin{z-index:997}

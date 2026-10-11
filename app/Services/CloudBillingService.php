@@ -10,12 +10,15 @@ use RuntimeException;
 
 class CloudBillingService
 {
-    const ALIYUN_ENDPOINT = 'https://business.aliyuncs.com/';
+    const ALIYUN_CHINA_ENDPOINT = 'https://business.aliyuncs.com/';
+    const ALIYUN_INTERNATIONAL_ENDPOINT = 'https://business.ap-southeast-1.aliyuncs.com/';
     const ALIYUN_VERSION = '2017-12-14';
     const TENCENT_ENDPOINT = 'https://billing.tencentcloudapi.com/';
     const TENCENT_HOST = 'billing.tencentcloudapi.com';
     const TENCENT_VERSION = '2018-07-09';
     const UCLOUD_ENDPOINT = 'https://api.ucloud.cn/';
+
+    private $aliyunEndpointsByAccount = [];
 
     public function snapshot(CloudAccount $account)
     {
@@ -88,33 +91,59 @@ class CloudBillingService
 
     private function aliyunRequest(CloudAccount $account, $action, array $parameters = [])
     {
-        $parameters = array_merge([
-            'Format' => 'JSON',
-            'Version' => self::ALIYUN_VERSION,
-            'AccessKeyId' => $this->accessKeyId($account),
-            'SignatureMethod' => 'HMAC-SHA1',
-            'SignatureVersion' => '1.0',
-            'SignatureNonce' => bin2hex(random_bytes(16)),
-            'Timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
-            'Action' => $action,
-        ], $parameters);
-        $token = $this->securityToken($account);
-        if ($token !== '') {
-            $parameters['SecurityToken'] = $token;
+        $accountKey = (string)($account->getKey() ?: spl_object_hash($account));
+        $endpoints = array_values(array_unique(array_filter([
+            $this->aliyunEndpointsByAccount[$accountKey] ?? null,
+            self::ALIYUN_CHINA_ENDPOINT,
+            self::ALIYUN_INTERNATIONAL_ENDPOINT,
+        ])));
+        $lastSiteError = null;
+
+        foreach ($endpoints as $endpoint) {
+            $requestParameters = array_merge([
+                'Format' => 'JSON',
+                'Version' => self::ALIYUN_VERSION,
+                'AccessKeyId' => $this->accessKeyId($account),
+                'SignatureMethod' => 'HMAC-SHA1',
+                'SignatureVersion' => '1.0',
+                'SignatureNonce' => bin2hex(random_bytes(16)),
+                'Timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+                'Action' => $action,
+            ], $parameters);
+            $token = $this->securityToken($account);
+            if ($token !== '') {
+                $requestParameters['SecurityToken'] = $token;
+            }
+            ksort($requestParameters);
+            $canonical = [];
+            foreach ($requestParameters as $key => $value) {
+                $canonical[] = $this->aliyunEncode($key) . '=' . $this->aliyunEncode($value);
+            }
+            $canonicalQuery = implode('&', $canonical);
+            $stringToSign = 'GET&%2F&' . $this->aliyunEncode($canonicalQuery);
+            $requestParameters['Signature'] = base64_encode(hash_hmac('sha1', $stringToSign, $this->accessKeySecret($account) . '&', true));
+
+            $response = $this->jsonResponse('GET', $endpoint, ['query' => $requestParameters], '阿里云费用中心');
+            $decoded = $response['data'];
+            $code = (string)($decoded['Code'] ?? $decoded['code'] ?? '');
+            $message = (string)($decoded['Message'] ?? $decoded['message'] ?? '');
+
+            if (strcasecmp($code, 'AuthSiteFail') === 0) {
+                $lastSiteError = $message;
+                continue;
+            }
+            if ($response['status'] < 200 || $response['status'] >= 300) {
+                throw new RuntimeException('阿里云费用中心请求失败（HTTP ' . $response['status'] . '）' . ($message ? '：' . $message : ''));
+            }
+            if (($decoded['Success'] ?? true) === false || ($code !== '' && !in_array($code, ['200', 'Success'], true))) {
+                throw new RuntimeException(($code ?: 'AliyunError') . '：' . ($message ?: '阿里云费用中心请求失败'));
+            }
+
+            $this->aliyunEndpointsByAccount[$accountKey] = $endpoint;
+            return $decoded;
         }
-        ksort($parameters);
-        $canonical = [];
-        foreach ($parameters as $key => $value) {
-            $canonical[] = $this->aliyunEncode($key) . '=' . $this->aliyunEncode($value);
-        }
-        $canonicalQuery = implode('&', $canonical);
-        $stringToSign = 'GET&%2F&' . $this->aliyunEncode($canonicalQuery);
-        $parameters['Signature'] = base64_encode(hash_hmac('sha1', $stringToSign, $this->accessKeySecret($account) . '&', true));
-        $decoded = $this->jsonRequest('GET', self::ALIYUN_ENDPOINT, ['query' => $parameters], '阿里云费用中心');
-        if (($decoded['Success'] ?? true) === false || (isset($decoded['Code']) && !in_array((string)$decoded['Code'], ['200', 'Success'], true))) {
-            throw new RuntimeException(($decoded['Code'] ?? 'AliyunError') . '：' . ($decoded['Message'] ?? '阿里云费用中心请求失败'));
-        }
-        return $decoded;
+
+        throw new RuntimeException('阿里云账号站点识别失败，请确认 AccessKey 属于当前阿里云账号' . ($lastSiteError ? '：' . $lastSiteError : ''));
     }
 
     private function tencentRequest(CloudAccount $account, $action, array $payload)
@@ -229,6 +258,17 @@ class CloudBillingService
 
     private function jsonRequest($method, $url, array $options, $label)
     {
+        $response = $this->jsonResponse($method, $url, $options, $label);
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            $decoded = $response['data'];
+            $message = $decoded['Message'] ?? $decoded['message'] ?? $decoded['Response']['Error']['Message'] ?? '';
+            throw new RuntimeException($label . '请求失败（HTTP ' . $response['status'] . '）' . ($message ? '：' . $message : ''));
+        }
+        return $response['data'];
+    }
+
+    private function jsonResponse($method, $url, array $options, $label)
+    {
         try {
             $response = (new Client([
                 'timeout' => 25,
@@ -243,11 +283,7 @@ class CloudBillingService
         if (!is_array($decoded)) {
             throw new RuntimeException($label . '返回了无法识别的数据（HTTP ' . $status . '）');
         }
-        if ($status < 200 || $status >= 300) {
-            $message = $decoded['Message'] ?? $decoded['message'] ?? $decoded['Response']['Error']['Message'] ?? '';
-            throw new RuntimeException($label . '请求失败（HTTP ' . $status . '）' . ($message ? '：' . $message : ''));
-        }
-        return $decoded;
+        return ['status' => $status, 'data' => $decoded];
     }
 
     private function accessKeyId(CloudAccount $account)

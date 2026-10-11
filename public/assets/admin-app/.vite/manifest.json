@@ -578,7 +578,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-CZSz5fTS.js",
+    "file": "assets/index-Dtkfou9k.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -774,7 +774,7 @@
     ]
   },
   "src/pages/cloudflare-dns/CloudflareDnsPage.tsx": {
-    "file": "assets/CloudflareDnsPage-CZykQ7cO.js",
+    "file": "assets/CloudflareDnsPage-BpCUuHSS.js",
     "name": "CloudflareDnsPage",
     "src": "src/pages/cloudflare-dns/CloudflareDnsPage.tsx",
     "isDynamicEntry": true,

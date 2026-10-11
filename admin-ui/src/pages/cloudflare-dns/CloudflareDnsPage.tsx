@@ -238,10 +238,7 @@ function RecordEditor({ open, accountId, zone, record, onClose, onSaved }: Recor
                 <Row gutter={16}>
                     <Col xs={24} md={8}>
                         <Form.Item name="type" label="记录类型" rules={[{ required: true }]}>
-                            <Select
-                                options={RECORD_TYPES.map((value) => ({ value, label: value }))}
-                                disabled={Boolean(record)}
-                            />
+                            <Select options={RECORD_TYPES.map((value) => ({ value, label: value }))} />
                         </Form.Item>
                     </Col>
                     <Col xs={24} md={16}>

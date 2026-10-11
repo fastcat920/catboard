@@ -52,7 +52,7 @@
     }
 
     function closeOthers() {
-        document.querySelectorAll(".referral-admin,.coupon-center-admin,.marketing-admin,.security-admin,.client-config-admin").forEach(function (node) {
+        document.querySelectorAll(".referral-admin,.coupon-center-admin,.marketing-admin,.security-admin,.client-config-admin,.cloud-account-admin").forEach(function (node) {
             node.hidden = true;
         });
     }

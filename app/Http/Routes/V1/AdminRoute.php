@@ -235,6 +235,12 @@ class AdminRoute
             $router->post('/aliyun-dns/address/save', 'V1\\Admin\\AliyunDnsController@saveAddress');
             $router->post('/aliyun-dns/address/attach', 'V1\\Admin\\AliyunDnsController@attachAddress');
             $router->post('/aliyun-dns/address/drop', 'V1\\Admin\\AliyunDnsController@dropAddress');
+            // Multi-cloud account balance and monthly bill overview
+            $router->get ('/cloud-account/overview', 'V1\\Admin\\CloudAccountController@overview');
+            $router->post('/cloud-account/save', 'V1\\Admin\\CloudAccountController@save');
+            $router->post('/cloud-account/refresh', 'V1\\Admin\\CloudAccountController@refresh');
+            $router->post('/cloud-account/refresh-all', 'V1\\Admin\\CloudAccountController@refreshAll');
+            $router->post('/cloud-account/drop', 'V1\\Admin\\CloudAccountController@drop');
             // Node security
             $router->get ('/security/dashboard', 'V1\\Admin\\NodeSecurityController@dashboard');
             $router->get ('/security/events', 'V1\\Admin\\NodeSecurityController@events');

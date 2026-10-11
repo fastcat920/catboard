@@ -107,7 +107,7 @@
     }
     function closeOthers() {
         document
-            .querySelectorAll(".referral-admin,.coupon-center-admin")
+            .querySelectorAll(".referral-admin,.coupon-center-admin,.cloud-account-admin")
             .forEach(function (x) {
                 x.hidden = true;
             });

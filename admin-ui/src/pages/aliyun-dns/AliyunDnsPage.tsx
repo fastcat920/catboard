@@ -1066,15 +1066,17 @@ export default function AliyunDnsPage() {
                                                                 }
                                                             >
                                                                 <GlobalOutlined />
-                                                                <span>
-                                                                    <strong>{topology.domain}</strong>
+                                                                <span className="dns-react-content">
+                                                                    <span className="dns-react-title-row">
+                                                                        <strong>{topology.domain}</strong>
+                                                                        <Tag color={stateColor(topology)}>
+                                                                            {stateName(topology)}
+                                                                        </Tag>
+                                                                    </span>
                                                                     <small>
                                                                         {topology.record_type} · TTL {topology.ttl}s
                                                                     </small>
                                                                 </span>
-                                                                <Tag color={stateColor(topology)}>
-                                                                    {stateName(topology)}
-                                                                </Tag>
                                                             </button>
                                                             <div className="dns-react-branches">
                                                                 {orderedPools.map((pool, poolIndex) => (
@@ -1090,8 +1092,13 @@ export default function AliyunDnsPage() {
                                                                             }
                                                                         >
                                                                             <CloudServerOutlined />
-                                                                            <span>
-                                                                                <strong>{pool.name}</strong>
+                                                                            <span className="dns-react-content">
+                                                                                <span className="dns-react-title-row">
+                                                                                    <strong>{pool.name}</strong>
+                                                                                    <Tag color={stateColor(pool)}>
+                                                                                        {stateName(pool)}
+                                                                                    </Tag>
+                                                                                </span>
                                                                                 <small>
                                                                                     顺序{' '}
                                                                                     {serialNumber(
@@ -1104,9 +1111,6 @@ export default function AliyunDnsPage() {
                                                                                     · {pool.addresses.length} 个地址
                                                                                 </small>
                                                                             </span>
-                                                                            <Tag color={stateColor(pool)}>
-                                                                                {stateName(pool)}
-                                                                            </Tag>
                                                                         </button>
                                                                         <div
                                                                             className={`dns-react-addresses${pool.addresses.length > 1 ? ' has-multiple' : ''}`}
@@ -1127,11 +1131,20 @@ export default function AliyunDnsPage() {
                                                                                             }
                                                                                         >
                                                                                             <CloudServerOutlined />
-                                                                                            <span>
-                                                                                                <strong>
-                                                                                                    {address.name ||
-                                                                                                        address.address}
-                                                                                                </strong>
+                                                                                            <span className="dns-react-content">
+                                                                                                <span className="dns-react-title-row">
+                                                                                                    <strong>
+                                                                                                        {address.name ||
+                                                                                                            address.address}
+                                                                                                    </strong>
+                                                                                                    <Tag
+                                                                                                        color={stateColor(
+                                                                                                            address,
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        {stateName(address)}
+                                                                                                    </Tag>
+                                                                                                </span>
                                                                                                 <small>
                                                                                                     顺序{' '}
                                                                                                     {serialNumber(
@@ -1142,13 +1155,6 @@ export default function AliyunDnsPage() {
                                                                                                     · {address.address}
                                                                                                 </small>
                                                                                             </span>
-                                                                                            <Tag
-                                                                                                color={stateColor(
-                                                                                                    address,
-                                                                                                )}
-                                                                                            >
-                                                                                                {stateName(address)}
-                                                                                            </Tag>
                                                                                         </button>
                                                                                     ),
                                                                                 )

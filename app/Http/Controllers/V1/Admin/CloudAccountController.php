@@ -29,6 +29,7 @@ class CloudAccountController extends Controller
         $data = $request->validate([
             'id' => 'nullable|integer|exists:v2_cloud_account,id',
             'name' => 'required|string|max:100',
+            'account_id' => 'nullable|string|max:191',
             'provider' => 'required|in:aliyun,tencent,ucloud',
             'access_key_id' => 'nullable|string|max:500',
             'access_key_secret' => 'nullable|string|max:1000',
@@ -42,6 +43,11 @@ class CloudAccountController extends Controller
             throw ValidationException::withMessages(['access_key_id' => '新建账号或更换云服务商时必须填写完整的访问密钥']);
         }
         $account->name = trim($data['name']);
+        if ($data['provider'] === 'ucloud') {
+            $account->account_id = trim((string)($data['account_id'] ?? '')) ?: null;
+        } elseif (!$account->exists || $providerChanged) {
+            $account->account_id = null;
+        }
         $account->provider = $data['provider'];
         $account->enabled = (bool)$data['enabled'];
         if ($providerChanged) {
@@ -104,6 +110,9 @@ class CloudAccountController extends Controller
     {
         try {
             $snapshot = $service->snapshot($account);
+            if (!empty($snapshot['account_id'])) {
+                $account->account_id = $snapshot['account_id'];
+            }
             $account->balance = $snapshot['balance'];
             $account->current_month_amount = $snapshot['current_month_amount'];
             $account->previous_month_amount = $snapshot['previous_month_amount'];
@@ -138,6 +147,7 @@ class CloudAccountController extends Controller
         return [
             'id' => $account->id,
             'name' => $account->name,
+            'account_id' => $account->account_id,
             'provider' => $account->provider,
             'enabled' => (bool)$account->enabled,
             'currency' => $account->currency ?: 'CNY',

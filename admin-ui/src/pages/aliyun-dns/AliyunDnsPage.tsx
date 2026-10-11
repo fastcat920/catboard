@@ -914,7 +914,9 @@ export default function AliyunDnsPage() {
                                                                                 {stateName(pool)}
                                                                             </Tag>
                                                                         </button>
-                                                                        <div className="dns-react-addresses">
+                                                                        <div
+                                                                            className={`dns-react-addresses${pool.addresses.length > 1 ? ' has-multiple' : ''}`}
+                                                                        >
                                                                             {pool.addresses.length ? (
                                                                                 pool.addresses.map((address) => (
                                                                                     <button

@@ -1,5 +1,6 @@
 import {
   CloudOutlined,
+  CopyOutlined,
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
@@ -22,6 +23,7 @@ import {
 import { unwrap } from '@/api/request'
 import { message, modal } from '@/app/staticApi'
 import { AdminLayout } from '@/layouts/AdminLayout'
+import { copyText } from '@/utils/clipboard'
 
 const PROVIDERS: Record<CloudProvider, string> = { aliyun: '阿里云', tencent: '腾讯云', ucloud: 'UCloud' }
 const KEY_LABELS: Record<CloudProvider, [string, string]> = {
@@ -66,6 +68,7 @@ function AccountEditor({ account, open, onClose, onSaved }: EditorProps) {
     if (!open) return
     form.setFieldsValue({
       name: account?.name ?? '',
+      account_id: account?.account_id ?? '',
       provider: account?.provider ?? 'aliyun',
       enabled: account?.enabled ?? true,
       access_key_id: '',
@@ -117,6 +120,19 @@ function AccountEditor({ account, open, onClose, onSaved }: EditorProps) {
           <Col xs={24} md={12}>
             <Form.Item name="provider" label="云服务商" rules={[{ required: true }]}>
               <Select options={Object.entries(PROVIDERS).map(([value, label]) => ({ value, label }))} />
+            </Form.Item>
+          </Col>
+          <Col span={24}>
+            <Form.Item
+              name="account_id"
+              label="账号 ID"
+              extra={provider === 'ucloud' ? 'UCloud 暂不提供调用者身份接口，请填写控制台显示的账号 ID。' : '保存或刷新时通过云厂商身份接口自动获取。'}
+            >
+              <Input
+                disabled={provider !== 'ucloud'}
+                maxLength={191}
+                placeholder={provider === 'ucloud' ? '请输入 UCloud 控制台显示的账号 ID' : '保存后自动获取'}
+              />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -228,11 +244,28 @@ export default function CloudAccountPage() {
               className="catboard-account-card"
               loading={loading}
               title={
-                <Space>
+                <div className="catboard-account-heading">
                   <span className={`catboard-provider is-${account.provider}`}>{PROVIDERS[account.provider].slice(0, 1)}</span>
-                  <span>{account.name}</span>
-                  <Tag>{PROVIDERS[account.provider]}</Tag>
-                </Space>
+                  <div className="catboard-account-identity">
+                    <Space size={8} wrap>
+                      <span>{account.name}</span>
+                      <Tag>{PROVIDERS[account.provider]}</Tag>
+                    </Space>
+                    <div className="catboard-account-id">
+                      <Typography.Text type="secondary">账号 ID：</Typography.Text>
+                      <code>{account.account_id || '未填写'}</code>
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<CopyOutlined />}
+                        disabled={!account.account_id}
+                        onClick={() => copyText(account.account_id || '')}
+                      >
+                        复制
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               }
               extra={<Tag color={health.color}>{health.label}</Tag>}
               actions={[

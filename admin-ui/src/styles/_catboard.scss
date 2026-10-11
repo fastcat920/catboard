@@ -51,6 +51,40 @@
   }
 }
 
+.catboard-account-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.catboard-account-identity {
+  min-width: 0;
+}
+
+.catboard-account-id {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+
+  code {
+    overflow: hidden;
+    color: var(--ant-color-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ant-btn {
+    flex: none;
+    height: auto;
+    padding-block: 0;
+  }
+}
+
 .catboard-filter-bar {
   display: grid;
   grid-template-columns: minmax(14rem, 1fr) 12rem 12rem;
@@ -210,12 +244,12 @@
 }
 
 .dns-topology-flow {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 2.75rem;
+  display: grid;
+  justify-items: center;
+  align-items: start;
   width: max-content;
   min-width: 100%;
+  padding: 0.5rem 1rem 1rem;
 }
 
 .dns-react-node {
@@ -233,6 +267,7 @@
   background: var(--ant-color-bg-container);
   text-align: left;
   cursor: pointer;
+  position: relative;
 
   &.is-warning {
     border-left-color: #faad14;
@@ -256,17 +291,16 @@
 }
 
 .dns-topology-root {
-  position: sticky;
-  left: 0;
+  position: relative;
   z-index: 2;
   margin: 0;
 
   &::after {
     position: absolute;
-    top: 50%;
-    left: 100%;
-    width: 2.75rem;
-    border-top: 2px solid var(--v2b-line, var(--ant-color-border));
+    top: 100%;
+    left: 50%;
+    height: 3rem;
+    border-left: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
 }
@@ -274,53 +308,88 @@
 .dns-react-branches {
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: 2.75rem;
+  align-items: flex-start;
+  gap: 2rem;
   position: relative;
-  padding-left: 0;
+  padding-top: 3rem;
 
   &::before {
     position: absolute;
-    top: 50%;
-    right: 100%;
-    width: 2.75rem;
+    top: 0;
+    right: 18.375rem;
+    left: 18.375rem;
     border-top: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
   }
 }
 
 .dns-react-branch {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 2.75rem;
+  display: grid;
+  justify-items: center;
+  width: 36.75rem;
   position: relative;
 
   &::before {
     position: absolute;
-    top: 50%;
-    right: 100%;
-    width: 2.75rem;
-    border-top: 2px solid var(--v2b-line, var(--ant-color-border));
+    bottom: 100%;
+    left: 50%;
+    height: 3rem;
+    border-left: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
+  }
+
+  > .dns-react-node {
+    width: 18rem;
+
+    &::after {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      height: 2.25rem;
+      border-left: 2px solid var(--v2b-line, var(--ant-color-border));
+      content: '';
+    }
   }
 }
 
 .dns-react-addresses {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
   gap: 0.75rem;
+  width: 100%;
   position: relative;
-  padding-left: 0;
+  padding-top: 2.25rem;
 
   &::before {
+    display: none;
     position: absolute;
-    top: 50%;
-    right: 100%;
-    width: 2.75rem;
+    top: 0;
+    right: 9rem;
+    left: 9rem;
     border-top: 2px solid var(--v2b-line, var(--ant-color-border));
     content: '';
+  }
+
+  &.has-multiple::before {
+    display: block;
+  }
+
+  .dns-react-node,
+  .dns-react-empty {
+    z-index: 1;
+    width: 18rem;
+    position: relative;
+
+    &::before {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      height: 2.25rem;
+      border-left: 2px solid var(--v2b-line, var(--ant-color-border));
+      content: '';
+    }
   }
 }
 

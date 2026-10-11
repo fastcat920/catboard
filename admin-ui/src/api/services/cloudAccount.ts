@@ -7,6 +7,7 @@ export type CloudHealth = 'healthy' | 'low' | 'recharge' | 'error' | 'unknown' |
 export interface CloudAccount {
   id: number
   name: string
+  account_id: string | null
   provider: CloudProvider
   enabled: boolean
   currency: string
@@ -30,6 +31,7 @@ export interface CloudAccountOverview {
 export interface CloudAccountInput {
   id?: number
   name: string
+  account_id?: string
   provider: CloudProvider
   access_key_id?: string
   access_key_secret?: string

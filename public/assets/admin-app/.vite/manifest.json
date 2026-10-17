@@ -578,7 +578,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-CStsLLBC.js",
+    "file": "assets/index-DM1s19-K.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -746,7 +746,7 @@
     ]
   },
   "src/pages/cloud/CloudAccountPage.tsx": {
-    "file": "assets/CloudAccountPage-DLfSF2-o.js",
+    "file": "assets/CloudAccountPage-DNWWKCnw.js",
     "name": "CloudAccountPage",
     "src": "src/pages/cloud/CloudAccountPage.tsx",
     "isDynamicEntry": true,

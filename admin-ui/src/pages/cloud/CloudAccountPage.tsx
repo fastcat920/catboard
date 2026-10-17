@@ -26,6 +26,7 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { copyText } from '@/utils/clipboard'
 
 const PROVIDERS: Record<CloudProvider, string> = { aliyun: '阿里云', tencent: '腾讯云', ucloud: 'UCloud' }
+const SITES = { china: '国内站', international: '国际站' } as const
 const KEY_LABELS: Record<CloudProvider, [string, string]> = {
   aliyun: ['AccessKey ID', 'AccessKey Secret'],
   tencent: ['SecretId', 'SecretKey'],
@@ -70,6 +71,7 @@ function AccountEditor({ account, open, onClose, onSaved }: EditorProps) {
       name: account?.name ?? '',
       account_id: account?.account_id ?? '',
       provider: account?.provider ?? 'aliyun',
+      site: account?.site ?? 'china',
       enabled: account?.enabled ?? true,
       access_key_id: '',
       access_key_secret: '',
@@ -120,6 +122,11 @@ function AccountEditor({ account, open, onClose, onSaved }: EditorProps) {
           <Col xs={24} md={12}>
             <Form.Item name="provider" label="云服务商" rules={[{ required: true }]}>
               <Select options={Object.entries(PROVIDERS).map(([value, label]) => ({ value, label }))} />
+            </Form.Item>
+          </Col>
+          <Col span={24}>
+            <Form.Item name="site" label="账号站点" rules={[{ required: true }]}>
+              <Select options={Object.entries(SITES).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
           </Col>
           <Col span={24}>
@@ -250,6 +257,7 @@ export default function CloudAccountPage() {
                     <Space size={8} wrap>
                       <span>{account.name}</span>
                       <Tag>{PROVIDERS[account.provider]}</Tag>
+                      <Tag color={account.site === 'international' ? 'blue' : 'default'}>{SITES[account.site]}</Tag>
                     </Space>
                     <div className="catboard-account-id">
                       <Typography.Text type="secondary">账号 ID：</Typography.Text>

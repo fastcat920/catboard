@@ -16,12 +16,12 @@ class CloudBillingService
     const ALIYUN_STS_CHINA_ENDPOINT = 'https://sts.cn-hangzhou.aliyuncs.com/';
     const ALIYUN_STS_INTERNATIONAL_ENDPOINT = 'https://sts.ap-southeast-1.aliyuncs.com/';
     const ALIYUN_STS_VERSION = '2015-04-01';
-    const TENCENT_HOST = 'billing.tencentcloudapi.com';
+    const TENCENT_CHINA_HOST = 'billing.tencentcloudapi.com';
+    const TENCENT_INTERNATIONAL_HOST = 'billing.intl.tencentcloudapi.com';
     const TENCENT_VERSION = '2018-07-09';
     const TENCENT_STS_VERSION = '2018-08-13';
-    const UCLOUD_ENDPOINT = 'https://api.ucloud.cn/';
-
-    private $aliyunEndpointsByAccount = [];
+    const UCLOUD_CHINA_ENDPOINT = 'https://api.ucloud.cn/';
+    const UCLOUD_INTERNATIONAL_ENDPOINT = 'https://api.ucloud-global.com/';
 
     public function snapshot(CloudAccount $account)
     {
@@ -75,7 +75,7 @@ class CloudBillingService
             'balance' => $this->number($balanceResponse['Response']['RealBalance'] ?? $balanceResponse['Response']['Balance'] ?? 0) / 100,
             'current_month_amount' => $this->sumTencentBill($currentResponse),
             'previous_month_amount' => $this->sumTencentBill($previousResponse),
-            'currency' => 'CNY',
+            'currency' => $this->site($account) === 'international' ? 'USD' : 'CNY',
         ];
     }
 
@@ -91,65 +91,44 @@ class CloudBillingService
             'balance' => $this->number($balanceData['AmountAvailable'] ?? $balanceData['Amount'] ?? 0),
             'current_month_amount' => $this->ucloudMonthAmount($account, $currentMonth),
             'previous_month_amount' => $this->ucloudMonthAmount($account, $previousMonth),
-            'currency' => 'CNY',
+            'currency' => $this->site($account) === 'international' ? 'USD' : 'CNY',
         ];
     }
 
     private function aliyunRequest(CloudAccount $account, $action, array $parameters = [])
     {
-        $accountKey = (string)($account->getKey() ?: spl_object_hash($account));
-        $endpoints = array_values(array_unique(array_filter([
-            $this->aliyunEndpointsByAccount[$accountKey] ?? null,
-            self::ALIYUN_CHINA_ENDPOINT,
-            self::ALIYUN_INTERNATIONAL_ENDPOINT,
-        ])));
-        $lastSiteError = null;
+        $requestParameters = $this->aliyunSignedParameters($account, $action, self::ALIYUN_VERSION, $parameters);
+        $response = $this->jsonResponse('GET', $this->aliyunEndpoint($account), ['query' => $requestParameters], '阿里云费用中心');
+        $decoded = $response['data'];
+        $code = (string)($decoded['Code'] ?? $decoded['code'] ?? '');
+        $message = (string)($decoded['Message'] ?? $decoded['message'] ?? '');
 
-        foreach ($endpoints as $endpoint) {
-            $requestParameters = $this->aliyunSignedParameters($account, $action, self::ALIYUN_VERSION, $parameters);
-
-            $response = $this->jsonResponse('GET', $endpoint, ['query' => $requestParameters], '阿里云费用中心');
-            $decoded = $response['data'];
-            $code = (string)($decoded['Code'] ?? $decoded['code'] ?? '');
-            $message = (string)($decoded['Message'] ?? $decoded['message'] ?? '');
-
-            if (strcasecmp($code, 'AuthSiteFail') === 0) {
-                $lastSiteError = $message;
-                continue;
-            }
-            if ($response['status'] < 200 || $response['status'] >= 300) {
-                throw new RuntimeException('阿里云费用中心请求失败（HTTP ' . $response['status'] . '）' . ($message ? '：' . $message : ''));
-            }
-            if (($decoded['Success'] ?? true) === false || ($code !== '' && !in_array($code, ['200', 'Success'], true))) {
-                throw new RuntimeException(($code ?: 'AliyunError') . '：' . ($message ?: '阿里云费用中心请求失败'));
-            }
-
-            $this->aliyunEndpointsByAccount[$accountKey] = $endpoint;
-            return $decoded;
+        if (strcasecmp($code, 'AuthSiteFail') === 0) {
+            throw new RuntimeException('阿里云账号站点不匹配，请确认选择的是中国站还是国际站');
         }
-
-        throw new RuntimeException('阿里云账号站点识别失败，请确认 AccessKey 属于当前阿里云账号' . ($lastSiteError ? '：' . $lastSiteError : ''));
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new RuntimeException('阿里云费用中心请求失败（HTTP ' . $response['status'] . '）' . ($message ? '：' . $message : ''));
+        }
+        if (($decoded['Success'] ?? true) === false || ($code !== '' && !in_array($code, ['200', 'Success'], true))) {
+            throw new RuntimeException(($code ?: 'AliyunError') . '：' . ($message ?: '阿里云费用中心请求失败'));
+        }
+        return $decoded;
     }
 
     private function aliyunCallerIdentity(CloudAccount $account)
     {
-        $accountKey = (string)($account->getKey() ?: spl_object_hash($account));
-        $international = ($this->aliyunEndpointsByAccount[$accountKey] ?? null) === self::ALIYUN_INTERNATIONAL_ENDPOINT;
-        $endpoints = $international
-            ? [self::ALIYUN_STS_INTERNATIONAL_ENDPOINT, self::ALIYUN_STS_CHINA_ENDPOINT]
-            : [self::ALIYUN_STS_CHINA_ENDPOINT, self::ALIYUN_STS_INTERNATIONAL_ENDPOINT];
-
-        foreach ($endpoints as $endpoint) {
-            try {
-                $parameters = $this->aliyunSignedParameters($account, 'GetCallerIdentity', self::ALIYUN_STS_VERSION);
-                $response = $this->jsonResponse('GET', $endpoint, ['query' => $parameters], '阿里云身份服务');
-                $accountId = $response['data']['AccountId'] ?? null;
-                if ($response['status'] >= 200 && $response['status'] < 300 && $accountId) {
-                    return (string)$accountId;
-                }
-            } catch (\Throwable $error) {
-                // 账号 ID 只是展示信息，身份接口异常不应阻断余额和账单同步。
+        try {
+            $parameters = $this->aliyunSignedParameters($account, 'GetCallerIdentity', self::ALIYUN_STS_VERSION);
+            $endpoint = $this->site($account) === 'international'
+                ? self::ALIYUN_STS_INTERNATIONAL_ENDPOINT
+                : self::ALIYUN_STS_CHINA_ENDPOINT;
+            $response = $this->jsonResponse('GET', $endpoint, ['query' => $parameters], '阿里云身份服务');
+            $accountId = $response['data']['AccountId'] ?? null;
+            if ($response['status'] >= 200 && $response['status'] < 300 && $accountId) {
+                return (string)$accountId;
             }
+        } catch (\Throwable $error) {
+            // 账号 ID 只是展示信息，身份接口异常不应阻断余额和账单同步。
         }
         return null;
     }
@@ -188,12 +167,15 @@ class CloudBillingService
             $action,
             $payload,
             'billing',
-            self::TENCENT_HOST,
+            $this->tencentHost($account),
             self::TENCENT_VERSION,
             '腾讯云费用中心'
         );
         if (!empty($decoded['Response']['Error'])) {
             $error = $decoded['Response']['Error'];
+            if (($error['Code'] ?? '') === 'AuthFailure.SignatureFailure') {
+                throw new RuntimeException('腾讯云签名验证失败，请检查账号站点、SecretId 和 SecretKey');
+            }
             throw new RuntimeException(($error['Code'] ?? 'TencentError') . '：' . ($error['Message'] ?? '腾讯云费用中心请求失败'));
         }
         return $decoded;
@@ -201,10 +183,9 @@ class CloudBillingService
 
     private function tencentCallerIdentity(CloudAccount $account)
     {
-        $endpoints = [
-            ['host' => 'sts.tencentcloudapi.com', 'region' => 'ap-guangzhou'],
-            ['host' => 'sts.intl.tencentcloudapi.com', 'region' => 'ap-singapore'],
-        ];
+        $endpoints = $this->site($account) === 'international'
+            ? [['host' => 'sts.intl.tencentcloudapi.com', 'region' => 'ap-singapore']]
+            : [['host' => 'sts.tencentcloudapi.com', 'region' => 'ap-guangzhou']];
         foreach ($endpoints as $endpoint) {
             try {
                 $decoded = $this->tencentSignedRequest(
@@ -278,8 +259,11 @@ class CloudBillingService
             $signing .= $key . $this->ucloudValue($value);
         }
         $parameters['Signature'] = sha1($signing . $this->accessKeySecret($account));
-        $decoded = $this->jsonRequest('GET', self::UCLOUD_ENDPOINT, ['query' => $parameters], 'UCloud 财务中心');
+        $decoded = $this->jsonRequest('GET', $this->ucloudEndpoint($account), ['query' => $parameters], 'UCloud 财务中心');
         if ((int)($decoded['RetCode'] ?? -1) !== 0) {
+            if ((int)($decoded['RetCode'] ?? -1) === 171) {
+                throw new RuntimeException('UCloud 签名验证失败，请检查账号站点、公钥和私钥');
+            }
             throw new RuntimeException('UCloud ' . ($decoded['RetCode'] ?? 'Error') . '：' . ($decoded['Message'] ?? '财务中心请求失败'));
         }
         return $decoded;
@@ -382,6 +366,32 @@ class CloudBillingService
         return $account->security_token_encrypted
             ? Crypt::decryptString($account->security_token_encrypted)
             : '';
+    }
+
+    private function site(CloudAccount $account)
+    {
+        return $account->site === 'international' ? 'international' : 'china';
+    }
+
+    private function aliyunEndpoint(CloudAccount $account)
+    {
+        return $this->site($account) === 'international'
+            ? self::ALIYUN_INTERNATIONAL_ENDPOINT
+            : self::ALIYUN_CHINA_ENDPOINT;
+    }
+
+    private function tencentHost(CloudAccount $account)
+    {
+        return $this->site($account) === 'international'
+            ? self::TENCENT_INTERNATIONAL_HOST
+            : self::TENCENT_CHINA_HOST;
+    }
+
+    private function ucloudEndpoint(CloudAccount $account)
+    {
+        return $this->site($account) === 'international'
+            ? self::UCLOUD_INTERNATIONAL_ENDPOINT
+            : self::UCLOUD_CHINA_ENDPOINT;
     }
 
     private function aliyunEncode($value)

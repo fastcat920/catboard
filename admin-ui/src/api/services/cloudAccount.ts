@@ -2,6 +2,7 @@ import { adminPath } from '@/app/settings'
 import { get, post } from '../request'
 
 export type CloudProvider = 'aliyun' | 'tencent' | 'ucloud'
+export type CloudSite = 'china' | 'international'
 export type CloudHealth = 'healthy' | 'low' | 'recharge' | 'error' | 'unknown' | 'disabled'
 
 export interface CloudAccount {
@@ -9,6 +10,7 @@ export interface CloudAccount {
   name: string
   account_id: string | null
   provider: CloudProvider
+  site: CloudSite
   enabled: boolean
   currency: string
   balance: number | null
@@ -33,6 +35,7 @@ export interface CloudAccountInput {
   name: string
   account_id?: string
   provider: CloudProvider
+  site: CloudSite
   access_key_id?: string
   access_key_secret?: string
   security_token?: string

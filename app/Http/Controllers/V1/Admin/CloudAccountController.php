@@ -31,6 +31,7 @@ class CloudAccountController extends Controller
             'name' => 'required|string|max:100',
             'account_id' => 'nullable|string|max:191',
             'provider' => 'required|in:aliyun,tencent,ucloud',
+            'site' => 'nullable|in:china,international',
             'access_key_id' => 'nullable|string|max:500',
             'access_key_secret' => 'nullable|string|max:1000',
             'security_token' => 'nullable|string|max:3000',
@@ -38,7 +39,9 @@ class CloudAccountController extends Controller
             'enabled' => 'required|boolean',
         ]);
         $account = !empty($data['id']) ? CloudAccount::findOrFail($data['id']) : new CloudAccount();
+        $site = $data['site'] ?? ($account->site ?: 'china');
         $providerChanged = $account->exists && $account->provider !== $data['provider'];
+        $siteChanged = $account->exists && ($account->site ?: 'china') !== $site;
         if ((!$account->exists || $providerChanged) && (empty($data['access_key_id']) || empty($data['access_key_secret']))) {
             throw ValidationException::withMessages(['access_key_id' => '新建账号或更换云服务商时必须填写完整的访问密钥']);
         }
@@ -49,9 +52,15 @@ class CloudAccountController extends Controller
             $account->account_id = null;
         }
         $account->provider = $data['provider'];
+        $account->site = $site;
         $account->enabled = (bool)$data['enabled'];
         if ($providerChanged) {
             $account->security_token_encrypted = null;
+        }
+        if ($providerChanged || $siteChanged) {
+            if ($data['provider'] !== 'ucloud') {
+                $account->account_id = null;
+            }
             $account->currency = null;
             $account->balance = null;
             $account->current_month_amount = null;
@@ -149,6 +158,7 @@ class CloudAccountController extends Controller
             'name' => $account->name,
             'account_id' => $account->account_id,
             'provider' => $account->provider,
+            'site' => $account->site ?: 'china',
             'enabled' => (bool)$account->enabled,
             'currency' => $account->currency ?: 'CNY',
             'balance' => $account->balance === null ? null : (float)$account->balance,

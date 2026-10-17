@@ -778,7 +778,8 @@ class NodeSecurityController extends Controller
             $server['client_policies'] = $clientPolicies->get($key, collect())->map(function ($policy) {
                 return [
                     'id' => (int)$policy->id, 'client_family' => $policy->client_family,
-                    'client_platform' => $policy->client_platform, 'min_version' => $policy->min_version,
+                    'client_platform' => $policy->client_platform, 'user_agent' => $policy->user_agent ?? null,
+                    'min_version' => $policy->min_version,
                     'max_version' => $policy->max_version, 'delivery_mode' => $policy->delivery_mode,
                     'visibility' => $policy->visibility ?? 'show',
                     'check_url' => $policy->check_url, 'check_interval' => (int)$policy->check_interval,
@@ -897,7 +898,8 @@ class NodeSecurityController extends Controller
         $request->validate([
             'id' => 'nullable|integer', 'server_type' => 'required|string|max:32',
             'server_id' => 'required|integer|min:1', 'client_family' => 'required|string|max:64',
-            'client_platform' => 'nullable|string|max:24', 'min_version' => 'nullable|string|max:32',
+            'client_platform' => 'nullable|string|max:24', 'user_agent' => 'nullable|string|max:512',
+            'min_version' => 'nullable|string|max:32',
             'max_version' => 'nullable|string|max:32',
             'delivery_mode' => 'required|in:primary_only,manual_backup,auto_fallback',
             'visibility' => 'required|in:show,hide',
@@ -917,6 +919,7 @@ class NodeSecurityController extends Controller
             'server_type' => $request->input('server_type'), 'server_id' => (int)$request->input('server_id'),
             'client_family' => trim($request->input('client_family')),
             'client_platform' => trim((string)$request->input('client_platform')) ?: null,
+            'user_agent' => trim((string)$request->input('user_agent')) ?: null,
             'min_version' => $minVersion ?: null, 'max_version' => $maxVersion ?: null,
             'delivery_mode' => $request->input('delivery_mode'), 'visibility' => $request->input('visibility'),
             'check_url' => $request->input('check_url'),
@@ -927,7 +930,8 @@ class NodeSecurityController extends Controller
         else DB::table('v2_node_entry_client_policy')->insert($payload + ['created_at' => $now]);
         $this->adminLog($request, 'entry_client_policy.save', 'node', $request->input('server_id'), [
             'server_type' => $payload['server_type'], 'client_family' => $payload['client_family'],
-            'client_platform' => $payload['client_platform'], 'delivery_mode' => $payload['delivery_mode'],
+            'client_platform' => $payload['client_platform'], 'user_agent' => $payload['user_agent'],
+            'delivery_mode' => $payload['delivery_mode'],
             'visibility' => $payload['visibility'],
         ]);
         return response(['data' => true]);

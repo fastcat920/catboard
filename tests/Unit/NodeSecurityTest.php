@@ -64,6 +64,26 @@ class NodeSecurityTest extends TestCase
         $this->assertTrue(NodeEntryPoolService::clientVisibilityAllows('denylist', true, 'show'));
     }
 
+    public function testEntryPolicyCanRequireAnExactUserAgent()
+    {
+        $policy = (object)[
+            'client_family' => '*',
+            'client_platform' => '*',
+            'user_agent' => 'clash.meta (FFQ Private Test Center by FFQ.LA)',
+            'min_version' => null,
+            'max_version' => null,
+        ];
+        $client = [
+            'client_family' => '其他 / 未识别',
+            'client_platform' => '未知',
+            'client_version' => null,
+            'user_agent' => 'clash.meta (FFQ Private Test Center by FFQ.LA)',
+        ];
+        $this->assertTrue(NodeEntryPoolService::clientPolicyMatches($policy, $client));
+        $client['user_agent'] = 'clash.meta';
+        $this->assertFalse(NodeEntryPoolService::clientPolicyMatches($policy, $client));
+    }
+
     public function testEventWindowUsesMonitoringBaselineWhenItIsMoreRecent()
     {
         $event = (object)[

@@ -92,16 +92,24 @@ class NodeEntryPoolService
 
     private function matchingPolicy($policies, array $client)
     {
+        return $policies->first(function ($policy) use ($client) {
+            return self::clientPolicyMatches($policy, $client);
+        });
+    }
+
+    public static function clientPolicyMatches($policy, array $client): bool
+    {
         $family = (string)($client['client_family'] ?? '');
         $platform = (string)($client['client_platform'] ?? '');
         $version = trim((string)($client['client_version'] ?? ''));
-        return $policies->first(function ($policy) use ($family, $platform, $version) {
-            if ($policy->client_family !== '*' && $policy->client_family !== $family) return false;
-            if ($policy->client_platform && $policy->client_platform !== '*' && $policy->client_platform !== $platform) return false;
-            if ($policy->min_version && ($version === '' || version_compare($version, $policy->min_version, '<'))) return false;
-            if ($policy->max_version && ($version === '' || version_compare($version, $policy->max_version, '>'))) return false;
-            return true;
-        });
+        $userAgent = trim((string)($client['user_agent'] ?? ''));
+        $requiredUserAgent = trim((string)($policy->user_agent ?? ''));
+        if ($requiredUserAgent !== '' && $requiredUserAgent !== $userAgent) return false;
+        if ($policy->client_family !== '*' && $policy->client_family !== $family) return false;
+        if ($policy->client_platform && $policy->client_platform !== '*' && $policy->client_platform !== $platform) return false;
+        if ($policy->min_version && ($version === '' || version_compare($version, $policy->min_version, '<'))) return false;
+        if ($policy->max_version && ($version === '' || version_compare($version, $policy->max_version, '>'))) return false;
+        return true;
     }
 
     public static function applyClashFallbackGroups(array &$config, array $servers): void

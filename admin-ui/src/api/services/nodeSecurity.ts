@@ -21,6 +21,7 @@ export interface EntryClientPolicy {
   id: number
   client_family: string
   client_platform?: string | null
+  user_agent?: string | null
   min_version?: string | null
   max_version?: string | null
   delivery_mode: EntryDeliveryMode
@@ -62,4 +63,3 @@ export const deleteEntry = (id: number) => post<boolean>(base('/entry/delete'), 
 export const saveEntryClientPolicy = (data: object) => post<boolean>(base('/entry-client-policy/save'), data, true)
 export const deleteEntryClientPolicy = (id: number) =>
   post<boolean>(base('/entry-client-policy/delete'), { id }, true)
-

@@ -21,6 +21,7 @@ class AppController extends Controller
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
             $client = (new UaClassifierService())->classify($request->userAgent());
+            $client['user_agent'] = trim((string)$request->userAgent());
             $servers = $serverService->getAvailableServers($user, $client);
         }
         $audit = new AuditService();

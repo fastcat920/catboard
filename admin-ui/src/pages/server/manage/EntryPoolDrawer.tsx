@@ -99,6 +99,7 @@ interface EntryForm {
 interface PolicyForm {
   client_family: string
   client_platform: string
+  user_agent?: string
   min_version?: string
   max_version?: string
   delivery_mode: EntryDeliveryMode
@@ -224,12 +225,14 @@ export function EntryPoolDrawer({ node, open, onClose, onChanged }: Props) {
         ? {
             ...policy,
             client_platform: policy.client_platform || '*',
+            user_agent: policy.user_agent || undefined,
             min_version: policy.min_version || undefined,
             max_version: policy.max_version || undefined,
           }
         : {
             client_family: '*',
             client_platform: '*',
+            user_agent: undefined,
             delivery_mode: pool?.delivery_mode ?? 'primary_only',
             visibility: defaultVisibility,
             priority: 100,
@@ -310,6 +313,12 @@ export function EntryPoolDrawer({ node, open, onClose, onChanged }: Props) {
 
   const policyColumns: TableColumnsType<EntryClientPolicy> = [
     { title: '客户端', render: (_, item) => (item.client_family === '*' ? '全部客户端' : item.client_family) },
+    {
+      title: 'UA 精确匹配',
+      width: 260,
+      ellipsis: true,
+      render: (_, item) => item.user_agent || <Typography.Text type="secondary">不限制</Typography.Text>,
+    },
     {
       title: '平台 / 版本',
       render: (_, item) => {
@@ -454,7 +463,7 @@ export function EntryPoolDrawer({ node, open, onClose, onChanged }: Props) {
               columns={policyColumns}
               dataSource={pool.client_policies}
               pagination={false}
-              scroll={{ x: 1000 }}
+              scroll={{ x: 1260 }}
               locale={{ emptyText: '尚未添加客户端规则，节点按上方可见范围处理' }}
             />
             {policyFormOpen && (
@@ -466,6 +475,15 @@ export function EntryPoolDrawer({ node, open, onClose, onChanged }: Props) {
                     <Col xs={24} md={12} lg={6}><Form.Item name="client_platform" label="平台"><Select options={CLIENT_PLATFORMS.map((value) => ({ value, label: value === '*' ? '全部平台' : value }))} /></Form.Item></Col>
                     <Col xs={12} lg={6}><Form.Item name="min_version" label="最低版本"><Input placeholder="留空不限" /></Form.Item></Col>
                     <Col xs={12} lg={6}><Form.Item name="max_version" label="最高版本"><Input placeholder="留空不限" /></Form.Item></Col>
+                    <Col xs={24}>
+                      <Form.Item
+                        name="user_agent"
+                        label="UA 精确匹配（可选）"
+                        extra="填写后仅完整 User-Agent 与此内容完全一致的请求命中；客户端与平台可选择全部。"
+                      >
+                        <Input.TextArea rows={2} maxLength={512} placeholder="例如：clash.meta (FFQ Private Test Center by FFQ.LA)" />
+                      </Form.Item>
+                    </Col>
                     <Col xs={24} md={12} lg={6}><Form.Item name="delivery_mode" label="下发模式" rules={[{ required: true }]}><Select options={DELIVERY_OPTIONS} /></Form.Item></Col>
                     <Col xs={24} md={12} lg={6}><Form.Item name="visibility" label="节点动作" rules={[{ required: true }]}><Select options={[{ value: 'show', label: '显示节点' }, { value: 'hide', label: '隐藏节点' }]} /></Form.Item></Col>
                     <Col xs={12} lg={6}><Form.Item name="priority" label="规则优先级" rules={[{ required: true }]}><InputNumber min={1} max={10000} style={{ width: '100%' }} /></Form.Item></Col>

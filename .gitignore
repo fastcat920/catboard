@@ -1,4 +1,6 @@
 /node_modules
+/resources/theme/default/node_modules
+/resources/theme/default/dist
 /config/v2board.php
 /public/hot
 /public/storage

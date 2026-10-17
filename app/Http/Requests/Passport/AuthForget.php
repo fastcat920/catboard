@@ -6,6 +6,17 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class AuthForget extends FormRequest
 {
+    protected function prepareForValidation()
+    {
+        $emailCode = $this->input('email_code');
+
+        if (is_int($emailCode) || is_float($emailCode)) {
+            $this->merge([
+                'email_code' => str_pad((string)$emailCode, 6, '0', STR_PAD_LEFT),
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

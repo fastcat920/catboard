@@ -54,7 +54,8 @@ class BEasyPaymentUSDT {
         $curl->close();
 
         if (!isset($result->status_code) || $result->status_code != 200) {
-            abort(500, "Failed to create order. Error: {$result->message}");
+            info('BEPUSDT order creation failed', ['message' => isset($result->message) ? $result->message : null]);
+            abort(500, __('Payment gateway request failed'));
         }
 
         $paymentURL = $result->data->payment_url;

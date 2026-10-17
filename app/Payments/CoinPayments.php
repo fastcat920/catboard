@@ -62,7 +62,7 @@ class CoinPayments {
     {
 
         if (!isset($params['merchant']) || $params['merchant'] != trim($this->config['coinpayments_merchant_id'])) {
-            abort(500, 'No or incorrect Merchant ID passed');
+            abort(500, __('Payment gateway configuration is invalid'));
         }
 
         $headers = getallheaders();
@@ -81,7 +81,7 @@ class CoinPayments {
         // }
 
         if (!hash_equals($hmac, $signHeader)) {
-            abort(400, 'HMAC signature does not match');
+            abort(400, __('Payment callback verification failed'));
         }
 
         // HMAC Signature verified at this point, load some variables.
@@ -95,7 +95,7 @@ class CoinPayments {
             ];
         } else if ($status < 0) {
             //payment error, this is usually final but payments will sometimes be reopened if there was no exchange rate conversion or with seller consent
-            abort(500, 'Payment Timed Out or Error');
+            abort(500, __('Payment gateway request failed'));
         } else {
             //payment is pending, you can optionally add a note to the order page
             return('IPN OK: pending');

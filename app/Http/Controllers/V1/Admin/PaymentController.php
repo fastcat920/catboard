@@ -65,6 +65,7 @@ class PaymentController extends Controller
         }
         $params = $request->validate([
             'name' => 'required',
+            'name_en' => 'nullable|string|max:255',
             'icon' => 'nullable',
             'payment' => 'required',
             'config' => 'required',

@@ -1,6 +1,7 @@
 import { Badge, Divider, Input, Radio, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useRef } from 'react'
 import type { Ticket } from '@/api/types'
+import { adminBasePath } from '@/app/settings'
 import { JsLink } from '@/components/JsLink'
 import { Loading } from '@/components/Loading'
 import { V2Table } from '@/components/table/V2Table'
@@ -15,7 +16,9 @@ const FIRST_PAGE = { pageSize: 10, current: 1 }
  * 打开工单对话（原版 toChat）：桌面端在 800×600 的新窗口打开，手机 / iPad 在当前页打开
  */
 function toChat(id: number) {
-  const url = `${window.location.origin}${window.location.pathname}#/ticket/${id}`
+  // 管理端使用 BrowserRouter，不能拼接旧版 hash 路由；否则会在 /ticket 列表页
+  // 后面附加 #/ticket/:id，桌面新窗口会再次加载列表，移动端也无法进入对话页。
+  const url = `${window.location.origin}${adminBasePath}/ticket/${id}`
   const ua = window.navigator.userAgent.toLowerCase()
   if (ua.indexOf('mobile') === -1 && ua.indexOf('ipad') === -1) {
     window.open(

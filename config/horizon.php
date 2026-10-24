@@ -180,7 +180,6 @@ return [
                     'send_email',
                     'send_email_mass',
                     'send_telegram',
-                    'node_security',
                 ],
                 'balance' => 'auto',
                 'minProcesses' => 1,

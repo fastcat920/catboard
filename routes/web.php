@@ -58,14 +58,6 @@ Route::get('/' . $securePath . '/legacy/{path?}', function () use ($securePath) 
     ]);
 })->where('path', '.*');
 
-Route::get('/' . $securePath . '/security/{path?}', function () use ($securePath) {
-    return view('security-admin', [
-        'title' => config('v2board.app_name', 'V2Board'),
-        'secure_path' => $securePath,
-        'version' => config('app.version'),
-    ]);
-})->where('path', '.*');
-
 // 兼容迁移阶段使用过的 /v2 地址，统一跳转到正式源码管理端。
 Route::get('/' . $securePath . '/v2/{path?}', function ($path = null) use ($securePath) {
     return redirect('/' . $securePath . ($path ? '/' . $path : ''));

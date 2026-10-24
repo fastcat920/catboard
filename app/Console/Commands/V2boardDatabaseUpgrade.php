@@ -73,8 +73,6 @@ class V2boardDatabaseUpgrade extends Command
         if (!Schema::hasTable('v2_security_setting')) {
             throw new RuntimeException('Security settings table is missing after migrations');
         }
-        $this->runDataUpgrade('database_upgrade.backfill_ua.v1', 'security:backfill-ua');
-        $this->runDataUpgrade('database_upgrade.backfill_access_snapshots.v1', 'security:backfill-access-snapshots');
         $this->info('Database upgrade completed. No manual migration or backfill command is required.');
         return 0;
     }

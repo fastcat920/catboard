@@ -114,7 +114,12 @@ class AliyunDnsService
         return $this->request($account, 'ReplaceCloudGtmInstanceConfigAddressPool', [
             'InstanceId' => $instanceId,
             'ConfigId' => $configId,
-            'AddressPools' => $pools,
+            // 阿里云 GTM API 的批量参数包含 AddressPool 集合节点，不能直接把
+            // 数组挂在 AddressPools 下，否则扁平化后会生成错误的参数路径，接口
+            // 可能将请求解释为空关联并移除当前域名的全部地址池。
+            'AddressPools' => [
+                'AddressPool' => array_values($pools),
+            ],
         ]);
     }
 
@@ -169,7 +174,10 @@ class AliyunDnsService
     {
         return $this->request($account, 'ReplaceCloudGtmAddressPoolAddress', [
             'AddressPoolId' => $poolId,
-            'Addresses' => $addresses,
+            // 与地址池替换接口相同，节点列表需要 Address 集合包装。
+            'Addresses' => [
+                'Address' => array_values($addresses),
+            ],
         ]);
     }
 

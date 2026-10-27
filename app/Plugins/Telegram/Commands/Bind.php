@@ -29,7 +29,7 @@ class Bind extends Telegram {
                 break;
             case 1:
                 if (!Cache::has("otpn_{$token}")) {
-                    abort(403, 'token is error');
+                    abort(403, __('Subscription token is invalid'));
                 }
                 $usertoken = Cache::get("otpn_{$token}");
                 $token = $usertoken;
@@ -44,16 +44,16 @@ class Bind extends Telegram {
                     $parts = explode(':', $idhash, 2);
                     [$userid, $clienthash] = $parts;
                     if (!$userid || !$clienthash) {
-                        abort(403, 'token is error');
+                        abort(403, __('Subscription token is invalid'));
                     }
                     $user = User::where('id', $userid)->select('token')->first();
                     if (!$user) {
-                        abort(403, 'token is error');
+                        abort(403, __('Subscription token is invalid'));
                     }
                     $usertoken = $user->token;
                     $hash = hash_hmac('sha1', $counterBytes, $usertoken, false);
                     if ($clienthash !== $hash) {
-                        abort(403, 'token is error');
+                        abort(403, __('Subscription token is invalid'));
                     }
                     Cache::put("totp_{$token}", $usertoken, $timestep);
                 }

@@ -173,6 +173,7 @@ return [
             'V2board' => [
                 'connection' => 'redis',
                 'queue' => [
+                    'default',
                     'order_handle',
                     'traffic_fetch',
                     'stat',

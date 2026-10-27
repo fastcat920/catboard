@@ -578,7 +578,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-B248Qz8u.js",
+    "file": "assets/index-CZb9nt0d.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -675,7 +675,7 @@
     "src": "src/assets/fonts/simple-line-icons/Simple-Line-Icons.woff2"
   },
   "src/pages/aliyun-dns/AliyunDnsPage.tsx": {
-    "file": "assets/AliyunDnsPage-DVbdaqX7.js",
+    "file": "assets/AliyunDnsPage-D6Mo3zP_.js",
     "name": "AliyunDnsPage",
     "src": "src/pages/aliyun-dns/AliyunDnsPage.tsx",
     "isDynamicEntry": true,

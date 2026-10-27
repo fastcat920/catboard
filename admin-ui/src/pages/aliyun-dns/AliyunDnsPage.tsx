@@ -1009,9 +1009,9 @@ export default function AliyunDnsPage() {
                 await unwrap(
                     attachDnsAddress({ ...context, pool_id: attach.pool?.id, address_id: resourceId, weight: 100 }),
                 )
-            message.success('资源已关联')
             setAttach(null)
             await loadTopology()
+            message.success('资源已关联')
         } finally {
             setSaving(false)
         }

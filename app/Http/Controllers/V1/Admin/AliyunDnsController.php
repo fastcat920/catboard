@@ -464,6 +464,10 @@ class AliyunDnsController extends Controller
         try {
             $full = $service->fullInfo($account, $data['instance_id'], $data['config_id']);
             $links = $this->poolLinks($full);
+            $remotePools = $this->listFrom($full['AddressPools'] ?? [], 'AddressPool');
+            if ($remotePools && !$links) {
+                throw new \RuntimeException('无法解析当前地址池关联关系，为避免误删请刷新后重试');
+            }
             foreach ($links as $link) {
                 if ($link['AddressPoolId'] === $data['pool_id']) {
                     throw new \RuntimeException('该地址池已关联当前接入域名');
@@ -476,6 +480,13 @@ class AliyunDnsController extends Controller
                 'RequestSource' => ['default'],
             ];
             $result = $service->replaceInstancePools($account, $data['instance_id'], $data['config_id'], $links);
+            $verified = $this->poolLinks($service->fullInfo($account, $data['instance_id'], $data['config_id']));
+            $verifiedIds = array_fill_keys(array_map(static fn ($link) => (string)$link['AddressPoolId'], $verified), true);
+            foreach ($links as $link) {
+                if (!isset($verifiedIds[(string)$link['AddressPoolId']])) {
+                    throw new \RuntimeException('阿里云未确认地址池关联结果，请刷新后重试');
+                }
+            }
         } catch (\Throwable $error) {
             throw ValidationException::withMessages(['pool' => $error->getMessage()]);
         }

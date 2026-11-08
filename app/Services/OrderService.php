@@ -238,7 +238,10 @@ class OrderService
         $notUsedTraffic = $nowUserTraffic - (($user->u + $user->d) / 1073741824);
         $remainingTrafficRatio = $notUsedTraffic / $nowUserTraffic;
         $result = $remainingTrafficRatio * $paidTotalAmount;
-        $order->surplus_amount = max($result, 0);
+        // All order amounts are stored in integer cents. Round the calculated
+        // float before it is used to reduce the new order, so the preview,
+        // persisted order and payment request cannot disagree by one cent.
+        $order->surplus_amount = (int)round(max($result, 0));
         $orderModel = Order::where('user_id', $user->id)->where('period', '!=', 'reset_price')->where('status', 3);
         $order->surplus_order_ids = array_column($orderModel->get()->toArray(), 'id');
     }
@@ -292,7 +295,11 @@ class OrderService
                                   $avgPricePerSecond * $laterMonthsSeconds;
         }
     
-        $order->surplus_amount = max($orderSurplusAmount, 0);
+        // Keep the replacement credit in integer cents. Previously the float
+        // was truncated in different places (preview vs. order persistence),
+        // which could make the displayed deduction and payable amount differ
+        // by one cent.
+        $order->surplus_amount = (int)round(max($orderSurplusAmount, 0));
         $order->surplus_order_ids = array_column($orders, 'id');
     }
 

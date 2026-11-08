@@ -32,11 +32,11 @@ class TicketController extends Controller
 
             $ticket['message'] = TicketMessage::where('ticket_id', $ticket->id)->get();
             for ($i = 0; $i < count($ticket['message']); $i++) {
-                if ($ticket['message'][$i]['user_id'] !== $ticket->user_id) {
-                    $ticket['message'][$i]['is_me'] = false;
-                } else {
-                    $ticket['message'][$i]['is_me'] = true;
-                }
+                $isUserMessage = (int)$ticket['message'][$i]['user_id'] === (int)$ticket->user_id;
+                $ticket['message'][$i]['is_me'] = $isUserMessage;
+                // Expose an explicit sender role so clients do not have to
+                // infer客服消息 from a legacy is_me field.
+                $ticket['message'][$i]['is_admin'] = !$isUserMessage;
             }
 
             return response(['data' => $ticket]);

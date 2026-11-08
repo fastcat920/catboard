@@ -394,7 +394,7 @@ const fetchTicketDetail = async (ticketId, isAutoRefresh = false) => {
           ...msg,
           // 添加is_admin属性用于前端显示（is_me表示是否是用户自己的消息）
           // 统一处理所有面板类型，is_admin表示"不是用户自己的消息"
-          is_admin: !msg.is_me
+          is_admin: msg.is_admin ?? !msg.is_me
         }));
       } else {
         ticketMessages.value = [];

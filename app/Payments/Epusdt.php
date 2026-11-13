@@ -79,14 +79,15 @@ class Epusdt
 
         if (!isset($result->status_code) || (int) $result->status_code !== 200) {
             $message = isset($result->message) ? $result->message : 'epusdt create order failed';
-            abort(500, $message);
+            info('Epusdt order creation failed', ['message' => $message]);
+            abort(500, __('Payment gateway request failed'));
         }
 
         $paymentUrl = $result->data->payment_url ?? null;
 
         if ($network !== '') {
             if (!isset($result->data->trade_id) || $result->data->trade_id === '') {
-                abort(500, 'epusdt create order response missing trade_id');
+                abort(500, __('Payment gateway request failed'));
             }
 
             $switchParams = [
@@ -108,14 +109,15 @@ class Epusdt
 
             if (!isset($switchResult->status_code) || (int) $switchResult->status_code !== 200) {
                 $message = isset($switchResult->message) ? $switchResult->message : 'epusdt switch network failed';
-                abort(500, $message);
+                info('Epusdt network switch failed', ['message' => $message]);
+                abort(500, __('Payment gateway request failed'));
             }
 
             $paymentUrl = $switchResult->data->payment_url ?? $paymentUrl;
         }
 
         if (empty($paymentUrl)) {
-            abort(500, 'epusdt payment url missing');
+            abort(500, __('Payment gateway request failed'));
         }
 
         return [

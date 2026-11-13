@@ -21,7 +21,9 @@ class NoticeController extends Controller
     {
         $data = $request->only([
             'title',
+            'title_en',
             'content',
+            'content_en',
             'img_url',
             'tags'
         ]);

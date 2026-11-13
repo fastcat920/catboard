@@ -21,7 +21,7 @@ class KnowledgeController extends Controller
             ]);
         }
         return response([
-            'data' => Knowledge::select(['title', 'id', 'updated_at', 'category', 'show'])
+            'data' => Knowledge::select(['title', 'title_en', 'id', 'updated_at', 'category', 'category_en', 'show'])
                 ->orderBy('sort', 'ASC')
                 ->get()
         ]);
@@ -39,6 +39,7 @@ class KnowledgeController extends Controller
         $params = $request->validated();
 
         if (!$request->input('id')) {
+            $params['language'] = 'zh-CN';
             if (!Knowledge::create($params)) {
                 abort(500, '创建失败');
             }

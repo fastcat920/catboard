@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Services\MailService;
 use App\Services\PlanService;
 use App\Services\OrderService;
+use App\Services\BalanceLedgerService;
 use Illuminate\Console\Command;
 use App\Models\User;
 use App\Models\Order;
@@ -73,9 +74,6 @@ class CheckRenewal extends Command
                     if (!$plan->renew) {
                         throw new Exception('This subscription cannot be renewed');
                     }
-                    if($user->balance < $plan[$latestPeriod]) {
-                        throw new Exception('No enough balance');
-                    }
 
                     DB::beginTransaction();
                     $order = new Order();
@@ -84,12 +82,18 @@ class CheckRenewal extends Command
                     $order->plan_id = $plan->id;
                     $order->period = $latestPeriod;
                     $order->trade_no = Helper::generateOrderNo();
-                    $order->balance_amount = $plan[$latestPeriod];
-                    $order->total_amount = 0;
+                    $order->total_amount = (int)$plan[$latestPeriod];
                     $orderService->setVipDiscount($user);
+                    if ($user->balance < $order->total_amount) {
+                        DB::rollBack();
+                        throw new Exception('No enough balance');
+                    }
+                    $order->balance_amount = $order->total_amount;
+                    $order->total_amount = 0;
                     $order->type = 2;
                     
-                    $user->balance = $user->balance - $plan[$latestPeriod];
+                    $balanceBefore = (int)$user->balance;
+                    $user->balance = $user->balance - $order->balance_amount;
                     $user->expired_at = $this->getTime($latestPeriod, $user->expired_at);
                     if (!$user->save()) {
                         DB::rollback();
@@ -100,6 +104,13 @@ class CheckRenewal extends Command
                         DB::rollback();
                         throw new Exception('自动续费失败');
                     }
+                    app(BalanceLedgerService::class)->record([
+                        'user_id' => $user->id, 'type' => 'purchase', 'amount' => -(int)$order->balance_amount,
+                        'balance_before' => $balanceBefore, 'balance_after' => (int)$user->balance,
+                        'source_key' => 'purchase:' . $order->id, 'source_type' => 'order',
+                        'source_id' => $order->id, 'order_id' => $order->id, 'trade_no' => $order->trade_no,
+                        'description' => '自动续费使用余额',
+                    ]);
                     DB::commit();
                     //$mailService->remindAutorenewal($user);
                 } catch (\Exception $e) {

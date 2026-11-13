@@ -41,7 +41,7 @@ class StripeALL {
         $currency = $this->config['currency'];
         $exchange = $this->exchange('CNY', strtoupper($currency));
         if (!$exchange) {
-            throw new abort('Currency conversion API failed', 500);
+            abort(500, __('Currency conversion has timed out, please try again later'));
         }
         //jump url
         $jumpUrl = null;
@@ -83,7 +83,7 @@ class StripeALL {
         $nextAction = null;
         
         if (!$stripeIntents['next_action']) {
-            throw new abort(__('Payment gateway request failed'));
+            abort(500, __('Payment gateway request failed'));
         }else {
             $nextAction = $stripeIntents['next_action'];
         }
@@ -94,14 +94,14 @@ class StripeALL {
                     $jumpUrl = $nextAction['alipay_handle_redirect']['url'];
                     $actionType = 1;
                 }else {
-                    throw new abort('unable get Alipay redirect url', 500);
+                    abort(500, __('Payment gateway request failed'));
                 }
                 break;
             case "wechat_pay":
                 if (isset($nextAction['wechat_pay_display_qr_code'])){
                     $jumpUrl = $nextAction['wechat_pay_display_qr_code']['data'];
                 }else {
-                    throw new abort('unable get WeChat Pay redirect url', 500);
+                    abort(500, __('Payment gateway request failed'));
                 }
         }
     } else {

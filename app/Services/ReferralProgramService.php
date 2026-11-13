@@ -262,13 +262,20 @@ class ReferralProgramService
 
     public function processCompletedOrder(Order $order): void
     {
-        if (!$order->invite_user_id || (int)$order->type !== 1 || (int)$order->status !== 3) return;
+        if (!$order->invite_user_id || !in_array((int)$order->type, [1, 2, 3], true) || (int)$order->status !== 3) return;
+        if ((int)$order->plan_id <= 0 || in_array($order->period, ['deposit', 'reset_price'], true)) return;
         $setting = $this->setting();
         if (!$setting || !$setting->enabled) return;
-        if ($order->total_amount < $setting->first_order_min) return;
+        // A trial is granted directly on the user without creating a purchase
+        // order. Its first paid purchase can therefore be a change or renewal.
+        $purchaseAmount = (int)$order->total_amount + (int)$order->balance_amount;
+        if ($purchaseAmount <= 0 || $purchaseAmount < (int)$setting->first_order_min) return;
         if (!Schema::hasTable('v2_referral_reward')) return;
 
         DB::transaction(function () use ($order, $setting) {
+            // Serialize effective-invite creation for this invited user.
+            $invitee = User::where('id', $order->user_id)->lockForUpdate()->first();
+            if (!$invitee) return;
             $effectiveKey = 'effective_invite:' . $order->user_id;
             $effectiveReward = ReferralReward::where('event_key', $effectiveKey)->lockForUpdate()->first();
             if ($effectiveReward && $effectiveReward->status !== 'reversed') return;
@@ -284,7 +291,6 @@ class ReferralProgramService
             if ($effectiveReward) $effectiveReward->fill($effectiveData)->save();
             else ReferralReward::create(array_merge(['event_key' => $effectiveKey], $effectiveData));
 
-            $invitee = User::find($order->user_id);
             if ($setting->invitee_reward > 0 && $invitee && $this->inviteeRewardEligible($invitee)) {
                 $this->grantMoney(
                     $invitee,

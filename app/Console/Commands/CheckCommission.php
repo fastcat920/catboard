@@ -72,6 +72,11 @@ class CheckCommission extends Command
             ->get();
         foreach ($orders as $order) {
             DB::beginTransaction();
+            $order = Order::where('id', $order->id)->lockForUpdate()->first();
+            if (!$order || (int)$order->commission_status !== 1) {
+                DB::rollBack();
+                continue;
+            }
             if (!$this->payHandle($order->invite_user_id, $order)) {
                 DB::rollBack();
                 continue;
@@ -100,10 +105,10 @@ class CheckCommission extends Command
             ];
         }
         for ($l = 0; $l < $level; $l++) {
-            $inviter = User::find($inviteUserId);
+            $inviter = User::where('id', $inviteUserId)->lockForUpdate()->first();
             if (!$inviter) continue;
             if (!isset($commissionShareLevels[$l])) continue;
-            $commissionBalance = $order->commission_balance * ($commissionShareLevels[$l] / 100);
+            $commissionBalance = (int)round($order->commission_balance * ($commissionShareLevels[$l] / 100));
             if (!$commissionBalance) continue;
             $balanceBefore = (int)$inviter->commission_balance;
             $walletBefore = (int)$inviter->balance;

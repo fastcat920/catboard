@@ -74,9 +74,6 @@ class CheckRenewal extends Command
                     if (!$plan->renew) {
                         throw new Exception('This subscription cannot be renewed');
                     }
-                    if($user->balance < $plan[$latestPeriod]) {
-                        throw new Exception('No enough balance');
-                    }
 
                     DB::beginTransaction();
                     $order = new Order();
@@ -85,13 +82,18 @@ class CheckRenewal extends Command
                     $order->plan_id = $plan->id;
                     $order->period = $latestPeriod;
                     $order->trade_no = Helper::generateOrderNo();
-                    $order->balance_amount = $plan[$latestPeriod];
-                    $order->total_amount = 0;
+                    $order->total_amount = (int)$plan[$latestPeriod];
                     $orderService->setVipDiscount($user);
+                    if ($user->balance < $order->total_amount) {
+                        DB::rollBack();
+                        throw new Exception('No enough balance');
+                    }
+                    $order->balance_amount = $order->total_amount;
+                    $order->total_amount = 0;
                     $order->type = 2;
                     
                     $balanceBefore = (int)$user->balance;
-                    $user->balance = $user->balance - $plan[$latestPeriod];
+                    $user->balance = $user->balance - $order->balance_amount;
                     $user->expired_at = $this->getTime($latestPeriod, $user->expired_at);
                     if (!$user->save()) {
                         DB::rollback();

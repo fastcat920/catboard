@@ -28,6 +28,16 @@ class OrderService
 
     public function open()
     {
+        return DB::transaction(function () {
+            $this->order = Order::where('id', $this->order->id)->lockForUpdate()->firstOrFail();
+            if ((int)$this->order->status !== 1) return;
+            User::where('id', $this->order->user_id)->lockForUpdate()->firstOrFail();
+            return $this->openLocked();
+        });
+    }
+
+    private function openLocked()
+    {
         $order = $this->order;
         $this->user = User::find($order->user_id);
         if ($order->type == 9) {
@@ -281,19 +291,9 @@ class OrderService
     
         $remainingTrafficRatio = ($totalTraffic - $usedTraffic) / $totalTraffic;
     
-        $avgPricePerSecond = $orderAmountSum / $orderRangeSecond;
-        if ($orderRangeSecond <= 31 * 86400) {
-            $remainingExpiredTimeRatio = $orderSurplusSecond / $orderRangeSecond;
-            $surplusRatio = min($remainingExpiredTimeRatio, $remainingTrafficRatio);
-            $orderSurplusAmount = $avgPricePerSecond * $orderSurplusSecond * $surplusRatio;
-        } else {
-            $monthSeconds = 30 * 86400;
-            $firstMonthRemainSeconds = $orderSurplusSecond % $monthSeconds;
-            $surplusRatio = min($firstMonthRemainSeconds / $monthSeconds, $remainingTrafficRatio);
-            $laterMonthsSeconds = $orderSurplusSecond - $firstMonthRemainSeconds;
-            $orderSurplusAmount = $avgPricePerSecond * $monthSeconds * $surplusRatio +
-                                  $avgPricePerSecond * $laterMonthsSeconds;
-        }
+        if ($orderRangeSecond <= 0) return;
+        $surplusRatio = max(0, min(1, $orderSurplusSecond / $orderRangeSecond, $remainingTrafficRatio));
+        $orderSurplusAmount = $orderAmountSum * $surplusRatio;
     
         // Keep the replacement credit in integer cents. Previously the float
         // was truncated in different places (preview vs. order persistence),
@@ -320,6 +320,16 @@ class OrderService
     }
 
     public function cancel():bool
+    {
+        return DB::transaction(function () {
+            $this->order = Order::where('id', $this->order->id)->lockForUpdate()->firstOrFail();
+            if ((int)$this->order->status === 2) return true;
+            if ((int)$this->order->status !== 0) return false;
+            return $this->cancelLocked();
+        });
+    }
+
+    private function cancelLocked():bool
     {
         $order = $this->order;
         DB::beginTransaction();

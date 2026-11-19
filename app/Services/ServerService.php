@@ -413,12 +413,8 @@ class ServerService
         $apiKey = (string) config('v2board.server_token', '');
         if ($apiKey === '') return null;
         return sprintf(
-            "work=\$(mktemp -d) && cd \"\$work\" && " .
-            "base=https://github.com/fastcat920/CatNode/releases/download/v0.3.0 && " .
-            "curl -fLO \"\$base/catnode-linux-amd64.tar.gz\" && " .
-            "curl -fLO \"\$base/catnode-linux-amd64.tar.gz.sha256\" && " .
-            "sha256sum -c catnode-linux-amd64.tar.gz.sha256 && tar -xzf catnode-linux-amd64.tar.gz && " .
-            "bash catnode-linux-amd64/install.sh --api-host %s --node-id %d --domain %s --port %d --api-key %s",
+            'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.3.0/bootstrap.sh && ' .
+            'bash catnode-install.sh --api-host %s --node-id %d --domain %s --port %d --api-key %s',
             escapeshellarg($panel), (int) $node['id'], escapeshellarg($node['host']), $port, escapeshellarg($apiKey)
         );
     }

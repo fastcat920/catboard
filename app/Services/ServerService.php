@@ -200,6 +200,15 @@ class ServerService
             $v2node[$key]['type'] = 'v2node';
             $v2node[$key]['last_check_at'] = Cache::get(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $v['id']));
             if (!in_array($user->group_id, $v['group_id'])) continue;
+            if ($v['protocol'] === 'fastcat-v2' && $v['parent_id']) {
+                $parent = $v2node[$v['parent_id']] ?? null;
+                if (!$parent || $parent['protocol'] !== 'fastcat-v2' || $parent['parent_id']
+                    || !in_array($user->group_id, $parent['group_id'])) {
+                    continue;
+                }
+                $v2node[$key]['_fastcat_managed_parent'] = (int) $parent['id'];
+                $v2node[$key]['_fastcat_managed_sni'] = $parent['host'];
+            }
             if (isset($v2node[$v['parent_id']])) {
                 $v2node[$key]['last_check_at'] = Cache::get(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $v['parent_id']));
                 $v2node[$key]['created_at'] = $v2node[$v['parent_id']]['created_at'];

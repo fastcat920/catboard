@@ -43,7 +43,7 @@ class FastCatManagedGrants
 
     public static function issue(array $server, int $user): ?array
     {
-        $id = (int) ($server['id'] ?? 0);
+        $id = (int) ($server['_fastcat_managed_parent'] ?? $server['id'] ?? 0);
         if ($id < 1 || $user < 1) return null;
         $dir = self::directory($id);
         $heartbeat = @filemtime($dir . '/heartbeat');
@@ -81,11 +81,17 @@ class FastCatManagedGrants
             fclose($lock);
         }
         $entry = ['type' => 'fastcat-auto', 'server' => $host, 'port' => $port, 'h3-port' => $port, 'udp' => true];
+        $sni = $server['_fastcat_managed_sni'] ?? $host;
+        if (!is_string($sni) || !filter_var($sni, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
+        if ($sni !== $host) {
+            $entry['sni'] = $sni;
+            $entry['h3-sni'] = $sni;
+        }
         $ipv4 = $server['tls_settings']['fastcat_endpoint_ipv4'] ?? null;
         if (is_string($ipv4) && filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             $entry['server'] = $ipv4;
-            $entry['sni'] = $host;
-            $entry['h3-sni'] = $host;
+            $entry['sni'] = $sni;
+            $entry['h3-sni'] = $sni;
         }
         return $entry + $grant;
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\Server;
 
 use App\Http\Controllers\Controller;
 use App\Services\FastCatManagedGrants;
+use App\Models\ServerV2node;
 use App\Services\ServerService;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,13 @@ class FastCatController extends Controller
         $id = (int) $params['node_id'];
         $node = $servers->getServer($id, 'v2node');
         abort_unless($node && $node['protocol'] === 'fastcat-v2', 404);
-        $eligible = $node['show'] ? array_fill_keys($servers->getAvailableUsers($node['group_id'])->pluck('id')->all(), true) : [];
+        $groups = $node['group_id'] ?? [];
+        if (!$node['show']) {
+            $childGroups = ServerV2node::where('parent_id', $id)->where('protocol', 'fastcat-v2')
+                ->where('show', 1)->get(['group_id'])->pluck('group_id')->flatten()->all();
+            $groups = array_values(array_intersect($groups, $childGroups));
+        }
+        $eligible = $groups ? array_fill_keys($servers->getAvailableUsers($groups)->pluck('id')->all(), true) : [];
         return response()->json(FastCatManagedGrants::snapshot($id, $eligible), 200, ['Cache-Control' => 'private, no-store']);
     }
 }

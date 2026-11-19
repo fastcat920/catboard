@@ -31,6 +31,12 @@ class AdminRoute
             $router->get ('/server/route/fetch', 'V1\\Admin\\Server\\RouteController@fetch');
             $router->post('/server/route/save', 'V1\\Admin\\Server\\RouteController@save');
             $router->post('/server/route/drop', 'V1\\Admin\\Server\\RouteController@drop');
+            $router->get ('/security/entry-pools', 'V1\\Admin\\NodeEntryPoolController@entryPools');
+            $router->post('/security/entry-setting/save', 'V1\\Admin\\NodeEntryPoolController@saveEntrySetting');
+            $router->post('/security/entry/save', 'V1\\Admin\\NodeEntryPoolController@saveEntry');
+            $router->post('/security/entry/delete', 'V1\\Admin\\NodeEntryPoolController@deleteEntry');
+            $router->post('/security/entry-client-policy/save', 'V1\\Admin\\NodeEntryPoolController@saveEntryClientPolicy');
+            $router->post('/security/entry-client-policy/delete', 'V1\\Admin\\NodeEntryPoolController@deleteEntryClientPolicy');
             $router->get ('/server/manage/getNodes', 'V1\\Admin\\Server\\ManageController@getNodes');
             $router->post('/server/manage/sort', 'V1\\Admin\\Server\\ManageController@sort');
             $router->group([

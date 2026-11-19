@@ -412,7 +412,7 @@ class ServerService
             || !filter_var($node['host'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
         return sprintf(
             "work=\$(mktemp -d) && cd \"\$work\" && " .
-            "base=https://github.com/fastcat920/CatNode/releases/download/v0.2.0 && " .
+            "base=https://github.com/fastcat920/CatNode/releases/download/v0.3.0 && " .
             "curl -fLO \"\$base/catnode-linux-amd64.tar.gz\" && " .
             "curl -fLO \"\$base/catnode-linux-amd64.tar.gz.sha256\" && " .
             "sha256sum -c catnode-linux-amd64.tar.gz.sha256 && tar -xzf catnode-linux-amd64.tar.gz && " .

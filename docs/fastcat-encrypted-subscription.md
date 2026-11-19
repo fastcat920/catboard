@@ -78,3 +78,13 @@ php artisan fastcat:auto export vless:42 --out=/srv/catboard-private/snapshot-v2
 
 原生 FastCat v2 仅对启用 v2 订阅的已授权设备下发。当前 CatNode 使用独立
 授权文件。这套配置用于连通性验收，FastCat v2 按账号流量上报仍需接入后再启用正式计费。
+
+#### CatNode 自动同步模式
+
+CatNode 配置面板 HTTPS 地址、节点数字 ID 和节点通讯 Token 后，会定期通过
+`GET /api/v1/server/fastCat/grants` 拉取授权。完成首次拉取后，已通过设备
+证明的快猫刷新订阅时自动签发凭证，H2/H3 使用独立令牌。面板以节点记录的
+连接地址和连接端口下发两个入口。原有设备证明配置继续使用。
+自动模式下无需创建 `endpoints.json`、执行授权导出或在两台服务器间复制
+设备令牌。已签发的设备授权需由订阅刷新续期，账号失去节点资格后会从授权
+快照移除。多实例部署须共享私有的 `storage/app/fastcat-v2` 目录。

@@ -15,7 +15,7 @@ class FastCatV1 extends ClashMeta
     public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null)
     {
         $directory = (string) config('fastcat.auto_grants_dir', '');
-        if ($supportsAuto && $directory !== '' && $user['u'] + $user['d'] < $user['transfer_enable']) {
+        if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
             $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device);
         } else {
             $servers = FastCatAutoGrants::apply($servers, 0, '');

@@ -7,7 +7,7 @@ class FastCatAutoGrants
     /** Resolve existing authorized logical nodes, after plan, visibility and audit filtering. */
     public static function apply(array $servers, int $userId, string $directory, ?string $device = null): array
     {
-        if ($userId <= 0 || $directory === '') {
+        if ($userId <= 0) {
             return array_values(array_filter($servers, static function ($server) {
                 return ($server['protocol'] ?? '') !== 'fastcat-v2';
             }));
@@ -28,13 +28,16 @@ class FastCatAutoGrants
                 continue;
             }
             if (!array_key_exists($key, $lookups)) {
-                $root = $directory . '/' . $key;
-                $entry = self::record($root . '/endpoints.json');
-                // An existing HTTP/2 + v1 node stays available during a staged rollout.
-                $useDevice = $device !== null && isset($entry['h3-port']);
-                $lookups[$key] = $nativeV2 && !$useDevice
-                    ? null
-                    : self::lookup($root, $userId, $useDevice ? $device : null);
+                $lookups[$key] = $nativeV2 ? FastCatManagedGrants::issue($server, $userId, $device) : null;
+                if ($lookups[$key] === null && $directory !== '') {
+                    $root = $directory . '/' . $key;
+                    $entry = self::record($root . '/endpoints.json');
+                    // An existing HTTP/2 + v1 node stays available during a staged rollout.
+                    $useDevice = $device !== null && isset($entry['h3-port']);
+                    $lookups[$key] = $nativeV2 && !$useDevice
+                        ? null
+                        : self::lookup($root, $userId, $useDevice ? $device : null);
+                }
             }
             $node = $lookups[$key];
             if ($node === null) {

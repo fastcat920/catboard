@@ -42,8 +42,8 @@ class ClientController extends Controller
                     $request->header('X-FastCat-Device-Grant', ''), (string)$request->query('token'),
                     (string)config('fastcat.device_grant_key', ''), time()
                 ) : null;
-                $auto = $request->query('fc_auto') === '1' && (!$v2 || $device !== null || config('fastcat.device_grant_key', '') === '');
-                $class = new FastCatV1($user, $servers, $auto, $device);
+                $auto = $request->query('fc_auto') === '1';
+                $class = new FastCatV1($user, $servers, $auto, $device, $v2);
                 return $this->auditedResponse($audit, $request, $class->handle());
             }
             if($flag) {

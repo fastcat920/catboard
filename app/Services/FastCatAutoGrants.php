@@ -5,7 +5,7 @@ namespace App\Services;
 class FastCatAutoGrants
 {
     /** Resolve existing authorized logical nodes, after plan, visibility and audit filtering. */
-    public static function apply(array $servers, int $userId, string $directory, ?string $device = null): array
+    public static function apply(array $servers, int $userId, string $directory, ?string $device = null, bool $managedV2 = false): array
     {
         if ($userId <= 0) {
             return array_values(array_filter($servers, static function ($server) {
@@ -21,14 +21,13 @@ class FastCatAutoGrants
                 continue;
             }
             $nativeV2 = ($server['protocol'] ?? '') === 'fastcat-v2';
-            if ($nativeV2 && $device === null) continue;
             $key = ($server['type'] ?? '') . ':' . ($server['id'] ?? '');
             if (!preg_match('/^[a-z][a-z0-9]*:[1-9][0-9]*$/D', $key)) {
                 if (!$nativeV2) $output[] = $server;
                 continue;
             }
             if (!array_key_exists($key, $lookups)) {
-                $lookups[$key] = $nativeV2 ? FastCatManagedGrants::issue($server, $userId, $device) : null;
+                $lookups[$key] = $nativeV2 && $managedV2 ? FastCatManagedGrants::issue($server, $userId) : null;
                 if ($lookups[$key] === null && $directory !== '') {
                     $root = $directory . '/' . $key;
                     $entry = self::record($root . '/endpoints.json');

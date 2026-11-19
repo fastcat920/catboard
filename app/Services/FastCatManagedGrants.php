@@ -24,7 +24,7 @@ class FastCatManagedGrants
         $h2 = [];
         $h3 = [];
         foreach (new \FilesystemIterator($dir) as $file) {
-            if (!preg_match('/^([1-9][0-9]*)\.dev_[0-9a-f]{24}\.json$/D', $file->getFilename(), $parts)
+            if (!preg_match('/^([1-9][0-9]*)\.account\.json$/D', $file->getFilename(), $parts)
                 || !isset($eligible[(int) $parts[1]])
                 || $file->getMTime() < time() - self::GRANT_TTL) {
                 continue;
@@ -41,10 +41,10 @@ class FastCatManagedGrants
         return ['h2' => $h2, 'h3' => $h3];
     }
 
-    public static function issue(array $server, int $user, string $device): ?array
+    public static function issue(array $server, int $user): ?array
     {
         $id = (int) ($server['id'] ?? 0);
-        if ($id < 1 || $user < 1 || !preg_match('/^dev_[0-9a-f]{24}$/D', $device)) return null;
+        if ($id < 1 || $user < 1) return null;
         $dir = self::directory($id);
         $heartbeat = @filemtime($dir . '/heartbeat');
         if ($heartbeat === false || $heartbeat < time() - 45) return null;
@@ -54,7 +54,7 @@ class FastCatManagedGrants
         if (!is_string($host) || !filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)
             || $port < 1 || $port > 65535) return null;
 
-        $file = $dir . '/' . $user . '.' . $device . '.json';
+        $file = $dir . '/' . $user . '.account.json';
         $lock = fopen($dir . '/.lock', 'c');
         if (!$lock) throw new \RuntimeException('Could not open managed authorization lock.');
         try {

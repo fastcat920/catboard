@@ -1,4 +1,5 @@
-import { Input, Select } from 'antd'
+import { copyText } from '@/utils/clipboard'
+import { Button, Input, Select } from 'antd'
 import { JsLink } from '@/components/JsLink'
 import { json4, NetworkSettingsEditor, PaddingSchemeEditor } from './editors'
 import { EncryptionSettings, TlsSettings } from './settings'
@@ -196,6 +197,34 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           </div>
           {protocol === 'fastcat-v2' && (
             <div className="form-group">
+              <label>协议组合</label>
+              <Select
+                style={{ width: '100%' }}
+                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_transport_mode) || 'auto'}
+                options={[
+                  { value: 'auto', label: server.parent_id ? '跟随父节点' : '自动（HTTP/2 + HTTP/3）' },
+                  { value: 'h2', label: '仅 HTTP/2' },
+                  { value: 'h3', label: '仅 HTTP/3' },
+                ]}
+                onChange={(value) => setServer((s) => ({
+                  ...s,
+                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_transport_mode: value },
+                }))}
+              />
+              <label>密钥交换</label>
+              <Select
+                style={{ width: '100%' }}
+                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_tls_key_exchange) || 'default'}
+                options={[
+                  { value: 'default', label: '默认协商' },
+                  { value: 'x25519', label: 'X25519' },
+                  { value: 'x25519mlkem768', label: 'X25519MLKEM768' },
+                ]}
+                onChange={(value) => setServer((s) => ({
+                  ...s,
+                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_tls_key_exchange: value },
+                }))}
+              />
               <label>入口 IPv4（可选）</label>
               <Input
                 placeholder="直接拨号此 IP，证书仍按连接域名校验"
@@ -332,14 +361,19 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           <ParentField type="v2node" server={server} change={formChange} />
           <RouteField server={server} change={formChange} />
           <div className="form-group">
-            <label>一键安装指令</label>
-            {protocol === 'fastcat-v2' ? <p>请在 CatNode 服务器配置 FastCat v2 入口。</p> : <Input.TextArea
+            <label>{protocol === 'fastcat-v2' && server.parent_id ? '前置转发配置（Nginx stream）' : '一键安装指令'}</label>
+            {protocol === 'fastcat-v2' && (
+              <Button disabled={!server.install_command} onClick={() => copyText(text(server.install_command))}>
+                {server.parent_id ? '复制前置转发配置' : '复制 CatNode 部署命令'}
+              </Button>
+            )}
+            <Input.TextArea
               value={text(server.install_command)}
               rows={4}
               readOnly
               // 皮肤里取 --v2b-readonly-bg（见 styles/skins/_shell.scss），legacy 下为原值
               style={{ backgroundColor: 'var(--v2b-readonly-bg, #f5f5f5a0)', cursor: 'text' }}
-            />}
+            />
           </div>
         </div>
         <DrawerActions saving={saving} onCancel={onShow} onSave={submit} />

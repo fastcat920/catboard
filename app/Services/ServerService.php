@@ -207,6 +207,7 @@ class ServerService
                     continue;
                 }
                 $v2node[$key]['_fastcat_managed_parent'] = (int) $parent['id'];
+                $v2node[$key]['_fastcat_parent_mode'] = $parent['tls_settings']['fastcat_transport_mode'] ?? 'auto';
                 $v2node[$key]['_fastcat_managed_sni'] = $parent['host'];
             }
             if (isset($v2node[$v['parent_id']])) {
@@ -388,6 +389,38 @@ class ServerService
         return $servers;
     }
 
+    private function fastCatDeployCommand(array $node, string $panel): ?string
+    {
+        $port = filter_var($node['server_port'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]);
+        if (!$port) return null;
+        if ($node['parent_id']) {
+            $parent = $this->getServer((int) $node['parent_id'], 'v2node');
+            if (!$parent || $parent['protocol'] !== 'fastcat-v2' || $parent['parent_id']) return null;
+            $host = $parent['tls_settings']['fastcat_endpoint_ipv4'] ?? $parent['host'];
+            $targetPort = filter_var($parent['port'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]);
+            if (!$targetPort || !filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
+            $parentMode = $parent['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+            $childMode = $node['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+            $mode = $childMode === 'auto' ? $parentMode : $childMode;
+            if ($parentMode !== 'auto' && $mode !== $parentMode) return null;
+            $streams = [];
+            if ($mode !== 'h3') $streams[] = sprintf('server { listen %d; proxy_pass %s:%d; }', $port, $host, $targetPort);
+            if ($mode !== 'h2') $streams[] = sprintf('server { listen %d udp reuseport; proxy_pass %s:%d; proxy_timeout 10m; }', $port, $host, $targetPort);
+            return implode("\n", $streams);
+        }
+        if (parse_url($panel, PHP_URL_SCHEME) !== 'https' || !parse_url($panel, PHP_URL_HOST)
+            || !filter_var($node['host'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
+        return sprintf(
+            "work=\$(mktemp -d) && cd \"\$work\" && " .
+            "base=https://github.com/fastcat920/CatNode/releases/download/v0.2.0 && " .
+            "curl -fLO \"\$base/catnode-linux-amd64.tar.gz\" && " .
+            "curl -fLO \"\$base/catnode-linux-amd64.tar.gz.sha256\" && " .
+            "sha256sum -c catnode-linux-amd64.tar.gz.sha256 && tar -xzf catnode-linux-amd64.tar.gz && " .
+            "bash catnode-linux-amd64/install.sh --api-host %s --node-id %d --domain %s --port %d",
+            escapeshellarg($panel), (int) $node['id'], escapeshellarg($node['host']), $port
+        );
+    }
+
     public function getAllV2node()
     {
         $servers = ServerV2node::orderBy('sort', 'ASC')
@@ -399,11 +432,12 @@ class ServerService
                 $servers[$k]['padding_scheme'] = json_encode($v['padding_scheme']);
             }
 
+            $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
             if (($v['protocol'] ?? '') === 'fastcat-v2') {
+                $servers[$k]['install_command'] = $this->fastCatDeployCommand($v, (string) $apiHost);
                 continue;
             }
 
-            $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
             $apiKey = config('v2board.server_token', '');
             $nodeId = (int) $v['id'];
             $apiHostArg = escapeshellarg((string) $apiHost);

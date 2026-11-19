@@ -26,6 +26,8 @@ class FastCatController extends Controller
             $groups = array_values(array_intersect($groups, $childGroups));
         }
         $eligible = $groups ? array_fill_keys($servers->getAvailableUsers($groups)->pluck('id')->all(), true) : [];
-        return response()->json(FastCatManagedGrants::snapshot($id, $eligible), 200, ['Cache-Control' => 'private, no-store']);
+        $mode = $request->header('X-FastCat-Transport-Modes') === '1'
+            ? ($node['tls_settings']['fastcat_transport_mode'] ?? 'auto') : 'auto';
+        return response()->json(FastCatManagedGrants::snapshot($id, $eligible, $mode), 200, ['Cache-Control' => 'private, no-store']);
     }
 }

@@ -11,13 +11,13 @@ class FastCatManagedGrants
         return storage_path('app/fastcat-v2/' . $id);
     }
 
-    public static function snapshot(int $id, array $eligible): array
+    public static function snapshot(int $id, array $eligible, string $mode = 'auto'): array
     {
         $dir = self::directory($id);
         if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) {
             throw new \RuntimeException('Could not create node authorization directory.');
         }
-        if (!touch($dir . '/heartbeat')) {
+        if (file_put_contents($dir . '/heartbeat', $mode, LOCK_EX) !== strlen($mode)) {
             throw new \RuntimeException('Could not record node authorization heartbeat.');
         }
 
@@ -38,16 +38,23 @@ class FastCatManagedGrants
             $h3[] = $grant['h3-token'];
         }
 
-        return ['h2' => $h2, 'h3' => $h3];
+        return ['h2' => $h2, 'h3' => $h3, 'transport_mode' => $mode];
     }
 
-    public static function issue(array $server, int $user): ?array
+    public static function issue(array $server, int $user, bool $transportModes = false): ?array
     {
         $id = (int) ($server['_fastcat_managed_parent'] ?? $server['id'] ?? 0);
         if ($id < 1 || $user < 1) return null;
         $dir = self::directory($id);
         $heartbeat = @filemtime($dir . '/heartbeat');
         if ($heartbeat === false || $heartbeat < time() - 45) return null;
+
+        $configured = $server['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+        $parentMode = $server['_fastcat_parent_mode'] ?? $configured;
+        $mode = ($configured === 'auto') ? $parentMode : $configured;
+        if (($parentMode !== 'auto' && $mode !== $parentMode)
+            || ($parentMode !== 'auto' && @file_get_contents($dir . '/heartbeat') !== $parentMode)
+            || ($mode === 'h3' && !$transportModes)) return null;
 
         $host = $server['host'] ?? '';
         $port = (int) ($server['port'] ?? 0);
@@ -92,6 +99,14 @@ class FastCatManagedGrants
             $entry['server'] = $ipv4;
             $entry['sni'] = $sni;
             $entry['h3-sni'] = $sni;
+        }
+        $entry['tls-key-exchange'] = $server['tls_settings']['fastcat_tls_key_exchange'] ?? 'default';
+        if ($mode === 'h2') {
+            $entry['type'] = 'fastcat-h2';
+            $entry['udp'] = false;
+            unset($entry['h3-port'], $entry['h3-sni'], $grant['h3-token']);
+        } elseif ($mode === 'h3') {
+            $entry['transport-mode'] = 'h3';
         }
         return $entry + $grant;
     }

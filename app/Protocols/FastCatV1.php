@@ -12,11 +12,11 @@ class FastCatV1 extends ClashMeta
 
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
 
-    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false)
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false)
     {
         $directory = (string) config('fastcat.auto_grants_dir', '');
         if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
-            $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2);
+            $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2, $transportModes);
         } else {
             $servers = FastCatAutoGrants::apply($servers, 0, '');
         }

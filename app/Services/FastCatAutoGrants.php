@@ -5,7 +5,7 @@ namespace App\Services;
 class FastCatAutoGrants
 {
     /** Resolve existing authorized logical nodes, after plan, visibility and audit filtering. */
-    public static function apply(array $servers, int $userId, string $directory, ?string $device = null, bool $managedV2 = false): array
+    public static function apply(array $servers, int $userId, string $directory, ?string $device = null, bool $managedV2 = false, bool $transportModes = false): array
     {
         if ($userId <= 0) {
             return array_values(array_filter($servers, static function ($server) {
@@ -27,8 +27,9 @@ class FastCatAutoGrants
                 continue;
             }
             if (!array_key_exists($key, $lookups)) {
-                $lookups[$key] = $nativeV2 && $managedV2 ? FastCatManagedGrants::issue($server, $userId) : null;
-                if ($lookups[$key] === null && $directory !== '') {
+                $lookups[$key] = $nativeV2 && $managedV2 ? FastCatManagedGrants::issue($server, $userId, $transportModes) : null;
+                if ($lookups[$key] === null && $directory !== '' &&
+                    (!$nativeV2 || ($server['tls_settings']['fastcat_transport_mode'] ?? 'auto') === 'auto')) {
                     $root = $directory . '/' . $key;
                     $entry = self::record($root . '/endpoints.json');
                     // An existing HTTP/2 + v1 node stays available during a staged rollout.

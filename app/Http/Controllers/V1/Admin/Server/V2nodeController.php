@@ -50,6 +50,7 @@ class V2nodeController extends Controller
                 'host' => 'required|string|max:253',
                 'port' => 'required|integer|min:1|max:65535',
                 'server_port' => 'required|integer|min:1|max:65535',
+                'tls_settings.fastcat_endpoint_ipv4' => 'nullable|ipv4',
             ]);
             $params['tls'] = 1;
             $params['network'] = 'tcp';

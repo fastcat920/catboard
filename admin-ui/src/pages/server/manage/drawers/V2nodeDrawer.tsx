@@ -194,6 +194,19 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               </div>
             )}
           </div>
+          {protocol === 'fastcat-v2' && (
+            <div className="form-group">
+              <label>入口 IPv4（可选）</label>
+              <Input
+                placeholder="直接拨号此 IP，证书仍按连接域名校验"
+                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_endpoint_ipv4)}
+                onChange={(e) => setServer((s) => ({
+                  ...s,
+                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_endpoint_ipv4: e.target.value.trim() || null },
+                }))}
+              />
+            </div>
+          )}
           {protocol == 'shadowsocks' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}

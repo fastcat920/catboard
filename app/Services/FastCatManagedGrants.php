@@ -80,7 +80,14 @@ class FastCatManagedGrants
         } finally {
             fclose($lock);
         }
-        return ['type' => 'fastcat-auto', 'server' => $host, 'port' => $port, 'h3-port' => $port, 'udp' => true] + $grant;
+        $entry = ['type' => 'fastcat-auto', 'server' => $host, 'port' => $port, 'h3-port' => $port, 'udp' => true];
+        $ipv4 = $server['tls_settings']['fastcat_endpoint_ipv4'] ?? null;
+        if (is_string($ipv4) && filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $entry['server'] = $ipv4;
+            $entry['sni'] = $host;
+            $entry['h3-sni'] = $host;
+        }
+        return $entry + $grant;
     }
 
     private static function validToken($token): bool

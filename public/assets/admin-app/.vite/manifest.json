@@ -578,7 +578,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-C1gKhjWp.js",
+    "file": "assets/index-Cjj8mgoa.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -1173,7 +1173,7 @@
     ]
   },
   "src/pages/server/manage/ServerManagePage.tsx": {
-    "file": "assets/ServerManagePage-D-OtzjBu.js",
+    "file": "assets/ServerManagePage-C6vmStFn.js",
     "name": "ServerManagePage",
     "src": "src/pages/server/manage/ServerManagePage.tsx",
     "isDynamicEntry": true,

@@ -23,6 +23,7 @@ class FastCatManagedGrants
 
         $h2 = [];
         $h3 = [];
+        $accounts = [];
         foreach (new \FilesystemIterator($dir) as $file) {
             if (!preg_match('/^([1-9][0-9]*)\.account\.json$/D', $file->getFilename(), $parts)
                 || !isset($eligible[(int) $parts[1]])
@@ -36,9 +37,10 @@ class FastCatManagedGrants
             }
             $h2[] = $grant['token'];
             $h3[] = $grant['h3-token'];
+            $accounts[] = (int) $parts[1];
         }
 
-        return ['h2' => $h2, 'h3' => $h3, 'transport_mode' => $mode];
+        return ['h2' => $h2, 'h3' => $h3, 'transport_mode' => $mode, 'account_ids' => $accounts];
     }
 
     public static function issue(array $server, int $user, bool $transportModes = false): ?array

@@ -2,6 +2,7 @@
 
 namespace App\Protocols;
 
+use App\Services\FastCatAutoGrants;
 use App\Services\FastCatSubscriptionCipher;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
@@ -10,6 +11,22 @@ class FastCatV1 extends ClashMeta
     public $flag = 'fastcat-v1';
 
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
+
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null)
+    {
+        $directory = (string) config('fastcat.auto_grants_dir', '');
+        if ($supportsAuto && $directory !== '' && $user['u'] + $user['d'] < $user['transfer_enable']) {
+            $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device);
+        } else {
+            $servers = FastCatAutoGrants::apply($servers, 0, '');
+        }
+        parent::__construct($user, $servers);
+    }
+
+    protected function buildCustomProxy(array $server): ?array
+    {
+        return $server['_fastcat_auto_proxy'] ?? null;
+    }
 
     public function handle()
     {
@@ -34,7 +51,7 @@ class FastCatV1 extends ClashMeta
 
     public static function removeHiddenProxyGroups(array $config): array
     {
-        $groups = $config['proxy-groups'] ?? [];
+        $groups = $config['proxy-groups'] ?? null;
         if (!is_array($groups)) {
             return $config;
         }

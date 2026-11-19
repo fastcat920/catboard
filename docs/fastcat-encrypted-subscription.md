@@ -33,3 +33,48 @@ php artisan config:cache
 The matching FastCat client build must receive both IDs and keys through its
 `--dart-define` build environment. To rotate, publish a client containing the
 next key before changing `FASTCAT_ACTIVE_KID` to that key's ID.
+
+## Android 自动双入口节点
+
+安装包含 `fastCatSupportsAutoV1` 能力的 Android 核心后，订阅请求会带 `flag=fastcat-v1&fc_auto=1`。面板在原有账户、节点可见性和审计筛选之后，只为已登记的账户与节点签发自动配置。既有设备、未登记的账户和其他订阅格式沿用各自的配置。单个自动节点支持 TCP，首页沿用面板的节点名称。HTTP/2 使用顶层 `server`、`port`、`sni`、`token`，HTTPS v1 使用 `fallback-port`、`fallback-token` 与可选的 `fallback-server`、`fallback-sni`。两个入口都应验证有效的 TLS 证书。
+
+在面板设置 `FASTCAT_AUTO_GRANTS_DIR` 为 Web 根目录外的私有绝对路径，留空即关闭。如果使用 Laravel 配置缓存，按部署流程刷新缓存。面板多实例需要读取同一份授权数据，授权操作应在同一个支持文件锁和原子重命名的文件系统进行。以下以已存在、该账号有权使用的面板节点 `vless:42` 及账户 71 为例。路径和保留示例域名仅用于说明。以面板服务的系统账户操作：
+
+```sh
+umask 077
+install -d -m 700 /srv/catboard-private/fastcat/vless:42
+cat > /srv/catboard-private/fastcat/vless:42/endpoints.json <<'JSON'
+{"server":"hk.example.net","port":18444,"fallback-port":8443}
+JSON
+php artisan fastcat:auto grant vless:42 71
+php artisan fastcat:auto export vless:42 --out=/srv/catboard-private/snapshot-001
+```
+
+同一账户重复 grant 保留其两份凭据。导出每次重新检查节点可见状态、允许的套餐组、账户到期、禁用和剩余流量。导出的目录必须是新路径，含 `h2.tokens` 和 `v1.tokens`。通过受保护的部署通道以 0600 原子替换两台入口各自的 `-tokens-file` 文件，对两个进程发送 SIGHUP 并核对载入成功，再让用户刷新订阅。带令牌的授权目录和导出目录仅给相应服务账户访问，完成分发后清理旧快照。所有账户均被移除时，导出两个空文件，重新载入后拒绝所有新请求。
+
+撤销账户 71 时执行 `php artisan fastcat:auto revoke vless:42 71`，随后导出到新目录并替换、重载两端的凭据。账户过期、套餐变更和用量变化后，也要重新导出并同步才能让节点执行新的授权状态。审计封禁、设备撤销或凭据泄露需要主动撤销相应账户授权；按账户发出的令牌适用于该账户的已授权设备。可将撤销、导出和受保护的同步接入运营方的生命周期任务。已建立的流按服务端既有连接生命周期结束。两端服务的按账户用量回传和速率限制属于独立的生产计量链路，需由运营部署接入。面板和示例不附带任何生产令牌。
+
+## v2 的设备级授权
+
+具备 v2 核心的 Android 使用 `fc_auto=1&fc_v2=1`。设备网关验证设备会话后向面板添加绑定该账户上游订阅 token 和设备记录 ID 的签名。网关与面板设置同一个至少 32 字节的私有 `FASTCAT_DEVICE_GRANT_KEY`。校验允许的时钟偏差为 60 秒。面板已配密钥时，缺少有效证明或没有设备授权的请求只保留原有订阅节点。未设置密钥的旧部署仍使用已有账户级路径。旧客户端只声明 `fc_auto` 时仍可使用已签发的账户级授权。
+
+在节点的 `endpoints.json` 增加 `"h3-port":18444`，可选 `h3-server`、`h3-sni` 和 `tls-key-exchange`。在已登记节点、账户和真实设备记录 ID 上执行：
+
+```sh
+DEVICE_ID=dev_0123456789abcdef01234567
+php artisan fastcat:auto grant vless:42 71 --device="$DEVICE_ID"
+php artisan fastcat:auto export vless:42 --out=/srv/catboard-private/snapshot-v2-001
+```
+
+导出 h3、h2、v1 三份按入口独立的名单。每个设备在该账号及节点下取得独立的 H3 和 H2 凭据。撤销时执行 `php artisan fastcat:auto revoke vless:42 71 --device="$DEVICE_ID"`，禁用对应设备会话，重新导出、同步并 SIGHUP 所有启用的服务。仅禁用网关会话不会清除入口中已载入的令牌；正在使用的连接按其会话生命周期结束。转为严格按设备管控的账户还要撤销遗留的账户级凭据。
+
+### CatNode 原生 FastCat v2 节点
+
+在节点管理添加 v2node 节点，在协议菜单选 **FastCat v2**。设置连接域名、
+端口和授权分组。面板记录键为 `v2node:<节点 ID>`，设备授权与订阅复用上面的流程。
+在该记录的私有目录配置 `endpoints.json`，其中 `server`、`port` 和
+`h3-port` 对应已经启动的 CatNode。用 `fastcat:auto grant v2node:<节点 ID>`
+为测试账号和设备授权，再导出令牌同步到 CatNode，最后在安卓快猫刷新订阅。
+
+原生 FastCat v2 仅对启用 v2 订阅的已授权设备下发。当前 CatNode 使用独立
+授权文件。这套配置用于连通性验收，FastCat v2 按账号流量上报仍需接入后再启用正式计费。

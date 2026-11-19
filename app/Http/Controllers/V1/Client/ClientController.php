@@ -8,6 +8,7 @@ use App\Protocols\Singbox\Singbox;
 use App\Protocols\Singbox\SingboxOld;
 use App\Protocols\ClashMeta;
 use App\Protocols\FastCatV1;
+use App\Services\FastCatAutoGrants;
 use App\Services\ServerService;
 use App\Services\UserService;
 use App\Services\NodeSecurity\AuditService;
@@ -36,7 +37,13 @@ class ClientController extends Controller
             $fastCatFlag = strtolower((string) config('fastcat.subscription.flag', 'fastcat-v1'));
             if ($queryFlag !== '' && hash_equals($fastCatFlag, $queryFlag)) {
                 $this->setSubscribeInfoToServers($servers, $user);
-                $class = new FastCatV1($user, $servers);
+                $v2 = $request->query('fc_v2') === '1';
+                $device = $v2 ? FastCatAutoGrants::verifiedDevice(
+                    $request->header('X-FastCat-Device-Grant', ''), (string)$request->query('token'),
+                    (string)config('fastcat.device_grant_key', ''), time()
+                ) : null;
+                $auto = $request->query('fc_auto') === '1' && (!$v2 || $device !== null || config('fastcat.device_grant_key', '') === '');
+                $class = new FastCatV1($user, $servers, $auto, $device);
                 return $this->auditedResponse($audit, $request, $class->handle());
             }
             if($flag) {

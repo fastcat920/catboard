@@ -390,6 +390,10 @@ class ServerService
                 $servers[$k]['padding_scheme'] = json_encode($v['padding_scheme']);
             }
 
+            if (($v['protocol'] ?? '') === 'fastcat-v2') {
+                continue;
+            }
+
             $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
             $apiKey = config('v2board.server_token', '');
             $nodeId = (int) $v['id'];

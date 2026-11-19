@@ -42,6 +42,7 @@ const NETWORK_PLACEHOLDERS = {
 export const PROTOCOLS = [
   { value: 'anytls', label: 'AnyTLS' },
   { value: 'hysteria2', label: 'Hysteria2' },
+  { value: 'fastcat-v2', label: 'FastCat v2' },
   { value: 'shadowsocks', label: 'Shadowsocks' },
   { value: 'trojan', label: 'Trojan' },
   { value: 'tuic', label: 'Tuic' },
@@ -49,9 +50,9 @@ export const PROTOCOLS = [
   { value: 'vmess', label: 'VMess' },
 ]
 /** 这些协议必须使用 TLS：切换到它们时安全性自动设为 TLS */
-const TLS_REQUIRED = ['anytls', 'hysteria2', 'trojan', 'tuic']
+const TLS_REQUIRED = ['fastcat-v2', 'anytls', 'hysteria2', 'trojan', 'tuic']
 /** 安全性默认显示为 TLS 的协议 */
-const TLS_DEFAULT = ['hysteria2', 'trojan', 'tuic']
+const TLS_DEFAULT = ['fastcat-v2', 'hysteria2', 'trojan', 'tuic']
 
 function NetworkRow({ server, change, onEdit }: { server: NodeForm; change: Change; onEdit: () => void }) {
   const isShadowsocks = server.protocol == 'shadowsocks'
@@ -105,7 +106,9 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
     setServer((s) => stringifySettings(s, 'network_settings'))
   }
   const formChange: Change = (key, value) => {
-    if (key === 'protocol' && TLS_REQUIRED.includes(value as string)) {
+    if (key === 'protocol' && value === 'fastcat-v2') {
+      setServer((s) => ({ ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null }))
+    } else if (key === 'protocol' && TLS_REQUIRED.includes(value as string)) {
       setServer((s) => ({ ...s, protocol: value, tls: 1 }))
     } else {
       change(key, value)
@@ -194,7 +197,7 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           {protocol == 'shadowsocks' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}
-          {protocol != null && protocol != 'hysteria2' && protocol != 'shadowsocks' && protocol != 'tuic' && (
+          {protocol != null && protocol != 'fastcat-v2' && protocol != 'hysteria2' && protocol != 'shadowsocks' && protocol != 'tuic' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}
           {server.network != null &&
@@ -317,13 +320,13 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           <RouteField server={server} change={formChange} />
           <div className="form-group">
             <label>一键安装指令</label>
-            <Input.TextArea
+            {protocol === 'fastcat-v2' ? <p>请在 CatNode 服务器配置 FastCat v2 入口。</p> : <Input.TextArea
               value={text(server.install_command)}
               rows={4}
               readOnly
               // 皮肤里取 --v2b-readonly-bg（见 styles/skins/_shell.scss），legacy 下为原值
               style={{ backgroundColor: 'var(--v2b-readonly-bg, #f5f5f5a0)', cursor: 'text' }}
-            />
+            />}
           </div>
         </div>
         <DrawerActions saving={saving} onCancel={onShow} onSave={submit} />

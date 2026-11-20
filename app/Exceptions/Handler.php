@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 use Facade\Ignition\Exceptions\ViewException;
@@ -53,10 +54,23 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
-        if ($exception instanceof ViewException) {
+        // Only the public homepage renders the selected user theme. Admin and
+        // other Blade failures must keep their real exception classification.
+        if ($exception instanceof ViewException && $request->path() === '/') {
             abort(500, "主题渲染失败。如更新主题，参数可能发生变化请重新配置主题后再试。");
         }
         return parent::render($request, $exception);
+    }
+
+    protected function invalidJson($request, ValidationException $exception)
+    {
+        $errors = $exception->errors();
+        $message = collect($errors)->flatten()->first();
+
+        return response()->json([
+            'message' => $message ?: __('Invalid parameter'),
+            'errors' => $errors,
+        ], $exception->status);
     }
 
 

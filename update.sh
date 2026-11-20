@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [ ! -d ".git" ]; then
   echo "Please deploy using Git."
   exit 1
@@ -10,14 +12,25 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-git config --global --add safe.directory $(pwd)
-git fetch --all && git reset --hard origin/master && git pull origin master
+git config --global --add safe.directory "$(pwd)"
+git fetch origin custom
+git reset --hard origin/custom
 rm -rf composer.lock composer.phar
 wget https://github.com/composer/composer/releases/latest/download/composer.phar -O composer.phar
 php composer.phar update -vvv
 
+if ! grep -q '^TRIAL_IDENTITY_KEY=..*' .env; then
+    trial_identity_key="$(php -r 'echo bin2hex(random_bytes(32));')"
+    if grep -q '^TRIAL_IDENTITY_KEY=' .env; then
+        sed -i "s/^TRIAL_IDENTITY_KEY=.*/TRIAL_IDENTITY_KEY=${trial_identity_key}/" .env
+    else
+        printf '\nTRIAL_IDENTITY_KEY=%s\n' "$trial_identity_key" >> .env
+    fi
+    echo "Generated TRIAL_IDENTITY_KEY for account trial protection."
+fi
+
 php_main_version=$(php -v | head -n 1 | cut -d ' ' -f 2 | cut -d '.' -f 1)
-if [ $php_main_version -ge 8 ]; then
+if [ "$php_main_version" -ge 8 ]; then
     php composer.phar require joanhey/adapterman
     if ! php -m | grep -q "pcntl"; then
         echo "Adding pcntl extension to cli-php.ini"
@@ -29,6 +42,15 @@ fi
 
 php artisan v2board:update
 
+echo "Running registered database upgrades..."
+php artisan v2board:upgrade-database
+echo "Database migrations and one-time data upgrades completed."
+
+echo "Refreshing application routes and compiled views..."
+php artisan route:clear
+php artisan view:clear
+echo "Application routes and views refreshed."
+
 if [ -f "/etc/init.d/bt" ]; then
-  chown -R www $(pwd);
+  chown -R www "$(pwd)";
 fi

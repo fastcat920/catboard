@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notice;
+use App\Support\ContentLocale;
 use Illuminate\Http\Request;
 
 class NoticeController extends Controller
@@ -18,9 +19,10 @@ class NoticeController extends Controller
     
             if (!$notice) {
                 return response([
-                    'message' => 'Notice not found'
+                    'message' => __('Notice does not exist')
                 ], 404);
             }
+            ContentLocale::localize($notice, ['title', 'content'], $request);
     
             return response([
                 'data' => $notice
@@ -37,6 +39,9 @@ class NoticeController extends Controller
     
         $total = $model->count();
         $res = $model->forPage($current, $pageSize)->get();
+        $res->each(function ($notice) use ($request) {
+            ContentLocale::localize($notice, ['title', 'content'], $request);
+        });
     
         return response([
             'data' => $res,

@@ -53,7 +53,9 @@ class AuthService
                 ])
                     ->find($data['id']);
                 if (!$user) return false;
-                Cache::put($jwt, $user->toArray(), 3600);
+                $authUser = $user->toArray();
+                $authUser['auth_session'] = $data['session'];
+                Cache::put($jwt, $authUser, 3600);
             }
             return Cache::get($jwt);
         } catch (\Exception $e) {

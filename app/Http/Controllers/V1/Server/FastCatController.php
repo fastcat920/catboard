@@ -89,6 +89,8 @@ LUA
         $eligible = $groups ? array_fill_keys($servers->getAvailableUsers($groups)->pluck('id')->all(), true) : [];
         $mode = $request->header('X-FastCat-Transport-Modes') === '1'
             ? ($node['tls_settings']['fastcat_transport_mode'] ?? 'auto') : 'auto';
-        return response()->json(FastCatManagedGrants::snapshot($id, $eligible, $mode), 200, ['Cache-Control' => 'private, no-store']);
+        $snapshot = FastCatManagedGrants::snapshot($id, $eligible, $mode);
+        Cache::put(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $id), time(), 3600);
+        return response()->json($snapshot, 200, ['Cache-Control' => 'private, no-store']);
     }
 }

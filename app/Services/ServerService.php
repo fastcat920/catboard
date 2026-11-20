@@ -413,9 +413,9 @@ class ServerService
         $apiKey = (string) config('v2board.server_token', '');
         if ($apiKey === '') return null;
         return sprintf(
-            'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.3.0/bootstrap.sh && ' .
-            'bash catnode-install.sh --api-host %s --node-id %d --domain %s --port %d --api-key %s',
-            escapeshellarg($panel), (int) $node['id'], escapeshellarg($node['host']), $port, escapeshellarg($apiKey)
+            'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.4.0/bootstrap.sh && ' .
+            'bash catnode-install.sh --api-host %s --node-id %d --domain %s --port %d --api-key %s%s',
+            escapeshellarg($panel), (int) $node['id'], escapeshellarg($node['host']), $port, escapeshellarg($apiKey), $port === 443 ? ' --shared-https' : ''
         );
     }
 

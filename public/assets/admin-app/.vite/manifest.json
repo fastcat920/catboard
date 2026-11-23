@@ -1,4 +1,14 @@
 {
+  "../../../../Users/pizihu/Projects/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
+    "file": "assets/worker-json-8CDXFfik.js",
+    "src": "../../../../Users/pizihu/Projects/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
+  },
+  "../../../../Users/pizihu/Projects/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
+    "file": "assets/darkreader-Cmw0ewJI.js",
+    "name": "darkreader",
+    "src": "../../../../Users/pizihu/Projects/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
+    "isDynamicEntry": true
+  },
   "_AdminLayout-BbTYaaPi.js": {
     "file": "assets/AdminLayout-BbTYaaPi.js",
     "name": "AdminLayout",
@@ -268,7 +278,7 @@
       "_staticApi-HeytMHj0.js"
     ],
     "dynamicImports": [
-      "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
+      "../../../../Users/pizihu/Projects/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
     ]
   },
   "_date-picker-uYVlbayM.js": {
@@ -578,7 +588,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-MSOb88_7.js",
+    "file": "assets/index-BCJLoISr.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -631,16 +641,6 @@
       "assets/Simple-Line-Icons-D0KobG-u.woff2",
       "assets/Simple-Line-Icons-BAgH0-Pt.woff"
     ]
-  },
-  "node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
-    "file": "assets/worker-json-8CDXFfik.js",
-    "src": "node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
-  },
-  "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
-    "file": "assets/darkreader-Cmw0ewJI.js",
-    "name": "darkreader",
-    "src": "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
-    "isDynamicEntry": true
   },
   "src/assets/fonts/fontawesome/fa-brands-400.woff": {
     "file": "assets/fa-brands-400-kK0FQ5N5.woff",
@@ -1173,7 +1173,7 @@
     ]
   },
   "src/pages/server/manage/ServerManagePage.tsx": {
-    "file": "assets/ServerManagePage-BMFqxeRK.js",
+    "file": "assets/ServerManagePage-Ba9xWinG.js",
     "name": "ServerManagePage",
     "src": "src/pages/server/manage/ServerManagePage.tsx",
     "isDynamicEntry": true,

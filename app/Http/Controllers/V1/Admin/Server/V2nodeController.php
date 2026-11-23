@@ -21,7 +21,7 @@ class V2nodeController extends Controller
             'listen_ip' => 'nullable',
             'port' => 'required',
             'server_port' => 'required',
-            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls,fastcat-v2',
+            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls,fastcat-v2,fcn-v1,fcn-v2',
             'tls' => 'required|in:0,1,2',
             'tls_settings' => 'nullable|array',
             'flow' => 'nullable|in:xtls-rprx-vision',
@@ -45,6 +45,27 @@ class V2nodeController extends Controller
             'show' => 'nullable|in:0,1',
             'sort' => 'nullable'
         ]);
+        if (in_array($params['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
+            $request->validate([
+                'host' => 'required|string|max:253',
+                'port' => 'required|integer|min:1|max:65535',
+                'server_port' => 'required|integer|min:1|max:65535',
+            ]);
+            $params['tls'] = 1;
+            $params['network'] = 'tcp'; // schema field; FCN uses QUIC over UDP
+            $params['flow'] = null;
+            $params['network_settings'] = null;
+            $params['trusted_x_forwarded_for'] = null;
+            $params['encryption'] = null;
+            $params['encryption_settings'] = null;
+            $params['disable_sni'] = 0;
+            $params['zero_rtt_handshake'] = 0;
+            $params['congestion_control'] = 'bbr';
+            // ECH and custom TLS options are not implemented by the FCN profiles.
+            $params['tls_settings'] = array_intersect_key($params['tls_settings'] ?? [], array_flip([
+                'server_name', 'cert_mode', 'cert_file', 'key_file', 'tls_cert', 'tls_key', 'provider', 'dns_env'
+            ]));
+        }
         if ($params['protocol'] === 'fastcat-v2') {
             $request->validate([
                 'host' => 'required|string|max:253',

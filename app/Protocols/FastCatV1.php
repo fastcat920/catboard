@@ -10,10 +10,18 @@ class FastCatV1 extends ClashMeta
 {
     public $flag = 'fastcat-v1';
 
+    private $fcnUuid;
+
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
 
-    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false)
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false)
     {
+        $this->fcnUuid = $user['uuid'];
+        if (!$supportsFCN) {
+            $servers = array_values(array_filter($servers, function ($server) {
+                return !in_array($server['protocol'] ?? $server['type'] ?? '', ['fcn-v1', 'fcn-v2'], true);
+            }));
+        }
         $directory = (string) config('fastcat.auto_grants_dir', '');
         if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
             $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2, $transportModes);
@@ -25,6 +33,17 @@ class FastCatV1 extends ClashMeta
 
     protected function buildCustomProxy(array $server): ?array
     {
+        $protocol = $server['protocol'] ?? $server['type'] ?? '';
+        if (in_array($protocol, ['fcn-v1', 'fcn-v2'], true)) {
+            return [
+                'name' => $server['name'], 'type' => 'fcn',
+                'version' => $protocol === 'fcn-v1' ? 1 : 2,
+                'server' => $server['host'], 'port' => (int) $server['port'],
+                'uuid' => $this->fcnUuid,
+                'sni' => !empty($server['tls_settings']['server_name']) ? $server['tls_settings']['server_name'] : $server['host'],
+                'udp' => true,
+            ];
+        }
         return $server['_fastcat_auto_proxy'] ?? null;
     }
 

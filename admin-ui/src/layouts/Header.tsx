@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { adminBasePath, settings } from '@/app/settings'
+import { settings } from '@/app/settings'
 import { JsLink } from '@/components/JsLink'
 import { useLayoutStore } from '@/stores/layout'
 import { useThemeStore } from '@/stores/theme'

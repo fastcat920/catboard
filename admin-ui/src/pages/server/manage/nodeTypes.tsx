@@ -27,6 +27,8 @@ const TYPE_COLORS: Record<NodeType, string> = {
 const V2NODE_PROTOCOL_COLORS: Record<string, string> = {
   anytls: TYPE_COLORS.anytls,
   hysteria2: TYPE_COLORS.hysteria,
+  'fcn-v1': '#1677ff',
+  'fcn-v2': '#13a8a8',
   shadowsocks: TYPE_COLORS.shadowsocks,
   trojan: TYPE_COLORS.trojan,
   tuic: TYPE_COLORS.tuic,

@@ -431,6 +431,13 @@ class ServerService
             }
 
             $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
+            if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2'], true)) {
+                $servers[$k]['install_command'] = sprintf(
+                    'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.5.0/bootstrap.sh && bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
+                    escapeshellarg((string) $apiHost), (int) $v['id'], escapeshellarg((string) config('v2board.server_token', ''))
+                );
+                continue;
+            }
             if (($v['protocol'] ?? '') === 'fastcat-v2') {
                 $servers[$k]['install_command'] = $this->fastCatDeployCommand($v, (string) $apiHost);
                 continue;

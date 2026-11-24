@@ -43,7 +43,7 @@ class ClientController extends Controller
                     (string)config('fastcat.device_grant_key', ''), time()
                 ) : null;
                 $auto = $request->query('fc_auto') === '1';
-                $class = new FastCatV1($user, $servers, $auto, $device, $v2, $request->query('fc_transport') === '1', $request->query('fc_fcn') === '1');
+                $class = new FastCatV1($user, $servers, $auto, $device, $v2, $request->query('fc_transport') === '1', $request->query('fc_fcn') === '1', $request->query('fc_fcn_pin') === '1');
                 return $this->auditedResponse($audit, $request, $class->handle());
             }
             if($flag) {

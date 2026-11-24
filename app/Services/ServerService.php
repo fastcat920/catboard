@@ -227,7 +227,23 @@ class ServerService
                     $v2node[$key]['encryption_settings'] = array_diff_key($v2node[$key]['encryption_settings'], array('private_key' => ''));
                 }
             }
-            $servers[] = $v2node[$key]->toArray();
+            $export = $v2node[$key]->toArray();
+            if (in_array($v['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
+                $identityNode = $v2node[$key];
+                $seen = [$key => true];
+                $parentId = $v['parent_id'];
+                while ($parentId && !isset($seen[$parentId])) {
+                    $parent = $v2node[$parentId] ?? null;
+                    if (!$parent || !in_array($parent['protocol'], ['fcn-v1', 'fcn-v2'], true)) break;
+                    $identityNode = $parent;
+                    $seen[$parentId] = true;
+                    $parentId = $parent['parent_id'];
+                }
+                $export['tls_settings'] = \App\Services\FCNCertificate::publicSettings(
+                    $identityNode['tls_settings'] ?? [], $identityNode['host']
+                );
+            }
+            $servers[] = $export;
         }
         return $servers;
     }

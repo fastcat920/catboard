@@ -1,5 +1,5 @@
 import { copyText } from '@/utils/clipboard'
-import { Button, Input, Select } from 'antd'
+import { Button, Checkbox, Input, Select } from 'antd'
 import { JsLink } from '@/components/JsLink'
 import { json4, NetworkSettingsEditor, PaddingSchemeEditor } from './editors'
 import { EncryptionSettings, TlsSettings } from './settings'
@@ -198,6 +198,24 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
             )}
           </div>
           {(protocol === 'fcn-v1' || protocol === 'fcn-v2') && (
+            <div className="form-group">
+              <label>服务器身份验证</label>
+              <Select<string>
+                style={{ width: '100%' }}
+                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode) || 'ca'}
+                options={[{ value: 'ca', label: 'CA 证书验证' }, { value: 'spki', label: '自签证书 + 固定公钥' }]}
+                onChange={(value) => setServer((s) => ({ ...s, tls_settings: {
+                  ...(s.tls_settings as Record<string, unknown> | undefined), fcn_trust_mode: value,
+                  ...(value === 'spki' ? { cert_mode: 'remote' } : {}),
+                } }))}
+              />
+              {(server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki' && (
+                <p>保存时自动生成证书并下发公钥指纹；无需申请 CA 证书。换公钥后客户端必须刷新订阅。节点下发仅按账号权限组，固定公钥需要支持该功能的核心。</p>
+              )}
+              {Boolean(server.parent_id) && <p>前置节点使用父节点的证书身份；修改父节点后生效。</p>}
+            </div>
+          )}
+          {(protocol === 'fcn-v1' || protocol === 'fcn-v2') && (
             <div className="form-group">QUIC + TLS 1.3 · BBR · {protocol === 'fcn-v1' ? '单连接' : '双连接恢复选路'}。需要放行服务端 UDP 端口，使用账号 UUID 授权。</div>
           )}
           {protocol === 'fastcat-v2' && (
@@ -391,7 +409,25 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               onChange={(v) => formChange('network_settings', v)}
             />
           )}
-          {child.type === 'tls_settings' && (
+          {child.type === 'tls_settings' && (protocol === 'fcn-v1' || protocol === 'fcn-v2') &&
+            (server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki' && (
+            <div>
+              <label>SNI / 证书名称</label>
+              <Input value={text((server.tls_settings as Record<string, unknown> | undefined)?.server_name)}
+                placeholder={text(server.host)}
+                onChange={(e) => setServer((s) => ({ ...s, tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), server_name: e.target.value.trim() } }))} />
+              <p>身份由固定公钥验证。此名称需要与证书匹配，但不代表该网站官方身份，也不保证隐蔽性。</p>
+              <label>公钥指纹（保存后生成）</label>
+              <Input readOnly value={text((server.tls_settings as Record<string, unknown> | undefined)?.fcn_spki_sha256)} />
+              <p>证书到期前自动使用同一密钥续签；私钥仅下发给 CatNode，不进入用户订阅。</p>
+              <Checkbox checked={Boolean((server.tls_settings as Record<string, unknown> | undefined)?.fcn_rotate_key)}
+                onChange={(e) => setServer((s) => ({ ...s, tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fcn_rotate_key: e.target.checked } }))}>
+                保存时更换公钥（旧订阅需刷新后才能重连）
+              </Checkbox>
+            </div>
+          )}
+          {child.type === 'tls_settings' && !((protocol === 'fcn-v1' || protocol === 'fcn-v2') &&
+            (server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki') && (
             <TlsSettings
               settings={server.tls_settings}
               tls={server.tls}

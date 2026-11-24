@@ -16,7 +16,7 @@ foreach ([false,true] as $capable) {
     $property = new ReflectionProperty(\App\Protocols\ClashMeta::class, 'servers');
     if (PHP_VERSION_ID < 80100) $property->setAccessible(true);
     $visible = $property->getValue($app);
-    check(count($visible) === ($capable ? 2 : 0), 'wrong capability filtering');
+    check(count($visible) === 2, 'FCN visibility must not depend on client capability');
     foreach ($visible as $i=>$node) {
         $proxy = $app->proxy($node);
         check($proxy['type'] === 'fcn' && $proxy['version'] === $i+1, 'wrong profile');
@@ -27,4 +27,22 @@ foreach ([false,true] as $capable) {
 $app = new FCNProbe($user, [], false, null, false, false, true);
 $nodes[0]['tls_settings']['server_name']='';
 check($app->proxy($nodes[0])['sni']==='node.example','empty SNI must fall back to server hostname');
-echo "FCN v1/v2 account subscription and capability contracts passed\n";
+echo "FCN v1/v2 account subscription without capability filtering passed\n";
+
+$nodes[0]['tls_settings']['fcn_trust_mode'] = 'spki';
+$nodes[0]['tls_settings']['fcn_spki_sha256'] = 'sha256/' . base64_encode(str_repeat("\x01", 32));
+foreach ([false,true] as $pinCapable) {
+    $app = new FCNProbe($user, $nodes, false, null, false, false, true, $pinCapable);
+    $visible = $property->getValue($app);
+    check(count($visible) === 2, 'pinned FCN visibility must not depend on client capability');
+    {
+        $proxy = $app->proxy($nodes[0]);
+        check($proxy['tls-trust'] === 'spki' && count($proxy['server-public-key-pins']) === 1, 'missing explicit pin policy');
+        check(!isset($proxy['skip-cert-verify']), 'insecure flag leaked into pinned subscription');
+    }
+}
+echo "FCN pinned subscription is visible to both capability versions\n";
+
+$preserved = \App\Services\FastCatAutoGrants::apply([$nodes[0]], 42, '/unused-legacy-grants');
+check(($preserved[0]['protocol'] ?? '') === 'fcn-v1' && !isset($preserved[0]['_fastcat_auto_proxy']), 'legacy grant changed FCN identity');
+echo "FCN legacy override isolation passed\n";

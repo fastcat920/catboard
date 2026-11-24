@@ -7,6 +7,7 @@ use App\Models\ServerV2node;
 use Illuminate\Http\Request;
 use ParagonIE_Sodium_Compat as SodiumCompat;
 use App\Utils\Helper;
+use App\Services\FCNCertificate;
 
 class V2nodeController extends Controller
 {
@@ -47,20 +48,41 @@ class V2nodeController extends Controller
         ]);
         if (in_array($params['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
             $request->validate([
+                'tls_settings.fcn_trust_mode' => 'nullable|in:ca,spki',
+                'tls_settings.fcn_rotate_key' => 'nullable|boolean',
+                'tls_settings.server_name' => 'nullable|string|max:253',
                 'host' => 'required|string|max:253',
                 'port' => 'required|integer|min:1|max:65535',
                 'server_port' => 'required|integer|min:1|max:65535',
-                'tls_settings.cert_mode' => 'required|in:file,http,dns,remote',
-                'tls_settings.cert_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
-                'tls_settings.key_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
-                'tls_settings.tls_cert' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
-                'tls_settings.tls_key' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
-            ], [
-                'tls_settings.cert_mode.required' => 'FCN 需要选择可信证书模式。',
-                'tls_settings.cert_mode.in' => 'FCN 不支持自签证书或关闭 TLS，请选择已有证书文件、HTTP/DNS 申请或下发可信证书。',
-                'tls_settings.cert_file.required_if' => '请填写已有证书链的绝对路径。',
-                'tls_settings.key_file.required_if' => '请填写已有私钥的绝对路径。',
             ]);
+            $settings = $params['tls_settings'] ?? [];
+            if (($settings['fcn_trust_mode'] ?? 'ca') === 'spki') {
+                $existing = $request->input('id') ? ServerV2node::find($request->input('id')) : null;
+                $old = $existing ? ($existing->tls_settings ?? []) : [];
+                // Never trust a supplied fingerprint: derive it from the actual managed key.
+                try {
+                    $settings = FCNCertificate::forSave($settings, $old, trim($settings['server_name'] ?? '') ?: $params['host'], (bool) ($settings['fcn_rotate_key'] ?? false));
+                } catch (\InvalidArgumentException $e) {
+                    abort(422, $e->getMessage());
+                }
+                $params['tls_settings'] = $settings;
+            } else {
+                $request->validate([
+                    'host' => 'required|string|max:253',
+                    'port' => 'required|integer|min:1|max:65535',
+                    'server_port' => 'required|integer|min:1|max:65535',
+                    'tls_settings.cert_mode' => 'required|in:file,http,dns,remote',
+                    'tls_settings.cert_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                    'tls_settings.key_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                    'tls_settings.tls_cert' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+                    'tls_settings.tls_key' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+                ], [
+                    'tls_settings.cert_mode.required' => 'FCN 需要选择可信证书模式。',
+                    'tls_settings.cert_mode.in' => 'CA 验证模式需要可信证书；如需自签证书，请切换为“自签证书 + 固定公钥”。',
+                    'tls_settings.cert_file.required_if' => '请填写已有证书链的绝对路径。',
+                    'tls_settings.key_file.required_if' => '请填写已有私钥的绝对路径。',
+                ]);
+            }
             $params['tls'] = 1;
             $params['network'] = 'tcp'; // schema field; FCN uses QUIC over UDP
             $params['flow'] = null;
@@ -73,7 +95,8 @@ class V2nodeController extends Controller
             $params['congestion_control'] = 'bbr';
             // ECH and custom TLS options are not implemented by the FCN profiles.
             $params['tls_settings'] = array_intersect_key($params['tls_settings'] ?? [], array_flip([
-                'server_name', 'cert_mode', 'cert_file', 'key_file', 'tls_cert', 'tls_key', 'provider', 'dns_env'
+                'server_name', 'cert_mode', 'cert_file', 'key_file', 'tls_cert', 'tls_key', 'provider', 'dns_env',
+                'fcn_trust_mode', 'fcn_spki_sha256', 'fcn_cert_expires_at'
             ]));
         }
         if ($params['protocol'] === 'fastcat-v2') {

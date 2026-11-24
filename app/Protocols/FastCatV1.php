@@ -14,14 +14,11 @@ class FastCatV1 extends ClashMeta
 
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
 
-    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false)
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false, bool $supportsFCNPinning = false)
     {
         $this->fcnUuid = $user['uuid'];
-        if (!$supportsFCN) {
-            $servers = array_values(array_filter($servers, function ($server) {
-                return !in_array($server['protocol'] ?? $server['type'] ?? '', ['fcn-v1', 'fcn-v2'], true);
-            }));
-        }
+        // FCN visibility follows the normal account/group node list only.
+        // Legacy capability arguments are retained for call-site compatibility.
         $directory = (string) config('fastcat.auto_grants_dir', '');
         if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
             $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2, $transportModes);
@@ -35,7 +32,7 @@ class FastCatV1 extends ClashMeta
     {
         $protocol = $server['protocol'] ?? $server['type'] ?? '';
         if (in_array($protocol, ['fcn-v1', 'fcn-v2'], true)) {
-            return [
+            $proxy = [
                 'name' => $server['name'], 'type' => 'fcn',
                 'version' => $protocol === 'fcn-v1' ? 1 : 2,
                 'server' => $server['host'], 'port' => (int) $server['port'],
@@ -43,6 +40,19 @@ class FastCatV1 extends ClashMeta
                 'sni' => !empty($server['tls_settings']['server_name']) ? $server['tls_settings']['server_name'] : $server['host'],
                 'udp' => true,
             ];
+            $trust = $server['tls_settings']['fcn_trust_mode'] ?? 'ca';
+            if ($trust === 'spki') {
+                $pin = $server['tls_settings']['fcn_spki_sha256'] ?? '';
+                // A malformed managed identity is never downgraded to CA validation.
+                if (!preg_match('/^sha256\/[A-Za-z0-9+\/]{43}=$/D', $pin)) {
+                    throw new ServiceUnavailableHttpException(null, 'FCN 公钥指纹缺失，请在面板重新保存节点。');
+                }
+                $proxy['tls-trust'] = 'spki';
+                $proxy['server-public-key-pins'] = [$pin];
+            } elseif ($trust !== 'ca') {
+                throw new ServiceUnavailableHttpException(null, 'Unknown FCN trust mode.');
+            }
+            return $proxy;
         }
         return $server['_fastcat_auto_proxy'] ?? null;
     }

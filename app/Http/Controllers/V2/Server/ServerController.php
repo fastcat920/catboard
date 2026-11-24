@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\ServerService;
 use Illuminate\Http\Request;
 use App\Utils\Helper;
+use App\Services\FCNCertificate;
 
 class ServerController extends Controller
 {
@@ -52,6 +53,18 @@ class ServerController extends Controller
     // 后端获取配置
     public function config(Request $request)
     {
+        $settings = $this->nodeInfo->tls_settings ?? [];
+        if (in_array($this->nodeInfo->protocol, ['fcn-v1', 'fcn-v2'], true)
+            && ($settings['fcn_trust_mode'] ?? 'ca') === 'spki') {
+            // Renew with the same key before expiry; subscriptions keep the same SPKI pin.
+            $name = !empty($settings['server_name']) ? $settings['server_name'] : $this->nodeInfo->host;
+            $prepared = FCNCertificate::prepare($settings, $name);
+            if ($prepared !== $settings) {
+                $this->nodeInfo->tls_settings = $prepared;
+                $this->nodeInfo->save();
+            }
+        }
+
         $response = [
             'listen_ip' => $this->nodeInfo->listen_ip,
             'server_port' => $this->nodeInfo->server_port,

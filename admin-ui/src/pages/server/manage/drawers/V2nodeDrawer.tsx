@@ -396,6 +396,7 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               settings={server.tls_settings}
               tls={server.tls}
               certApply
+              requireTrustedCertificate={protocol === 'fcn-v1' || protocol === 'fcn-v2'}
               onChange={(v) => setServer((s) => ({ ...s, tls_settings: v }))}
             />
           )}

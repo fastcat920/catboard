@@ -25,16 +25,17 @@ interface TlsSettingsProps {
   tls: unknown
   /** 显示证书申请相关字段（仅 V2node） */
   certApply?: boolean
+  requireTrustedCertificate?: boolean
   onChange: (settings: Settings) => void
 }
 
 /** 安全性配置（Vless、V2node）：TLS 与 Reality 共用 */
-export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certProp, onChange }: TlsSettingsProps) {
+export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certProp, requireTrustedCertificate = false, onChange }: TlsSettingsProps) {
   const [settings, change] = useSettings(
     initial,
     () => ({
       server_name: '',
-      cert_mode: 'self',
+      cert_mode: requireTrustedCertificate ? 'file' : 'self',
       provider: '',
       dns_env: '',
       reject_unknown_sni: '0',
@@ -53,6 +54,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
   return (
     <>
       <div>
+        {requireTrustedCertificate && <p>FCN 必须使用可信证书。SNI 填写证书覆盖、由你控制的域名；自签证书不能连接。</p>}
         <div className="form-group">
           <label>Server Name(SNI)</label>
           <Input
@@ -65,15 +67,16 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
           <div className="form-group">
             <label>证书模式Cert Mode</label>
             <Select<string>
-              value={(e.cert_mode as string | undefined) ?? 'self'}
+              value={(e.cert_mode as string | undefined) ?? (requireTrustedCertificate ? 'file' : 'self')}
               style={{ width: '100%' }}
               onChange={(v) => change('cert_mode', v)}
               options={[
-                { value: 'self', label: '自签名' },
-                { value: 'remote', label: '自签名(面板下发)' },
+                ...(!requireTrustedCertificate ? [{ value: 'self', label: '自签名' }] : []),
+                { value: 'file', label: '文件（已有证书）' },
+                { value: 'remote', label: requireTrustedCertificate ? '面板下发可信证书' : '自签名(面板下发)' },
                 { value: 'http', label: 'HTTP申请' },
                 { value: 'dns', label: 'DNS申请' },
-                { value: 'none', label: '无证书(关闭TLS)' },
+                ...(!requireTrustedCertificate ? [{ value: 'none', label: '无证书(关闭TLS)' }] : []),
               ]}
             />
           </div>
@@ -123,7 +126,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
-        {isTls && e.cert_mode == 'remote' && certApply && (
+        {isTls && e.cert_mode == 'remote' && certApply && !requireTrustedCertificate && (
           <div className="form-group">
             <label>pinnedPeerCertSha256</label>
             <Input
@@ -135,6 +138,10 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
+        {isTls && e.cert_mode == 'remote' && requireTrustedCertificate && <>
+          <div className="form-group"><label>证书链 PEM</label><Input.TextArea rows={4} value={text(e.tls_cert)} onChange={(ev) => change('tls_cert', ev.target.value)} /></div>
+          <div className="form-group"><label>证书私钥 PEM</label><Input.TextArea rows={4} value={text(e.tls_key)} onChange={(ev) => change('tls_key', ev.target.value)} /></div>
+        </>}
         {isReality && (
           <div className="form-group">
             <label>Server Address</label>
@@ -196,6 +203,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
+        {!requireTrustedCertificate && <>
         <div className="form-group">
           <label>FingerPrint</label>
           <Select<string>
@@ -289,6 +297,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
+        </>}
       </div>
     </>
   )

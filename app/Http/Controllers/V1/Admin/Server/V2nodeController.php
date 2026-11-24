@@ -50,6 +50,16 @@ class V2nodeController extends Controller
                 'host' => 'required|string|max:253',
                 'port' => 'required|integer|min:1|max:65535',
                 'server_port' => 'required|integer|min:1|max:65535',
+                'tls_settings.cert_mode' => 'required|in:file,http,dns,remote',
+                'tls_settings.cert_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                'tls_settings.key_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                'tls_settings.tls_cert' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+                'tls_settings.tls_key' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+            ], [
+                'tls_settings.cert_mode.required' => 'FCN 需要选择可信证书模式。',
+                'tls_settings.cert_mode.in' => 'FCN 不支持自签证书或关闭 TLS，请选择已有证书文件、HTTP/DNS 申请或下发可信证书。',
+                'tls_settings.cert_file.required_if' => '请填写已有证书链的绝对路径。',
+                'tls_settings.key_file.required_if' => '请填写已有私钥的绝对路径。',
             ]);
             $params['tls'] = 1;
             $params['network'] = 'tcp'; // schema field; FCN uses QUIC over UDP

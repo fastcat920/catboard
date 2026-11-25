@@ -33,3 +33,31 @@ checkPin($edited['fcn_spki_sha256'] === $first['fcn_spki_sha256'], 'ordinary edi
 $rotated = FCNCertificate::forSave($first, $first, 'www.bing.com', true);
 checkPin($rotated['fcn_spki_sha256'] !== $first['fcn_spki_sha256'], 'explicit rotation retained the old key');
 echo "FCN ordinary edit key retention and explicit rotation passed\n";
+
+$http = FCNCertificate::caSettingsForSave([
+    'cert_mode' => 'http', 'dns_env' => 'DNS_TOKEN=secret', 'tls_key' => 'previous-key',
+], 'node.example');
+checkPin($http === ['cert_mode' => 'http'], 'HTTP retained credentials belonging to another mode');
+checkPin(FCNCertificate::automaticDomain($http, 'node.example') === 'node.example', 'HTTP did not use the node hostname');
+$dns = FCNCertificate::caSettingsForSave([
+    'cert_mode' => 'dns', 'server_name' => 'cert.example', 'provider' => 'cloudflare',
+    'dns_env' => 'DNS_TOKEN=token=part, ZONE_ID=zone', 'cert_file' => '/cert.pem', 'key_file' => '/key.pem',
+    'fcn_spki_sha256' => 'stale-pin',
+], '192.0.2.1');
+checkPin($dns['dns_env'] === 'DNS_TOKEN=token=part,ZONE_ID=zone'
+    && $dns['cert_file'] === '/cert.pem' && $dns['key_file'] === '/key.pem'
+    && !isset($dns['fcn_spki_sha256']), 'DNS lost current settings or retained an inactive pin');
+checkPin(FCNCertificate::automaticDomain($dns, '192.0.2.1') === 'cert.example', 'explicit SNI did not select DNS identity');
+checkPin(FCNCertificate::caSettingsForSave(['cert_mode' => 'dns', 'provider' => 'cloudflare'], 'node.example')
+    === ['cert_mode' => 'dns', 'provider' => 'cloudflare'], 'DNS credentials provided at the node must remain supported');
+checkPin(FCNCertificate::caSettingsForSave(['cert_mode' => 'file', 'key_file' => '/key.pem', 'dns_env' => 'secret'], '192.0.2.1')
+    === ['cert_mode' => 'file', 'key_file' => '/key.pem'], 'existing file with IP identity was altered');
+checkPin(FCNCertificate::caSettingsForSave(['cert_mode' => 'remote', 'tls_cert' => 'cert', 'tls_key' => 'key', 'dns_env' => 'secret'], 'node.example')
+    === ['cert_mode' => 'remote', 'tls_cert' => 'cert', 'tls_key' => 'key'], 'remote PEM fields changed');
+foreach (['192.0.2.1', '2001:db8::1', 'unqualified', 'invalid..example'] as $host) {
+    try { FCNCertificate::caSettingsForSave(['cert_mode' => 'http'], $host); throw new RuntimeException('invalid automatic domain accepted'); }
+    catch (InvalidArgumentException $expected) {}
+}
+try { FCNCertificate::caSettingsForSave(['cert_mode' => 'dns', 'dns_env' => 'malformed'], 'node.example'); throw new RuntimeException('invalid DNS environment accepted'); }
+catch (InvalidArgumentException $expected) {}
+echo "FCN automatic certificate settings, fallbacks and secret scoping passed\n";

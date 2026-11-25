@@ -456,15 +456,8 @@ class ServerService
             }
 
             $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
-            if (($v['protocol'] ?? '') === 'fcn-v3') {
-                $servers[$k]['install_command'] = $this->fcnV3DeployCommand($v, (string) $apiHost);
-                continue;
-            }
-            if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2'], true)) {
-                $servers[$k]['install_command'] = sprintf(
-                    'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.5.0/bootstrap.sh && bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
-                    escapeshellarg((string) $apiHost), (int) $v['id'], escapeshellarg((string) config('v2board.server_token', ''))
-                );
+            if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2', 'fcn-v3'], true)) {
+                $servers[$k]['install_command'] = $this->fcnDeployCommand($v, (string) $apiHost);
                 continue;
             }
             if (($v['protocol'] ?? '') === 'fastcat-v2') {
@@ -486,9 +479,10 @@ class ServerService
         return $servers;
     }
 
-    private function fcnV3DeployCommand(array $node, string $panel): ?string
+    private function fcnDeployCommand(array $node, string $panel): ?string
     {
-        $bootstrap = (string) config('fastcat.fcn_v3_native_bootstrap_url', '');
+        $bootstrap = $node['protocol'] === 'fcn-v3' ? (string) config('fastcat.fcn_v3_native_bootstrap_url', '') : '';
+        $bootstrap = $bootstrap ?: (string) config('fastcat.fcn_native_bootstrap_url', '');
         $apiKey = (string) config('v2board.server_token', '');
         foreach ([$bootstrap, $panel] as $url) {
             if (!filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'

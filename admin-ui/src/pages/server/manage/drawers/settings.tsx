@@ -11,8 +11,8 @@ const flag = (value: unknown) => Boolean(Number.parseInt(String(value), 10))
 
 function useSettings(initial: unknown, defaults: () => Settings, onChange: (settings: Settings) => void) {
   const [settings, setSettings] = useState<Settings>(() => (isEmpty(initial) ? defaults() : (initial as Settings)))
-  const change = (key: string, value: unknown) => {
-    const next = { ...settings, [key]: value }
+  const change = (key: string, value: unknown, update: Settings = {}) => {
+    const next = { ...settings, ...update, [key]: value }
     setSettings(next)
     onChange(next)
   }
@@ -26,17 +26,35 @@ interface TlsSettingsProps {
   /** 显示证书申请相关字段（仅 V2node） */
   certApply?: boolean
   requireTrustedCertificate?: boolean
-  fileCertificateOnly?: boolean
+  allowPanelCertificate?: boolean
+  defaultServerName?: string
   onChange: (settings: Settings) => void
 }
 
+export function fcnCertificateOptions(allowPanelCertificate: boolean) {
+  return [
+    { value: 'http', label: 'HTTP 自动申请' },
+    { value: 'dns', label: 'DNS 自动申请' },
+    { value: 'file', label: '文件（已有证书）' },
+    ...(allowPanelCertificate ? [{ value: 'remote', label: '面板下发可信证书' }] : []),
+  ]
+}
+
 /** 安全性配置（Vless、V2node）：TLS 与 Reality 共用 */
-export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certProp, requireTrustedCertificate = false, fileCertificateOnly = false, onChange }: TlsSettingsProps) {
+export function TlsSettings({
+  settings: initial,
+  tls: tlsProp,
+  certApply: certProp,
+  requireTrustedCertificate = false,
+  allowPanelCertificate = true,
+  defaultServerName,
+  onChange,
+}: TlsSettingsProps) {
   const [settings, change] = useSettings(
     initial,
     () => ({
       server_name: '',
-      cert_mode: requireTrustedCertificate ? 'file' : 'self',
+      cert_mode: requireTrustedCertificate ? undefined : 'self',
       provider: '',
       dns_env: '',
       reject_unknown_sni: '0',
@@ -51,36 +69,73 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
   const isTls = tls == 1
   const isReality = tls == 2
   const e = settings
-  const certificateMode = fileCertificateOnly ? 'file' : e.cert_mode
+  const fcnModes = fcnCertificateOptions(allowPanelCertificate)
+  const certificateMode = requireTrustedCertificate && !fcnModes.some(({ value }) => value === e.cert_mode)
+    ? undefined
+    : e.cert_mode
+  const pathPlaceholder = requireTrustedCertificate
+    ? certificateMode === 'file' ? '填写节点上的绝对路径' : '留空使用节点默认路径'
+    : '留空在/etc/v2node/目录自动生成'
+  const pathFields = (
+    <>
+      <div className="form-group">
+        <label>{requireTrustedCertificate ? '证书链文件路径' : '证书公钥文件地址Cert File Path'}</label>
+        <Input
+          value={text(e.cert_file)}
+          onChange={(ev) => change('cert_file', ev.target.value)}
+          placeholder={pathPlaceholder}
+        />
+      </div>
+      <div className="form-group">
+        <label>{requireTrustedCertificate ? '证书私钥文件路径' : '证书私钥文件地址Key File Path'}</label>
+        <Input
+          value={text(e.key_file)}
+          onChange={(ev) => change('key_file', ev.target.value)}
+          placeholder={pathPlaceholder}
+        />
+      </div>
+    </>
+  )
 
   return (
     <>
       <div>
-        {requireTrustedCertificate && <p>FCN 必须使用可信证书。SNI 填写证书覆盖、由你控制的域名；自签证书不能连接。</p>}
+        {requireTrustedCertificate && <p>使用系统信任的证书。SNI 留空时使用连接地址，自动申请需要你控制的域名。</p>}
         <div className="form-group">
           <label>Server Name(SNI)</label>
           <Input
             value={text(e.server_name)}
             onChange={(ev) => change('server_name', ev.target.value)}
-            placeholder={isReality ? 'REALITY必填，与后端保持一致' : ''}
+            placeholder={isReality ? 'REALITY必填，与后端保持一致' : defaultServerName}
           />
         </div>
-        {isTls && certApply && !fileCertificateOnly && (
+        {isTls && certApply && (
           <div className="form-group">
             <label>证书模式Cert Mode</label>
             <Select<string>
-              value={(e.cert_mode as string | undefined) ?? (requireTrustedCertificate ? 'file' : 'self')}
+              value={requireTrustedCertificate ? text(certificateMode) : text(certificateMode) ?? 'self'}
+              placeholder={requireTrustedCertificate ? '选择证书模式' : undefined}
               style={{ width: '100%' }}
-              onChange={(v) => change('cert_mode', v)}
-              options={[
-                ...(!requireTrustedCertificate ? [{ value: 'self', label: '自签名' }] : []),
+              onChange={(v) => {
+                // Changing ownership of the certificate must not reuse a former file-mode path.
+                const clearPaths = requireTrustedCertificate && certificateMode === 'file' && v !== certificateMode
+                change('cert_mode', v, clearPaths ? { cert_file: undefined, key_file: undefined } : {})
+              }}
+              options={requireTrustedCertificate ? fcnModes : [
+                { value: 'self', label: '自签名' },
                 { value: 'file', label: '文件（已有证书）' },
-                { value: 'remote', label: requireTrustedCertificate ? '面板下发可信证书' : '自签名(面板下发)' },
+                { value: 'remote', label: '自签名(面板下发)' },
                 { value: 'http', label: 'HTTP申请' },
                 { value: 'dns', label: 'DNS申请' },
-                ...(!requireTrustedCertificate ? [{ value: 'none', label: '无证书(关闭TLS)' }] : []),
+                { value: 'none', label: '无证书(关闭TLS)' },
               ]}
             />
+            {requireTrustedCertificate && certificateMode === 'http' && (
+              <p>域名应解析到节点。CatNode 通过公网 TCP 80 申请和续期证书，节点需能监听此端口。</p>
+            )}
+            {requireTrustedCertificate && certificateMode === 'dns' && (
+              <p>CatNode 通过 DNS 服务商申请和续期证书，可在 TCP 80 已占用的节点使用。</p>
+            )}
           </div>
         )}
         {certificateMode == 'dns' && certApply && (
@@ -100,33 +155,31 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
         )}
         {certificateMode == 'dns' && certApply && (
           <div className="form-group">
-            <label>DNS env</label>
-            <Input
-              value={text(e.dns_env)}
-              onChange={(ev) => change('dns_env', ev.target.value)}
-              placeholder="书写格式CF_DNS_API_TOKEN=xxxxxxx如有多条使用逗号,分隔"
-            />
+            <label>{requireTrustedCertificate ? 'DNS API 凭据' : 'DNS env'}</label>
+            {requireTrustedCertificate ? (
+              <Input.Password
+                value={text(e.dns_env)}
+                onChange={(ev) => change('dns_env', ev.target.value)}
+                placeholder="CF_DNS_API_TOKEN=…，多项以逗号分隔"
+                autoComplete="off"
+              />
+            ) : (
+              <Input
+                value={text(e.dns_env)}
+                onChange={(ev) => change('dns_env', ev.target.value)}
+                placeholder="书写格式CF_DNS_API_TOKEN=xxxxxxx如有多条使用逗号,分隔"
+              />
+            )}
+            {requireTrustedCertificate && <p>节点环境已配置 API 凭据时可留空。</p>}
           </div>
         )}
-        {isTls && certificateMode != 'none' && certApply && (
-          <div className="form-group">
-            <label>证书公钥文件地址Cert File Path</label>
-            <Input
-              value={text(e.cert_file)}
-              onChange={(ev) => change('cert_file', ev.target.value)}
-              placeholder={fileCertificateOnly ? '填写已有证书链的绝对路径' : '留空在/etc/v2node/目录自动生成'}
-            />
-          </div>
-        )}
-        {isTls && certificateMode != 'none' && certApply && (
-          <div className="form-group">
-            <label>证书私钥文件地址Key File Path</label>
-            <Input
-              value={text(e.key_file)}
-              onChange={(ev) => change('key_file', ev.target.value)}
-              placeholder={fileCertificateOnly ? '填写已有私钥的绝对路径' : '留空在/etc/v2node/目录自动生成'}
-            />
-          </div>
+        {isTls && certApply && (requireTrustedCertificate ? Boolean(certificateMode) : certificateMode != 'none') && (
+          requireTrustedCertificate && certificateMode !== 'file' ? (
+            <details className="form-group">
+              <summary>{e.cert_file || e.key_file ? '自定义证书文件路径（已配置）' : '自定义证书文件路径（可选）'}</summary>
+              {pathFields}
+            </details>
+          ) : pathFields
         )}
         {isTls && certificateMode == 'remote' && certApply && !requireTrustedCertificate && (
           <div className="form-group">

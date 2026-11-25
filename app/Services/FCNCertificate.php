@@ -8,6 +8,39 @@ use RuntimeException;
 /** Managed FCN certificates: identity is SHA256 of DER SubjectPublicKeyInfo. */
 class FCNCertificate
 {
+    public static function automaticDomain(array $settings, string $host): ?string
+    {
+        $name = trim($settings['server_name'] ?? '') ?: trim($host);
+        return strpos($name, '.') !== false
+            && !filter_var($name, FILTER_VALIDATE_IP)
+            && filter_var($name, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)
+            ? $name : null;
+    }
+
+    public static function caSettingsForSave(array $settings, string $host): array
+    {
+        $mode = $settings['cert_mode'];
+        if (in_array($mode, ['http', 'dns'], true) && self::automaticDomain($settings, $host) === null) {
+            throw new InvalidArgumentException('自动申请证书需要公网域名。节点连接地址为 IP 时，请填写用于申请的 SNI 域名。');
+        }
+        $fields = ['server_name', 'cert_mode', 'cert_file', 'key_file'];
+        if ($mode === 'dns') {
+            $fields = array_merge($fields, ['provider', 'dns_env']);
+            if (!empty($settings['dns_env'])) {
+                $entries = array_map('trim', explode(',', $settings['dns_env']));
+                foreach ($entries as $entry) {
+                    if (!preg_match('/\A[A-Za-z_][A-Za-z0-9_]*=[^\x00-\x1F\x7F]+\z/', $entry)) {
+                        throw new InvalidArgumentException('DNS 环境变量请按 KEY=VALUE 填写，多条用逗号分隔。');
+                    }
+                }
+                $settings['dns_env'] = implode(',', $entries);
+            }
+        } elseif ($mode === 'remote') {
+            $fields = array_merge($fields, ['tls_cert', 'tls_key']);
+        }
+        return array_intersect_key($settings, array_flip($fields));
+    }
+
     public static function forSave(array $settings, array $old, string $name, bool $rotate = false): array
     {
         if ($rotate) {
@@ -75,7 +108,7 @@ class FCNCertificate
     {
         // Subscription/API consumers never receive certificate private keys or DNS API secrets.
         return [
-            'server_name' => !empty($settings['server_name']) ? $settings['server_name'] : $fallbackName,
+            'server_name' => trim($settings['server_name'] ?? '') ?: $fallbackName,
             'fcn_trust_mode' => $settings['fcn_trust_mode'] ?? 'ca',
             'fcn_spki_sha256' => $settings['fcn_spki_sha256'] ?? null,
             'fcn_cert_expires_at' => $settings['fcn_cert_expires_at'] ?? null,

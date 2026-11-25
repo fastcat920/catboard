@@ -2,7 +2,7 @@ import { copyText } from '@/utils/clipboard'
 import { Button, Checkbox, Input, Select } from 'antd'
 import { JsLink } from '@/components/JsLink'
 import { json4, NetworkSettingsEditor, PaddingSchemeEditor } from './editors'
-import { EncryptionSettings, TlsSettings } from './settings'
+import { EncryptionSettings, fcnCertificateOptions, TlsSettings } from './settings'
 import {
   ChildDrawer,
   DrawerActions,
@@ -58,6 +58,14 @@ const TLS_REQUIRED = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'anytls', 'hys
 /** 安全性默认显示为 TLS 的协议 */
 const TLS_DEFAULT = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'hysteria2', 'trojan', 'tuic']
 
+function fcnCaSettings(previous: Record<string, unknown> | undefined, allowPanelCertificate: boolean) {
+  const modes = fcnCertificateOptions(allowPanelCertificate)
+  if (previous?.fcn_trust_mode !== 'spki' && modes.some(({ value }) => value === previous?.cert_mode)) {
+    return { ...previous, fcn_trust_mode: 'ca' }
+  }
+  return { server_name: previous?.server_name, cert_mode: 'http', fcn_trust_mode: 'ca' }
+}
+
 function NetworkRow({ server, change, onEdit }: { server: NodeForm; change: Change; onEdit: () => void }) {
   const isShadowsocks = server.protocol == 'shadowsocks'
   return (
@@ -110,20 +118,17 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
     setServer((s) => stringifySettings(s, 'network_settings'))
   }
   const formChange: Change = (key, value) => {
-    if (key === 'protocol' && value === 'fcn-v3') {
+    if (key === 'protocol' && (value === 'fcn-v1' || value === 'fcn-v2' || value === 'fcn-v3')) {
       setServer((s) => {
         const previous = s.tls_settings as Record<string, unknown> | undefined
+        const keepPanelCertificate = value !== 'fcn-v3' && (s.protocol === 'fcn-v1' || s.protocol === 'fcn-v2')
+        const usePinnedIdentity = keepPanelCertificate && previous?.fcn_trust_mode === 'spki'
         return {
           ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null,
-          tls_settings: {
-            cert_mode: 'file',
-            server_name: previous?.server_name,
-            cert_file: previous?.cert_mode === 'file' ? previous.cert_file : undefined,
-            key_file: previous?.cert_mode === 'file' ? previous.key_file : undefined,
-          },
+          tls_settings: usePinnedIdentity ? previous : fcnCaSettings(previous, keepPanelCertificate),
         }
       })
-    } else if (key === 'protocol' && ['fastcat-v2', 'fcn-v1', 'fcn-v2'].includes(value as string)) {
+    } else if (key === 'protocol' && value === 'fastcat-v2') {
       setServer((s) => ({ ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null }))
     } else if (key === 'protocol' && TLS_REQUIRED.includes(value as string)) {
       setServer((s) => ({ ...s, protocol: value, tls: 1 }))
@@ -140,6 +145,10 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
   }
 
   const protocol = server.protocol as string | null | undefined
+  const supportsPinnedIdentity = protocol === 'fcn-v1' || protocol === 'fcn-v2'
+  const isFCN = supportsPinnedIdentity || protocol === 'fcn-v3'
+  const tlsSettings = server.tls_settings as Record<string, unknown> | undefined
+  const usesPinnedIdentity = supportsPinnedIdentity && tlsSettings?.fcn_trust_mode === 'spki'
   const installCommand = protocol === record?.protocol ? text(record?.install_command) : undefined
   const tls = Number.parseInt(String(server.tls), 10)
   const networkSettings = server.network_settings
@@ -212,29 +221,37 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               </div>
             )}
           </div>
-          {(protocol === 'fcn-v1' || protocol === 'fcn-v2') && (
+          {supportsPinnedIdentity && (
             <div className="form-group">
               <label>服务器身份验证</label>
               <Select<string>
                 style={{ width: '100%' }}
-                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode) || 'ca'}
+                value={usesPinnedIdentity ? 'spki' : 'ca'}
                 options={[{ value: 'ca', label: 'CA 证书验证' }, { value: 'spki', label: '自签证书 + 固定公钥' }]}
-                onChange={(value) => setServer((s) => ({ ...s, tls_settings: {
-                  ...(s.tls_settings as Record<string, unknown> | undefined), fcn_trust_mode: value,
-                  ...(value === 'spki' ? { cert_mode: 'remote' } : {}),
-                } }))}
+                onChange={(value) => setServer((s) => {
+                  const previous = s.tls_settings as Record<string, unknown> | undefined
+                  const saved = record?.tls_settings as Record<string, unknown> | undefined
+                  const savedSupportsPanelCertificate = record?.protocol === 'fcn-v1' || record?.protocol === 'fcn-v2'
+                  const nextTlsSettings = value === 'spki'
+                    ? {
+                      ...(savedSupportsPanelCertificate && saved?.fcn_trust_mode === 'spki' ? saved : undefined),
+                      server_name: previous?.server_name, fcn_trust_mode: 'spki', cert_mode: 'remote',
+                    }
+                    : { ...fcnCaSettings(saved, savedSupportsPanelCertificate), server_name: previous?.server_name }
+                  return { ...s, tls_settings: nextTlsSettings }
+                })}
               />
-              {(server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki' && (
-                <p>保存时自动生成证书并下发公钥指纹；无需申请 CA 证书。换公钥后客户端必须刷新订阅。节点下发仅按账号权限组，固定公钥需要支持该功能的核心。</p>
+              {usesPinnedIdentity && (
+                <p>面板保存时生成证书并下发公钥指纹。固定公钥需要客户端核心支持，更换公钥后需刷新订阅。</p>
               )}
               {Boolean(server.parent_id) && <p>前置节点使用父节点的证书身份；修改父节点后生效。</p>}
             </div>
           )}
-          {(protocol === 'fcn-v1' || protocol === 'fcn-v2') && (
+          {supportsPinnedIdentity && (
             <div className="form-group">QUIC + TLS 1.3 · BBR · {protocol === 'fcn-v1' ? '单连接' : '双连接恢复选路'}。需要放行服务端 UDP 端口，使用账号 UUID 授权。</div>
           )}
           {protocol === 'fcn-v3' && (
-            <div className="form-group">HTTP/3 + TLS 1.3。放行服务端 UDP 端口，使用系统 CA 信任的证书文件和账号 UUID 授权。</div>
+            <div className="form-group">HTTP/3 + TLS 1.3。放行服务端 UDP 端口，使用系统 CA 信任的证书和账号 UUID 授权。</div>
           )}
           {protocol === 'fastcat-v2' && (
             <div className="form-group">
@@ -432,31 +449,30 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               onChange={(v) => formChange('network_settings', v)}
             />
           )}
-          {child.type === 'tls_settings' && (protocol === 'fcn-v1' || protocol === 'fcn-v2') &&
-            (server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki' && (
+          {child.type === 'tls_settings' && usesPinnedIdentity && (
             <div>
               <label>SNI / 证书名称</label>
-              <Input value={text((server.tls_settings as Record<string, unknown> | undefined)?.server_name)}
+              <Input value={text(tlsSettings?.server_name)}
                 placeholder={text(server.host)}
                 onChange={(e) => setServer((s) => ({ ...s, tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), server_name: e.target.value.trim() } }))} />
-              <p>身份由固定公钥验证。此名称需要与证书匹配，但不代表该网站官方身份，也不保证隐蔽性。</p>
+              <p>证书覆盖此名称，客户端通过固定公钥验证节点身份。</p>
               <label>公钥指纹（保存后生成）</label>
-              <Input readOnly value={text((server.tls_settings as Record<string, unknown> | undefined)?.fcn_spki_sha256)} />
-              <p>证书到期前自动使用同一密钥续签；私钥仅下发给 CatNode，不进入用户订阅。</p>
-              <Checkbox checked={Boolean((server.tls_settings as Record<string, unknown> | undefined)?.fcn_rotate_key)}
+              <Input readOnly value={text(tlsSettings?.fcn_spki_sha256)} />
+              <p>证书到期前使用同一密钥续签。私钥仅下发给 CatNode。</p>
+              <Checkbox checked={Boolean(tlsSettings?.fcn_rotate_key)}
                 onChange={(e) => setServer((s) => ({ ...s, tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fcn_rotate_key: e.target.checked } }))}>
                 保存时更换公钥（旧订阅需刷新后才能重连）
               </Checkbox>
             </div>
           )}
-          {child.type === 'tls_settings' && !((protocol === 'fcn-v1' || protocol === 'fcn-v2') &&
-            (server.tls_settings as Record<string, unknown> | undefined)?.fcn_trust_mode === 'spki') && (
+          {child.type === 'tls_settings' && !usesPinnedIdentity && (
             <TlsSettings
               settings={server.tls_settings}
               tls={server.tls}
               certApply
-              requireTrustedCertificate={protocol === 'fcn-v1' || protocol === 'fcn-v2' || protocol === 'fcn-v3'}
-              fileCertificateOnly={protocol === 'fcn-v3'}
+              requireTrustedCertificate={isFCN}
+              allowPanelCertificate={supportsPinnedIdentity}
+              defaultServerName={isFCN ? text(server.host) || '留空使用连接地址' : undefined}
               onChange={(v) => setServer((s) => ({ ...s, tls_settings: v }))}
             />
           )}

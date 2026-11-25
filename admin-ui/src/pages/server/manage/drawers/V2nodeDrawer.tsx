@@ -43,6 +43,7 @@ const NETWORK_PLACEHOLDERS = {
 export const PROTOCOLS = [
   { value: 'fcn-v1', label: 'FCN v1' },
   { value: 'fcn-v2', label: 'FCN v2' },
+  { value: 'fcn-v3', label: 'FCN v3' },
   { value: 'anytls', label: 'AnyTLS' },
   { value: 'hysteria2', label: 'Hysteria2' },
   { value: 'fastcat-v2', label: 'FastCat v2' },
@@ -53,9 +54,9 @@ export const PROTOCOLS = [
   { value: 'vmess', label: 'VMess' },
 ]
 /** 这些协议必须使用 TLS：切换到它们时安全性自动设为 TLS */
-const TLS_REQUIRED = ['fcn-v1', 'fcn-v2', 'fastcat-v2', 'anytls', 'hysteria2', 'trojan', 'tuic']
+const TLS_REQUIRED = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'anytls', 'hysteria2', 'trojan', 'tuic']
 /** 安全性默认显示为 TLS 的协议 */
-const TLS_DEFAULT = ['fcn-v1', 'fcn-v2', 'fastcat-v2', 'hysteria2', 'trojan', 'tuic']
+const TLS_DEFAULT = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'hysteria2', 'trojan', 'tuic']
 
 function NetworkRow({ server, change, onEdit }: { server: NodeForm; change: Change; onEdit: () => void }) {
   const isShadowsocks = server.protocol == 'shadowsocks'
@@ -109,7 +110,20 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
     setServer((s) => stringifySettings(s, 'network_settings'))
   }
   const formChange: Change = (key, value) => {
-    if (key === 'protocol' && ['fastcat-v2', 'fcn-v1', 'fcn-v2'].includes(value as string)) {
+    if (key === 'protocol' && value === 'fcn-v3') {
+      setServer((s) => {
+        const previous = s.tls_settings as Record<string, unknown> | undefined
+        return {
+          ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null,
+          tls_settings: {
+            cert_mode: 'file',
+            server_name: previous?.server_name,
+            cert_file: previous?.cert_mode === 'file' ? previous.cert_file : undefined,
+            key_file: previous?.cert_mode === 'file' ? previous.key_file : undefined,
+          },
+        }
+      })
+    } else if (key === 'protocol' && ['fastcat-v2', 'fcn-v1', 'fcn-v2'].includes(value as string)) {
       setServer((s) => ({ ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null }))
     } else if (key === 'protocol' && TLS_REQUIRED.includes(value as string)) {
       setServer((s) => ({ ...s, protocol: value, tls: 1 }))
@@ -218,6 +232,9 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           {(protocol === 'fcn-v1' || protocol === 'fcn-v2') && (
             <div className="form-group">QUIC + TLS 1.3 · BBR · {protocol === 'fcn-v1' ? '单连接' : '双连接恢复选路'}。需要放行服务端 UDP 端口，使用账号 UUID 授权。</div>
           )}
+          {protocol === 'fcn-v3' && (
+            <div className="form-group">HTTP/3 + TLS 1.3。放行服务端 UDP 端口，使用系统 CA 信任的证书文件和账号 UUID 授权。</div>
+          )}
           {protocol === 'fastcat-v2' && (
             <div className="form-group">
               <label>协议组合</label>
@@ -262,7 +279,7 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           {protocol == 'shadowsocks' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}
-          {protocol != null && protocol != 'fastcat-v2' && protocol != 'fcn-v1' && protocol != 'fcn-v2' && protocol != 'hysteria2' && protocol != 'shadowsocks' && protocol != 'tuic' && (
+          {protocol != null && protocol != 'fastcat-v2' && protocol != 'fcn-v1' && protocol != 'fcn-v2' && protocol != 'fcn-v3' && protocol != 'hysteria2' && protocol != 'shadowsocks' && protocol != 'tuic' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}
           {server.network != null &&
@@ -385,9 +402,9 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           <RouteField server={server} change={formChange} />
           <div className="form-group">
             <label>{protocol === 'fastcat-v2' && server.parent_id ? '前置转发配置（Nginx stream）' : '一键安装指令'}</label>
-            {['fastcat-v2', 'fcn-v1', 'fcn-v2'].includes(protocol ?? '') && (
+            {['fastcat-v2', 'fcn-v1', 'fcn-v2', 'fcn-v3'].includes(protocol ?? '') && (
               <Button disabled={!server.install_command} onClick={() => copyText(text(server.install_command) ?? '')}>
-                {server.parent_id ? '复制前置转发配置' : '复制 CatNode 部署命令'}
+                {server.parent_id && protocol !== 'fcn-v3' ? '复制前置转发配置' : '复制 CatNode 部署命令'}
               </Button>
             )}
             <Input.TextArea
@@ -432,7 +449,8 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
               settings={server.tls_settings}
               tls={server.tls}
               certApply
-              requireTrustedCertificate={protocol === 'fcn-v1' || protocol === 'fcn-v2'}
+              requireTrustedCertificate={protocol === 'fcn-v1' || protocol === 'fcn-v2' || protocol === 'fcn-v3'}
+              fileCertificateOnly={protocol === 'fcn-v3'}
               onChange={(v) => setServer((s) => ({ ...s, tls_settings: v }))}
             />
           )}

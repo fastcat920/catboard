@@ -14,11 +14,11 @@ class FastCatV1 extends ClashMeta
 
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
 
-    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false, bool $supportsFCNPinning = false)
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false, bool $supportsFCNPinning = false, bool $supportsFCNV3 = false)
     {
         $this->fcnUuid = $user['uuid'];
-        // FCN visibility follows the normal account/group node list only.
-        // Legacy capability arguments are retained for call-site compatibility.
+        // FCN v1/v2 retain their existing account/group visibility behavior.
+        $servers = self::filterUnsupportedFCNV3($servers, $supportsFCNV3);
         $directory = (string) config('fastcat.auto_grants_dir', '');
         if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
             $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2, $transportModes);
@@ -28,9 +28,25 @@ class FastCatV1 extends ClashMeta
         parent::__construct($user, $servers);
     }
 
+    public static function filterUnsupportedFCNV3(array $servers, bool $supportsFCNV3): array
+    {
+        if ($supportsFCNV3) return $servers;
+        return array_values(array_filter($servers, static function (array $server) {
+            return ($server['protocol'] ?? $server['type'] ?? '') !== 'fcn-v3';
+        }));
+    }
+
     protected function buildCustomProxy(array $server): ?array
     {
         $protocol = $server['protocol'] ?? $server['type'] ?? '';
+        if ($protocol === 'fcn-v3') {
+            return [
+                'type' => 'fcn-v3', 'name' => $server['name'],
+                'server' => $server['host'], 'port' => (int) $server['port'],
+                'sni' => !empty($server['tls_settings']['server_name']) ? $server['tls_settings']['server_name'] : $server['host'],
+                'uuid' => $this->fcnUuid, 'udp' => true,
+            ];
+        }
         if (in_array($protocol, ['fcn-v1', 'fcn-v2'], true)) {
             $proxy = [
                 'name' => $server['name'], 'type' => 'fcn',

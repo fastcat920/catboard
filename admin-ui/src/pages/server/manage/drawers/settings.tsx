@@ -26,11 +26,12 @@ interface TlsSettingsProps {
   /** 显示证书申请相关字段（仅 V2node） */
   certApply?: boolean
   requireTrustedCertificate?: boolean
+  fileCertificateOnly?: boolean
   onChange: (settings: Settings) => void
 }
 
 /** 安全性配置（Vless、V2node）：TLS 与 Reality 共用 */
-export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certProp, requireTrustedCertificate = false, onChange }: TlsSettingsProps) {
+export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certProp, requireTrustedCertificate = false, fileCertificateOnly = false, onChange }: TlsSettingsProps) {
   const [settings, change] = useSettings(
     initial,
     () => ({
@@ -50,6 +51,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
   const isTls = tls == 1
   const isReality = tls == 2
   const e = settings
+  const certificateMode = fileCertificateOnly ? 'file' : e.cert_mode
 
   return (
     <>
@@ -63,7 +65,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             placeholder={isReality ? 'REALITY必填，与后端保持一致' : ''}
           />
         </div>
-        {isTls && certApply && (
+        {isTls && certApply && !fileCertificateOnly && (
           <div className="form-group">
             <label>证书模式Cert Mode</label>
             <Select<string>
@@ -81,7 +83,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
-        {e.cert_mode == 'dns' && certApply && (
+        {certificateMode == 'dns' && certApply && (
           <div className="form-group">
             <label>
               DNS解析提供商Provider{' '}
@@ -96,7 +98,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
-        {e.cert_mode == 'dns' && certApply && (
+        {certificateMode == 'dns' && certApply && (
           <div className="form-group">
             <label>DNS env</label>
             <Input
@@ -106,27 +108,27 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
-        {isTls && e.cert_mode != 'none' && certApply && (
+        {isTls && certificateMode != 'none' && certApply && (
           <div className="form-group">
             <label>证书公钥文件地址Cert File Path</label>
             <Input
               value={text(e.cert_file)}
               onChange={(ev) => change('cert_file', ev.target.value)}
-              placeholder="留空在/etc/v2node/目录自动生成"
+              placeholder={fileCertificateOnly ? '填写已有证书链的绝对路径' : '留空在/etc/v2node/目录自动生成'}
             />
           </div>
         )}
-        {isTls && e.cert_mode != 'none' && certApply && (
+        {isTls && certificateMode != 'none' && certApply && (
           <div className="form-group">
             <label>证书私钥文件地址Key File Path</label>
             <Input
               value={text(e.key_file)}
               onChange={(ev) => change('key_file', ev.target.value)}
-              placeholder="留空在/etc/v2node/目录自动生成"
+              placeholder={fileCertificateOnly ? '填写已有私钥的绝对路径' : '留空在/etc/v2node/目录自动生成'}
             />
           </div>
         )}
-        {isTls && e.cert_mode == 'remote' && certApply && !requireTrustedCertificate && (
+        {isTls && certificateMode == 'remote' && certApply && !requireTrustedCertificate && (
           <div className="form-group">
             <label>pinnedPeerCertSha256</label>
             <Input
@@ -138,7 +140,7 @@ export function TlsSettings({ settings: initial, tls: tlsProp, certApply: certPr
             />
           </div>
         )}
-        {isTls && e.cert_mode == 'remote' && requireTrustedCertificate && <>
+        {isTls && certificateMode == 'remote' && requireTrustedCertificate && <>
           <div className="form-group"><label>证书链 PEM</label><Input.TextArea rows={4} value={text(e.tls_cert)} onChange={(ev) => change('tls_cert', ev.target.value)} /></div>
           <div className="form-group"><label>证书私钥 PEM</label><Input.TextArea rows={4} value={text(e.tls_key)} onChange={(ev) => change('tls_key', ev.target.value)} /></div>
         </>}

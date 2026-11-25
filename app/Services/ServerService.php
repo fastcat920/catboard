@@ -210,7 +210,7 @@ class ServerService
                 $v2node[$key]['_fastcat_parent_mode'] = $parent['tls_settings']['fastcat_transport_mode'] ?? 'auto';
                 $v2node[$key]['_fastcat_managed_sni'] = $parent['host'];
             }
-            if (isset($v2node[$v['parent_id']])) {
+            if (isset($v['parent_id'], $v2node[$v['parent_id']])) {
                 $v2node[$key]['last_check_at'] = Cache::get(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $v['parent_id']));
                 $v2node[$key]['created_at'] = $v2node[$v['parent_id']]['created_at'];
             }
@@ -228,6 +228,15 @@ class ServerService
                 }
             }
             $export = $v2node[$key]->toArray();
+            if ($v['protocol'] === 'fcn-v3') {
+                // This projection also feeds the user-facing JSON node API.
+                $serverName = trim((string) ($export['tls_settings']['server_name'] ?? ''));
+                // Keep the TLS identity when the entry pool substitutes a dial address.
+                $export['tls_settings'] = ['server_name' => $serverName !== '' ? $serverName : $export['host']];
+                $export['encryption_settings'] = null;
+                $export['network_settings'] = null;
+                $export['obfs_password'] = null;
+            }
             if (in_array($v['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
                 $identityNode = $v2node[$key];
                 $seen = [$key => true];
@@ -447,6 +456,10 @@ class ServerService
             }
 
             $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
+            if (($v['protocol'] ?? '') === 'fcn-v3') {
+                $servers[$k]['install_command'] = $this->fcnV3DeployCommand($v, (string) $apiHost);
+                continue;
+            }
             if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2'], true)) {
                 $servers[$k]['install_command'] = sprintf(
                     'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.5.0/bootstrap.sh && bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
@@ -471,6 +484,24 @@ class ServerService
             );
         }
         return $servers;
+    }
+
+    private function fcnV3DeployCommand(array $node, string $panel): ?string
+    {
+        $bootstrap = (string) config('fastcat.fcn_v3_native_bootstrap_url', '');
+        $apiKey = (string) config('v2board.server_token', '');
+        foreach ([$bootstrap, $panel] as $url) {
+            if (!filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'
+                || parse_url($url, PHP_URL_USER) !== null || parse_url($url, PHP_URL_FRAGMENT) !== null) {
+                return null;
+            }
+        }
+        if ($apiKey === '') return null;
+        return sprintf(
+            "curl --proto '=https' --proto-redir '=https' -fsSLo catnode-install.sh -- %s && " .
+            'bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
+            escapeshellarg($bootstrap), escapeshellarg($panel), (int) $node['id'], escapeshellarg($apiKey)
+        );
     }
 
     private function mergeData(&$servers)

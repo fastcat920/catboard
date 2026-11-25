@@ -46,3 +46,28 @@ echo "FCN pinned subscription is visible to both capability versions\n";
 $preserved = \App\Services\FastCatAutoGrants::apply([$nodes[0]], 42, '/unused-legacy-grants');
 check(($preserved[0]['protocol'] ?? '') === 'fcn-v1' && !isset($preserved[0]['_fastcat_auto_proxy']), 'legacy grant changed FCN identity');
 echo "FCN legacy override isolation passed\n";
+
+$v3 = [
+    'id' => 3, 'type' => 'v2node', 'protocol' => 'fcn-v3', 'name' => 'FCN v3',
+    'host' => 'v3.example', 'port' => '443', 'tls_settings' => [
+        'server_name' => 'cert.example', 'fcn_spki_sha256' => 'ignored-pin', 'tls_key' => 'ignored-inline-key',
+    ],
+];
+foreach ([false, true] as $capable) {
+    foreach ([false, true] as $olderCapabilities) {
+        $app = new FCNProbe($user, array_merge([$v3], $nodes), true, null, false, false,
+            $olderCapabilities, $olderCapabilities, $capable);
+        $visible = $property->getValue($app);
+        check(count($visible) === ($capable ? 3 : 2), 'FCN v3 visibility must depend on its own capability');
+        if ($capable) {
+            check($app->proxy($visible[0]) === [
+                'type' => 'fcn-v3', 'name' => 'FCN v3', 'server' => 'v3.example', 'port' => 443,
+                'sni' => 'cert.example', 'uuid' => $user['uuid'], 'udp' => true,
+            ], 'FCN v3 subscription must include only the CA/UUID contract fields');
+        }
+    }
+}
+$v3['tls_settings']['server_name'] = '';
+check($app->proxy($v3)['sni'] === 'v3.example', 'FCN v3 must fall back to the server hostname for an empty SNI');
+check(\App\Services\FastCatAutoGrants::apply([$v3], 42, '/unused-legacy-grants') === [$v3], 'legacy grant changed FCN v3 identity');
+echo "FCN v3 account subscription, capability isolation and CA-only projection passed\n";

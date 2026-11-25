@@ -16,6 +16,6 @@
 
 支持 FCN v3 的客户端在原有加密订阅请求中携带 `fc_fcn3=1`。面板只给用户权限组已授权的节点下发 `type: fcn-v3`，使用用户原有的账号 UUID。节点仍从原有 V2node 接口同步配置和用户，并向同一计量接口上报。
 
-将 `FASTCAT_FCN_V3_NATIVE_BOOTSTRAP_URL` 设为支持 FCN v3 的 CatNode 发布包的 HTTPS 引导脚本后，编辑器会生成 native 安装命令。未配置时可以手动安装支持 FCN v3 的 CatNode。
+保存 FCN v3 节点后，编辑器会生成 CatNode v0.6.0 的 native 安装命令。使用自建发布源时，可以通过 `FASTCAT_FCN_V3_NATIVE_BOOTSTRAP_URL` 指定支持 FCN v3 的 CatNode HTTPS 引导脚本。
 
 自签证书与固定公钥的配置、轮换和验收见 [FCN SPKI 说明](fcn-spki.md)。

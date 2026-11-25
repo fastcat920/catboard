@@ -2,6 +2,7 @@
 
 // Exercise the service projections without Laravel or a database.
 function config($key, $default = null) { return $GLOBALS['testConfig'][$key] ?? $default; }
+function env($key, $default = null) { return $GLOBALS['testEnv'][$key] ?? $default; }
 function check($value, $message) { if (!$value) throw new RuntimeException($message); }
 
 class NodeFixture extends ArrayObject
@@ -73,4 +74,12 @@ $command = $service->getAllV2node()[0]['install_command'];
 check(strpos($command, "'https://release.example/fcn3/bootstrap.sh'") !== false
     && strpos($command, "--native --api-host 'https://panel.example' --node-id 11 --api-key 'example-token'") !== false
     && strpos($command, 'v0.5.0') === false, 'installer did not use the configured v3 release');
-echo "FCN v3 group visibility, user API projection and optional installer passed\n";
+
+$GLOBALS['testEnv'] = ['FASTCAT_FCN_V3_NATIVE_BOOTSTRAP_URL' => ''];
+$fastcat = require __DIR__ . '/../config/fastcat.php';
+$GLOBALS['testConfig']['fastcat.fcn_v3_native_bootstrap_url'] = $fastcat['fcn_v3_native_bootstrap_url'];
+$command = $service->getAllV2node()[0]['install_command'];
+check(strpos($command, "'https://github.com/fastcat920/CatNode/releases/download/v0.6.0/bootstrap.sh'") !== false
+    && strpos($command, "--native --api-host 'https://panel.example' --node-id 11 --api-key 'example-token'") !== false,
+    'FCN v3 did not default to the CatNode native release');
+echo "FCN v3 group visibility, user API projection and installer passed\n";

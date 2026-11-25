@@ -140,6 +140,7 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
   }
 
   const protocol = server.protocol as string | null | undefined
+  const installCommand = protocol === record?.protocol ? text(record?.install_command) : undefined
   const tls = Number.parseInt(String(server.tls), 10)
   const networkSettings = server.network_settings
   const networkText =
@@ -403,12 +404,17 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           <div className="form-group">
             <label>{protocol === 'fastcat-v2' && server.parent_id ? '前置转发配置（Nginx stream）' : '一键安装指令'}</label>
             {['fastcat-v2', 'fcn-v1', 'fcn-v2', 'fcn-v3'].includes(protocol ?? '') && (
-              <Button disabled={!server.install_command} onClick={() => copyText(text(server.install_command) ?? '')}>
+              <Button disabled={!installCommand} onClick={() => installCommand && copyText(installCommand)}>
                 {server.parent_id && protocol !== 'fcn-v3' ? '复制前置转发配置' : '复制 CatNode 部署命令'}
               </Button>
             )}
             <Input.TextArea
-              value={text(server.install_command ?? '')}
+              value={installCommand ?? ''}
+              placeholder={protocol === 'fcn-v3'
+                ? record?.protocol !== protocol
+                  ? '保存 FCN v3 节点后生成 CatNode 部署命令'
+                  : '当前面板未提供可用的 FCN v3 CatNode 安装命令'
+                : undefined}
               rows={4}
               readOnly
               // 皮肤里取 --v2b-readonly-bg（见 styles/skins/_shell.scss），legacy 下为原值

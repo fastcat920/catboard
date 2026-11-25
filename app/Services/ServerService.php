@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Cache;
 
 class ServerService
 {
+    private const FCN_NATIVE_BOOTSTRAP_URL = 'https://github.com/fastcat920/CatNode/releases/download/v0.7.1/bootstrap.sh';
+
     public function getAvailableVless(User $user): array
     {
         $servers = [];
@@ -449,15 +451,16 @@ class ServerService
         $servers = ServerV2node::orderBy('sort', 'ASC')
             ->get()
             ->toArray();
+        $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
+        $fcnApiHost = $this->fcnPanelApiHost();
         foreach ($servers as $k => $v) {
             $servers[$k]['type'] = 'v2node';
             if (isset($v['padding_scheme'])) {
                 $servers[$k]['padding_scheme'] = json_encode($v['padding_scheme']);
             }
 
-            $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
             if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2', 'fcn-v3'], true)) {
-                $servers[$k]['install_command'] = $this->fcnDeployCommand($v, (string) $apiHost);
+                $servers[$k] = array_replace($servers[$k], $this->fcnDeployment($v, $fcnApiHost));
                 continue;
             }
             if (($v['protocol'] ?? '') === 'fastcat-v2') {
@@ -479,23 +482,44 @@ class ServerService
         return $servers;
     }
 
-    private function fcnDeployCommand(array $node, string $panel): ?string
+    private function fcnPanelApiHost(): ?string
     {
-        $bootstrap = $node['protocol'] === 'fcn-v3' ? (string) config('fastcat.fcn_v3_native_bootstrap_url', '') : '';
-        $bootstrap = $bootstrap ?: (string) config('fastcat.fcn_native_bootstrap_url', '');
-        $apiKey = (string) config('v2board.server_token', '');
-        foreach ([$bootstrap, $panel] as $url) {
-            if (!filter_var($url, FILTER_VALIDATE_URL) || parse_url($url, PHP_URL_SCHEME) !== 'https'
-                || parse_url($url, PHP_URL_USER) !== null || parse_url($url, PHP_URL_FRAGMENT) !== null) {
-                return null;
+        foreach ([config('v2board.server_api_url'), config('v2board.app_url'), config('app.url')] as $candidate) {
+            $url = trim((string) $candidate);
+            // Match CatNode's accepted API base URL format.
+            if (filter_var($url, FILTER_VALIDATE_URL)
+                && preg_match('~\Ahttps://[a-zA-Z0-9.:-]+(?:/[a-zA-Z0-9._/-]*)?\z~', $url)) {
+                return $url;
             }
         }
-        if ($apiKey === '') return null;
-        return sprintf(
+        return null;
+    }
+
+    private function fcnDeployment(array $node, ?string $panel): array
+    {
+        $apiKey = (string) config('v2board.server_token', '');
+        if ($apiKey === '') {
+            return ['install_command' => null, 'install_command_error' => '面板未配置节点通讯 Token，无法生成部署命令。'];
+        }
+
+        $bootstrap = self::FCN_NATIVE_BOOTSTRAP_URL;
+        if ($node['protocol'] === 'fcn-v3') {
+            $override = trim((string) config('fastcat.fcn_v3_native_bootstrap_url', ''));
+            if (filter_var($override, FILTER_VALIDATE_URL) && parse_url($override, PHP_URL_SCHEME) === 'https'
+                && parse_url($override, PHP_URL_USER) === null && parse_url($override, PHP_URL_FRAGMENT) === null) {
+                $bootstrap = $override;
+            }
+        }
+
+        // Prompt for the address when the panel has no HTTPS URL in its configuration.
+        $prompt = $panel === null ? "printf '%s' '面板 HTTPS 地址: ' && IFS= read -r catnode_panel_url && " : '';
+        $panelArgument = $panel === null ? '"$catnode_panel_url"' : escapeshellarg($panel);
+        $command = $prompt . sprintf(
             "curl --proto '=https' --proto-redir '=https' -fsSLo catnode-install.sh -- %s && " .
             'bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
-            escapeshellarg($bootstrap), escapeshellarg($panel), (int) $node['id'], escapeshellarg($apiKey)
+            escapeshellarg($bootstrap), $panelArgument, (int) $node['id'], escapeshellarg($apiKey)
         );
+        return ['install_command' => $command];
     }
 
     private function mergeData(&$servers)

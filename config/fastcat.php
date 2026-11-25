@@ -3,7 +3,6 @@
 return [
     'device_grant_key' => env('FASTCAT_DEVICE_GRANT_KEY', ''),
     'auto_grants_dir' => env('FASTCAT_AUTO_GRANTS_DIR', ''),
-    'fcn_native_bootstrap_url' => 'https://github.com/fastcat920/CatNode/releases/download/v0.7.1/bootstrap.sh',
     'fcn_v3_native_bootstrap_url' => env('FASTCAT_FCN_V3_NATIVE_BOOTSTRAP_URL', ''),
     'subscription' => [
         'enabled' => env('FASTCAT_SUBSCRIPTION_ENABLED', false),

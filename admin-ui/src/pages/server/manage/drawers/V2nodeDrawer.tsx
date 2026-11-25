@@ -136,11 +136,12 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
       change(key, value)
     }
   }
-  // 与原版一致：提交深拷贝后的数据（去掉一键安装指令）
+  // 与原版一致：提交深拷贝后的数据（去掉部署命令和状态）
   const submit = () => {
     const params = withParsedSettings(JSON.parse(JSON.stringify(server)) as NodeForm, 'network_settings')
     if (!params) return
     delete params.install_command
+    delete params.install_command_error
     void save(params, onShow)
   }
 
@@ -149,7 +150,14 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
   const isFCN = supportsPinnedIdentity || protocol === 'fcn-v3'
   const tlsSettings = server.tls_settings as Record<string, unknown> | undefined
   const usesPinnedIdentity = supportsPinnedIdentity && tlsSettings?.fcn_trust_mode === 'spki'
-  const installCommand = protocol === record?.protocol ? text(record?.install_command) : undefined
+  const hasSavedProtocol = protocol === record?.protocol
+  const installCommand = hasSavedProtocol ? text(record?.install_command) : undefined
+  let installPlaceholder: string | undefined
+  if (isFCN && !installCommand) {
+    installPlaceholder = hasSavedProtocol
+      ? text(record?.install_command_error) || '当前面板未提供可用的 CatNode 部署命令'
+      : '保存节点后生成 CatNode 部署命令'
+  }
   const tls = Number.parseInt(String(server.tls), 10)
   const networkSettings = server.network_settings
   const networkText =
@@ -427,11 +435,7 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
             )}
             <Input.TextArea
               value={installCommand ?? ''}
-              placeholder={protocol === 'fcn-v3'
-                ? record?.protocol !== protocol
-                  ? '保存 FCN v3 节点后生成 CatNode 部署命令'
-                  : '当前面板未提供可用的 FCN v3 CatNode 安装命令'
-                : undefined}
+              placeholder={installPlaceholder}
               rows={4}
               readOnly
               // 皮肤里取 --v2b-readonly-bg（见 styles/skins/_shell.scss），legacy 下为原值

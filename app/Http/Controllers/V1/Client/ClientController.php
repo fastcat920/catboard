@@ -31,11 +31,14 @@ class ClientController extends Controller
             $client = (new UaClassifierService())->classify($request->userAgent());
             $client['user_agent'] = trim((string)$request->userAgent());
             $servers = $serverService->getAvailableServers($user, $client);
-            $audit = new AuditService();
-            $servers = $audit->prepare($request, $servers, 'client.subscribe');
             $queryFlag = strtolower((string) $request->query('flag', ''));
             $fastCatFlag = strtolower((string) config('fastcat.subscription.flag', 'fastcat-v1'));
-            if ($queryFlag !== '' && hash_equals($fastCatFlag, $queryFlag)) {
+            $encrypted = $queryFlag !== '' && hash_equals($fastCatFlag, $queryFlag);
+            $supportsFCNV3 = $encrypted && $request->query('fc_fcn3') === '1';
+            $servers = FastCatV1::filterUnsupportedFCNV3($servers, $supportsFCNV3);
+            $audit = new AuditService();
+            $servers = $audit->prepare($request, $servers, 'client.subscribe');
+            if ($encrypted) {
                 $this->setSubscribeInfoToServers($servers, $user);
                 $v2 = $request->query('fc_v2') === '1';
                 $device = $v2 ? FastCatAutoGrants::verifiedDevice(
@@ -43,7 +46,8 @@ class ClientController extends Controller
                     (string)config('fastcat.device_grant_key', ''), time()
                 ) : null;
                 $auto = $request->query('fc_auto') === '1';
-                $class = new FastCatV1($user, $servers, $auto, $device, $v2, $request->query('fc_transport') === '1', $request->query('fc_fcn') === '1', $request->query('fc_fcn_pin') === '1');
+                $class = new FastCatV1($user, $servers, $auto, $device, $v2, $request->query('fc_transport') === '1',
+                    $request->query('fc_fcn') === '1', $request->query('fc_fcn_pin') === '1', $supportsFCNV3);
                 return $this->auditedResponse($audit, $request, $class->handle());
             }
             if($flag) {

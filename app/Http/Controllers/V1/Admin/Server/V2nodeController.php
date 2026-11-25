@@ -22,7 +22,7 @@ class V2nodeController extends Controller
             'listen_ip' => 'nullable',
             'port' => 'required',
             'server_port' => 'required',
-            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls,fastcat-v2,fcn-v1,fcn-v2',
+            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls,fastcat-v2,fcn-v1,fcn-v2,fcn-v3',
             'tls' => 'required|in:0,1,2',
             'tls_settings' => 'nullable|array',
             'flow' => 'nullable|in:xtls-rprx-vision',
@@ -46,7 +46,8 @@ class V2nodeController extends Controller
             'show' => 'nullable|in:0,1',
             'sort' => 'nullable'
         ]);
-        if (in_array($params['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
+        $legacyFCN = in_array($params['protocol'], ['fcn-v1', 'fcn-v2'], true);
+        if ($legacyFCN) {
             $request->validate([
                 'tls_settings.fcn_trust_mode' => 'nullable|in:ca,spki',
                 'tls_settings.fcn_rotate_key' => 'nullable|boolean',
@@ -83,8 +84,44 @@ class V2nodeController extends Controller
                     'tls_settings.key_file.required_if' => '请填写已有私钥的绝对路径。',
                 ]);
             }
+            // ECH and custom TLS options are not implemented by the FCN profiles.
+            $params['tls_settings'] = array_intersect_key($params['tls_settings'] ?? [], array_flip([
+                'server_name', 'cert_mode', 'cert_file', 'key_file', 'tls_cert', 'tls_key', 'provider', 'dns_env',
+                'fcn_trust_mode', 'fcn_spki_sha256', 'fcn_cert_expires_at'
+            ]));
+        }
+        if ($params['protocol'] === 'fcn-v3') {
+            $request->validate([
+                'host' => 'required|string|max:253',
+                'listen_ip' => 'nullable|ip',
+                'port' => 'required|integer|min:1|max:65535',
+                'server_port' => 'required|integer|min:1|max:65535',
+                'tls_settings.server_name' => 'nullable|string|max:253',
+                'tls_settings.fcn_trust_mode' => 'nullable|in:ca',
+                'tls_settings.cert_mode' => 'required|in:file',
+                'tls_settings.cert_file' => 'required|string|starts_with:/',
+                'tls_settings.key_file' => 'required|string|starts_with:/',
+            ]);
+            $settings = $params['tls_settings'];
+            foreach ([$params['host'], $settings['server_name'] ?? ''] as $name) {
+                if ($name !== '' && !filter_var($name, FILTER_VALIDATE_IP)
+                    && !filter_var($name, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                    abort(422, 'FCN v3 的连接地址和 SNI 必须是有效的域名或 IP。');
+                }
+            }
+            $params['listen_ip'] = $params['listen_ip'] ?? '0.0.0.0';
+            $params['tls_settings'] = array_intersect_key($settings, array_flip([
+                'server_name', 'cert_mode', 'cert_file', 'key_file',
+            ]));
+            $params['cipher'] = null;
+            $params['obfs'] = null;
+            $params['udp_relay_mode'] = null;
+            $params['up_mbps'] = 0;
+            $params['down_mbps'] = 0;
+        }
+        if ($legacyFCN || $params['protocol'] === 'fcn-v3') {
             $params['tls'] = 1;
-            $params['network'] = 'tcp'; // schema field; FCN uses QUIC over UDP
+            $params['network'] = 'tcp'; // Database field. FCN transports use QUIC over UDP.
             $params['flow'] = null;
             $params['network_settings'] = null;
             $params['trusted_x_forwarded_for'] = null;
@@ -93,11 +130,6 @@ class V2nodeController extends Controller
             $params['disable_sni'] = 0;
             $params['zero_rtt_handshake'] = 0;
             $params['congestion_control'] = 'bbr';
-            // ECH and custom TLS options are not implemented by the FCN profiles.
-            $params['tls_settings'] = array_intersect_key($params['tls_settings'] ?? [], array_flip([
-                'server_name', 'cert_mode', 'cert_file', 'key_file', 'tls_cert', 'tls_key', 'provider', 'dns_env',
-                'fcn_trust_mode', 'fcn_spki_sha256', 'fcn_cert_expires_at'
-            ]));
         }
         if ($params['protocol'] === 'fastcat-v2') {
             $request->validate([

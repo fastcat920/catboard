@@ -16,7 +16,7 @@ class FastCatAutoGrants
         $lookups = [];
         $emitted = [];
         foreach ($servers as $server) {
-            if (in_array($server['protocol'] ?? '', ['fcn-v1', 'fcn-v2'], true)) {
+            if (in_array($server['protocol'] ?? '', ['fcn-v1', 'fcn-v2', 'fcn-v3'], true)) {
                 // FCN has its own authenticated identity and must never use legacy grant overrides.
                 $output[] = $server;
                 continue;

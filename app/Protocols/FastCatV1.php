@@ -14,11 +14,9 @@ class FastCatV1 extends ClashMeta
 
     private const HIDDEN_PROXY_GROUPS = ['自动选择', '故障转移'];
 
-    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false, bool $supportsFCNPinning = false, bool $supportsFCNV3 = false)
+    public function __construct($user, $servers, bool $supportsAuto = false, ?string $device = null, bool $managedV2 = false, bool $transportModes = false, bool $supportsFCN = false, bool $supportsFCNPinning = false)
     {
         $this->fcnUuid = $user['uuid'];
-        // FCN v1/v2 retain their existing account/group visibility behavior.
-        $servers = self::filterUnsupportedFCNV3($servers, $supportsFCNV3);
         $directory = (string) config('fastcat.auto_grants_dir', '');
         if ($supportsAuto && $user['u'] + $user['d'] < $user['transfer_enable']) {
             $servers = FastCatAutoGrants::apply($servers, (int) $user['id'], $directory, $device, $managedV2, $transportModes);
@@ -26,14 +24,6 @@ class FastCatV1 extends ClashMeta
             $servers = FastCatAutoGrants::apply($servers, 0, '');
         }
         parent::__construct($user, $servers);
-    }
-
-    public static function filterUnsupportedFCNV3(array $servers, bool $supportsFCNV3): array
-    {
-        if ($supportsFCNV3) return $servers;
-        return array_values(array_filter($servers, static function (array $server) {
-            return ($server['protocol'] ?? $server['type'] ?? '') !== 'fcn-v3';
-        }));
     }
 
     protected function buildCustomProxy(array $server): ?array

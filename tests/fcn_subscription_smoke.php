@@ -53,21 +53,19 @@ $v3 = [
         'server_name' => 'cert.example', 'fcn_spki_sha256' => 'ignored-pin', 'tls_key' => 'ignored-inline-key',
     ],
 ];
-foreach ([false, true] as $capable) {
-    foreach ([false, true] as $olderCapabilities) {
-        $app = new FCNProbe($user, array_merge([$v3], $nodes), true, null, false, false,
-            $olderCapabilities, $olderCapabilities, $capable);
-        $visible = $property->getValue($app);
-        check(count($visible) === ($capable ? 3 : 2), 'FCN v3 visibility must depend on its own capability');
-        if ($capable) {
-            check($app->proxy($visible[0]) === [
-                'type' => 'fcn-v3', 'name' => 'FCN v3', 'server' => 'v3.example', 'port' => 443,
-                'sni' => 'cert.example', 'uuid' => $user['uuid'], 'udp' => true,
-            ], 'FCN v3 subscription must include only the CA/UUID contract fields');
-        }
-    }
+foreach ([false, true] as $olderCapabilities) {
+    $app = new FCNProbe($user, array_merge([$v3], $nodes), true, null, false, false,
+        $olderCapabilities, $olderCapabilities);
+    $visible = $property->getValue($app);
+    check(count($visible) === 3, 'FCN v3 visibility must follow the same group selection as FCN v1/v2');
+    check($app->proxy($visible[0]) === [
+        'type' => 'fcn-v3', 'name' => 'FCN v3', 'server' => 'v3.example', 'port' => 443,
+        'sni' => 'cert.example', 'uuid' => $user['uuid'], 'udp' => true,
+    ], 'FCN v3 subscription must include only the CA/UUID contract fields');
+    $unentitled = new FCNProbe($user, $nodes, true, null, false, false, $olderCapabilities, $olderCapabilities);
+    check($property->getValue($unentitled) === $nodes, 'FCN v3 was added to an already selected list without it');
 }
 $v3['tls_settings']['server_name'] = '';
 check($app->proxy($v3)['sni'] === 'v3.example', 'FCN v3 must fall back to the server hostname for an empty SNI');
 check(\App\Services\FastCatAutoGrants::apply([$v3], 42, '/unused-legacy-grants') === [$v3], 'legacy grant changed FCN v3 identity');
-echo "FCN v3 account subscription, capability isolation and CA-only projection passed\n";
+echo "FCN v3 account subscription without capability filtering and CA-only projection passed\n";

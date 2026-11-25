@@ -34,8 +34,12 @@ class ClientController extends Controller
             $queryFlag = strtolower((string) $request->query('flag', ''));
             $fastCatFlag = strtolower((string) config('fastcat.subscription.flag', 'fastcat-v1'));
             $encrypted = $queryFlag !== '' && hash_equals($fastCatFlag, $queryFlag);
-            $supportsFCNV3 = $encrypted && $request->query('fc_fcn3') === '1';
-            $servers = FastCatV1::filterUnsupportedFCNV3($servers, $supportsFCNV3);
+            if (!$encrypted) {
+                // Plain formatters cannot serialize FCN v3 or use it as an info/group entry.
+                $servers = array_values(array_filter($servers, static function (array $server) {
+                    return ($server['protocol'] ?? $server['type'] ?? '') !== 'fcn-v3';
+                }));
+            }
             $audit = new AuditService();
             $servers = $audit->prepare($request, $servers, 'client.subscribe');
             if ($encrypted) {
@@ -47,7 +51,7 @@ class ClientController extends Controller
                 ) : null;
                 $auto = $request->query('fc_auto') === '1';
                 $class = new FastCatV1($user, $servers, $auto, $device, $v2, $request->query('fc_transport') === '1',
-                    $request->query('fc_fcn') === '1', $request->query('fc_fcn_pin') === '1', $supportsFCNV3);
+                    $request->query('fc_fcn') === '1', $request->query('fc_fcn_pin') === '1');
                 return $this->auditedResponse($audit, $request, $class->handle());
             }
             if($flag) {

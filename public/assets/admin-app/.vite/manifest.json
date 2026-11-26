@@ -114,6 +114,14 @@
       "_staticApi-HeytMHj0.js"
     ]
   },
+  "_OrderedListOutlined-DxD5SG3t.js": {
+    "file": "assets/OrderedListOutlined-DxD5SG3t.js",
+    "name": "OrderedListOutlined",
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js",
+      "_staticApi-HeytMHj0.js"
+    ]
+  },
   "_PlusOutlined-BLewF-m2.js": {
     "file": "assets/PlusOutlined-BLewF-m2.js",
     "name": "PlusOutlined",
@@ -595,7 +603,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-BQXcu5kH.js",
+    "file": "assets/index-BSi9m2C_.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -682,7 +690,7 @@
     "src": "src/assets/fonts/simple-line-icons/Simple-Line-Icons.woff2"
   },
   "src/pages/aliyun-dns/AliyunDnsPage.tsx": {
-    "file": "assets/AliyunDnsPage-D6Mo3zP_.js",
+    "file": "assets/AliyunDnsPage-DLb7bzj_.js",
     "name": "AliyunDnsPage",
     "src": "src/pages/aliyun-dns/AliyunDnsPage.tsx",
     "isDynamicEntry": true,
@@ -711,6 +719,7 @@
       "_lib-CRCvPKkT.js",
       "_GlobalOutlined-CQzpATpj.js",
       "_LinkOutlined-BSjc5lhw.js",
+      "_OrderedListOutlined-DxD5SG3t.js",
       "_ThunderboltOutlined-BEXbV-SK.js",
       "_request-D2I3tlpY.js",
       "_AdminLayout-BbTYaaPi.js"
@@ -1026,7 +1035,7 @@
     ]
   },
   "src/pages/notice/NoticePage.tsx": {
-    "file": "assets/NoticePage-DK0T618p.js",
+    "file": "assets/NoticePage-McTANMto.js",
     "name": "NoticePage",
     "src": "src/pages/notice/NoticePage.tsx",
     "isDynamicEntry": true,
@@ -1035,7 +1044,7 @@
       "_staticApi-HeytMHj0.js",
       "_query--hTGPaFq.js",
       "_config-DFWtFCDM.js",
-      "_space-FzMidpRE.js",
+      "_useForm-CRz8eQxe.js",
       "_select-BQdeuFo0.js",
       "_button-DRhHkcc1.js",
       "_PlusOutlined-BLewF-m2.js",
@@ -1044,6 +1053,7 @@
       "_modal-BxWaDp_t.js",
       "_switch-BpNQmoxS.js",
       "_V2Table-DeUHvjj3.js",
+      "_OrderedListOutlined-DxD5SG3t.js",
       "_request-D2I3tlpY.js",
       "_AdminLayout-BbTYaaPi.js",
       "_user-Bj_-W0dK.js",
@@ -1052,6 +1062,9 @@
       "_FormGroup-D1ZYUfc5.js",
       "_format-BqIWK_xw.js",
       "_markdown-it-qurWmgGq.js"
+    ],
+    "css": [
+      "assets/NoticePage-DJUURcI7.css"
     ]
   },
   "src/pages/order/OrderPage.tsx": {

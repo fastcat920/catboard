@@ -1,6 +1,11 @@
-import { Button, Space } from 'antd'
+import {
+  BoldOutlined, FontSizeOutlined, AlignLeftOutlined, ItalicOutlined,
+  OrderedListOutlined, UnderlineOutlined, UnorderedListOutlined,
+} from '@ant-design/icons'
+import { Button, Tooltip } from 'antd'
 import MarkdownIt from 'markdown-it'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import './NoticeEditor.scss'
 
 const markdown = new MarkdownIt({ breaks: true })
 const htmlTag = /<\/?[a-z][\w-]*(?:\s|\/?>)/i
@@ -63,53 +68,65 @@ function initialHtml(value: string) {
 }
 
 const toolbar = [
-  ['加粗', 'bold'],
-  ['斜体', 'italic'],
-  ['下划线', 'underline'],
-  ['小标题', 'formatBlock', 'h3'],
-  ['项目符号', 'insertUnorderedList'],
-  ['编号列表', 'insertOrderedList'],
-  ['首行缩进', 'insertText', '\u00a0\u00a0'],
-] as const
+  { label: '加粗', command: 'bold', icon: BoldOutlined },
+  { label: '斜体', command: 'italic', icon: ItalicOutlined },
+  { label: '下划线', command: 'underline', icon: UnderlineOutlined },
+  { label: '小标题', command: 'formatBlock', icon: FontSizeOutlined, argument: 'h3' },
+  { label: '项目符号', command: 'insertUnorderedList', icon: UnorderedListOutlined },
+  { label: '编号列表', command: 'insertOrderedList', icon: OrderedListOutlined },
+  { label: '首行缩进', command: 'insertText', icon: AlignLeftOutlined, argument: '\u00a0\u00a0' },
+]
 
-export function NoticeEditor({ label, value, onChange }: {
+export function NoticeEditor({ label, placeholder, value, onChange }: {
   label: string
+  placeholder: string
   value?: string | null
   onChange: (value: string) => void
 }) {
   const editor = useRef<HTMLDivElement>(null)
   const initialValue = useRef(value ?? '')
+  const [empty, setEmpty] = useState(true)
 
   useLayoutEffect(() => {
-    if (editor.current) editor.current.innerHTML = initialHtml(initialValue.current)
+    const html = initialHtml(initialValue.current)
+    if (editor.current) editor.current.innerHTML = html
+    setEmpty(!html)
   }, [])
 
   const sync = () => {
-    if (editor.current) onChange(cleanHtml(editor.current.innerHTML))
+    if (!editor.current) return
+    const html = cleanHtml(editor.current.innerHTML)
+    setEmpty(!html)
+    onChange(html)
   }
 
   return (
-    <div>
-      <Space size={[4, 4]} wrap style={{ marginBottom: 8 }}>
-        {toolbar.map(([title, command, argument]) => (
-          <Button
-            key={command}
-            size="small"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => {
-              editor.current?.focus()
-              document.execCommand('styleWithCSS', false, 'false')
-              document.execCommand(command, false, argument)
-              sync()
-            }}
-          >
-            {title}
-          </Button>
+    <div className="notice-editor">
+      <div className="notice-editor__toolbar" role="group" aria-label={`${label}格式`}>
+        {toolbar.map(({ label: action, command, icon: Icon, argument }) => (
+          <Tooltip key={command} title={action}>
+            <Button
+              aria-label={action}
+              type="text"
+              size="small"
+              icon={<Icon />}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                editor.current?.focus()
+                document.execCommand('styleWithCSS', false, 'false')
+                document.execCommand(command, false, argument)
+                sync()
+              }}
+            />
+          </Tooltip>
         ))}
-      </Space>
+      </div>
       <div
         ref={editor}
-        className="ant-input"
+        className="notice-editor__body"
+        data-empty={empty}
+        data-placeholder={placeholder}
+        aria-placeholder={placeholder}
         contentEditable
         role="textbox"
         aria-label={label}
@@ -121,7 +138,6 @@ export function NoticeEditor({ label, value, onChange }: {
           sync()
         }}
         onDrop={(event) => event.preventDefault()}
-        style={{ minHeight: 150, maxHeight: 300, overflowY: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
       />
     </div>
   )

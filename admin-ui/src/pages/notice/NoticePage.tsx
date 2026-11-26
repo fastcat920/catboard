@@ -143,6 +143,7 @@ export default function NoticePage() {
           <FormGroup label="公告内容（中文）">
             <NoticeEditor
               label="公告内容（中文）"
+              placeholder="输入中文公告正文"
               value={submit.content}
               onChange={(content) => setSubmit((previous) => ({ ...previous, content: content }))}
             />
@@ -150,6 +151,7 @@ export default function NoticePage() {
           <FormGroup label="公告内容（英文）">
             <NoticeEditor
               label="公告内容（英文）"
+              placeholder="输入英文公告正文"
               value={submit.content_en}
               onChange={(content) => setSubmit((previous) => ({ ...previous, content_en: content }))}
             />

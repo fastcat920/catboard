@@ -46,7 +46,6 @@ export const PROTOCOLS = [
   { value: 'fcn-v3', label: 'FCN v3' },
   { value: 'anytls', label: 'AnyTLS' },
   { value: 'hysteria2', label: 'Hysteria2' },
-  { value: 'fastcat-v2', label: 'FastCat v2' },
   { value: 'shadowsocks', label: 'Shadowsocks' },
   { value: 'trojan', label: 'Trojan' },
   { value: 'tuic', label: 'Tuic' },
@@ -54,9 +53,9 @@ export const PROTOCOLS = [
   { value: 'vmess', label: 'VMess' },
 ]
 /** 这些协议必须使用 TLS：切换到它们时安全性自动设为 TLS */
-const TLS_REQUIRED = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'anytls', 'hysteria2', 'trojan', 'tuic']
+const TLS_REQUIRED = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'anytls', 'hysteria2', 'trojan', 'tuic']
 /** 安全性默认显示为 TLS 的协议 */
-const TLS_DEFAULT = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'fastcat-v2', 'hysteria2', 'trojan', 'tuic']
+const TLS_DEFAULT = ['fcn-v1', 'fcn-v2', 'fcn-v3', 'hysteria2', 'trojan', 'tuic']
 
 function fcnCaSettings(previous: Record<string, unknown> | undefined, allowPanelCertificate: boolean) {
   const modes = fcnCertificateOptions(allowPanelCertificate)
@@ -128,8 +127,6 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           tls_settings: usePinnedIdentity ? previous : fcnCaSettings(previous, keepPanelCertificate),
         }
       })
-    } else if (key === 'protocol' && value === 'fastcat-v2') {
-      setServer((s) => ({ ...s, protocol: value, tls: 1, network: 'tcp', flow: null, network_settings: null }))
     } else if (key === 'protocol' && TLS_REQUIRED.includes(value as string)) {
       setServer((s) => ({ ...s, protocol: value, tls: 1 }))
     } else {
@@ -153,10 +150,10 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
   const hasSavedProtocol = protocol === record?.protocol
   const installCommand = hasSavedProtocol ? text(record?.install_command) : undefined
   let installPlaceholder: string | undefined
-  if (isFCN && !installCommand) {
+  if (!installCommand) {
     installPlaceholder = hasSavedProtocol
-      ? text(record?.install_command_error) || '当前面板未提供可用的 CatNode 部署命令'
-      : '保存节点后生成 CatNode 部署命令'
+      ? text(record?.install_command_error) || '当前面板未提供可用的 fc-node 部署命令'
+      : '保存节点后生成 fc-node 部署命令'
   }
   const tls = Number.parseInt(String(server.tls), 10)
   const networkSettings = server.network_settings
@@ -260,50 +257,6 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           )}
           {protocol === 'fcn-v3' && (
             <div className="form-group">HTTP/3 + TLS 1.3。放行服务端 UDP 端口，使用系统 CA 信任的证书和账号 UUID 授权。</div>
-          )}
-          {protocol === 'fastcat-v2' && (
-            <div className="form-group">
-              <label>协议组合</label>
-              <Select
-                style={{ width: '100%' }}
-                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_transport_mode) || 'auto'}
-                options={[
-                  { value: 'auto', label: server.parent_id ? '跟随父节点' : '自动（HTTP/2 + HTTP/3）' },
-                  { value: 'h2', label: '仅 HTTP/2' },
-                  { value: 'h3', label: '仅 HTTP/3' },
-                ]}
-                onChange={(value) => setServer((s) => ({
-                  ...s,
-                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_transport_mode: value },
-                }))}
-              />
-              <label>密钥交换</label>
-              <Select
-                style={{ width: '100%' }}
-                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_tls_key_exchange) || 'default'}
-                options={[
-                  { value: 'default', label: '默认协商' },
-                  { value: 'x25519', label: 'X25519' },
-                  { value: 'x25519mlkem768', label: 'X25519MLKEM768' },
-                ]}
-                onChange={(value) => setServer((s) => ({
-                  ...s,
-                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_tls_key_exchange: value },
-                }))}
-              />
-              <label>入口 IPv4（可选）</label>
-              <Input
-                placeholder="直接拨号此 IP，证书仍按连接域名校验"
-                value={text((server.tls_settings as Record<string, unknown> | undefined)?.fastcat_endpoint_ipv4)}
-                onChange={(e) => setServer((s) => ({
-                  ...s,
-                  tls_settings: { ...(s.tls_settings as Record<string, unknown> | undefined), fastcat_endpoint_ipv4: e.target.value.trim() || null },
-                }))}
-              />
-            </div>
-          )}
-          {protocol == 'shadowsocks' && (
-            <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
           )}
           {protocol != null && protocol != 'fastcat-v2' && protocol != 'fcn-v1' && protocol != 'fcn-v2' && protocol != 'fcn-v3' && protocol != 'hysteria2' && protocol != 'shadowsocks' && protocol != 'tuic' && (
             <NetworkRow server={server} change={formChange} onEdit={() => showChild('编辑协议配置', 'network_settings')} />
@@ -427,12 +380,10 @@ export function V2nodeDrawer({ record, children }: NodeDrawerProps) {
           <ParentField type="v2node" server={server} change={formChange} />
           <RouteField server={server} change={formChange} />
           <div className="form-group">
-            <label>{protocol === 'fastcat-v2' && server.parent_id ? '前置转发配置（Nginx stream）' : '一键安装指令'}</label>
-            {['fastcat-v2', 'fcn-v1', 'fcn-v2', 'fcn-v3'].includes(protocol ?? '') && (
-              <Button disabled={!installCommand} onClick={() => installCommand && copyText(installCommand)}>
-                {server.parent_id && protocol !== 'fcn-v3' ? '复制前置转发配置' : '复制 CatNode 部署命令'}
-              </Button>
-            )}
+            <label>一键安装指令</label>
+            <Button disabled={!installCommand} onClick={() => installCommand && copyText(installCommand)}>
+              复制 fc-node 部署命令
+            </Button>
             <Input.TextArea
               value={installCommand ?? ''}
               placeholder={installPlaceholder}

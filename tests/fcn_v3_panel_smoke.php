@@ -99,17 +99,17 @@ $panelCases = [
     [['v2board.server_api_url' => '   ', 'v2board.app_url' => 'https://panel.example'], "'https://panel.example'", false],
     [['v2board.server_api_url' => 'https://user@old.example', 'v2board.app_url' => '',
         'app.url' => 'https://app.example'], "'https://app.example'", false],
-    [['v2board.server_api_url' => 'http://legacy.example', 'app.url' => 'http://localhost'], '"$catnode_panel_url"', true],
-    [['v2board.server_api_url' => 'https://old.example?token=value'], '"$catnode_panel_url"', true],
+    [['v2board.server_api_url' => 'http://legacy.example', 'app.url' => 'http://localhost'], '"$fc_node_panel_url"', true],
+    [['v2board.server_api_url' => 'https://old.example?token=value'], '"$fc_node_panel_url"', true],
 ];
 foreach (['fcn-v1', 'fcn-v2', 'fcn-v3'] as $protocol) {
     $node['protocol'] = $protocol;
     foreach ($panelCases as [$configuration, $panelArgument, $prompt]) {
         $GLOBALS['testConfig'] = $configuration + ['v2board.server_token' => 'example-token'];
         $command = $service->getAllV2node()[0]['install_command'];
-        check(is_string($command) && strpos($command, "'https://github.com/fastcat920/CatNode/releases/download/v0.7.1/bootstrap.sh'") !== false
-            && strpos($command, "--native --api-host {$panelArgument} --node-id 11 --api-key 'example-token'") !== false
-            && (strpos($command, 'read -r catnode_panel_url') !== false) === $prompt,
+        check(is_string($command) && strpos($command, "'https://github.com/fastcat920/CatNode/releases/latest/download/fc-node-install.sh'") !== false
+            && strpos($command, "--api-host {$panelArgument} --node-id 11 --api-key 'example-token'") !== false
+            && (strpos($command, 'read -r fc_node_panel_url') !== false) === $prompt,
             $protocol . ' did not produce the native command with the expected address');
     }
     $GLOBALS['testConfig'] = ['v2board.app_url' => 'https://panel.example'];
@@ -123,16 +123,18 @@ foreach (['fcn-v1', 'fcn-v2', 'fcn-v3'] as $protocol) {
 }
 $GLOBALS['testConfig'] = [
     'v2board.server_api_url' => 'https://panel.example', 'v2board.server_token' => 'example-token',
-    'fastcat.fcn_v3_native_bootstrap_url' => 'http://release.example/bootstrap.sh',
 ];
-$command = $service->getAllV2node()[0]['install_command'];
-check(strpos($command, '/v0.7.1/bootstrap.sh') !== false && strpos($command, 'http://release.example') === false,
-    'installer did not replace a non-HTTPS override with the built-in release');
-$GLOBALS['testConfig']['fastcat.fcn_v3_native_bootstrap_url'] = 'https://release.example/fcn3/bootstrap.sh';
-$command = $service->getAllV2node()[0]['install_command'];
-check(strpos($command, "'https://release.example/fcn3/bootstrap.sh'") !== false
-    && strpos($command, "--native --api-host 'https://panel.example' --node-id 11 --api-key 'example-token'") !== false,
-    'installer did not use the configured v3 release');
+foreach (['shadowsocks', 'vmess', 'vless', 'trojan', 'tuic', 'hysteria2', 'anytls'] as $protocol) {
+    $node['protocol'] = $protocol;
+    $command = $service->getAllV2node()[0]['install_command'];
+    check(strpos($command, '/releases/latest/download/fc-node-install.sh') !== false
+        && strpos($command, "--api-host 'https://panel.example' --node-id 11 --api-key 'example-token'") !== false,
+        $protocol . ' did not use fc-node');
+}
+$node['protocol'] = 'fastcat-v2';
+check($service->getAllV2node()[0]['install_command'] === null, 'retired node has an installer');
+check($service->getAvailableV2node($user) === [], 'retired node is still exported');
+$node['protocol'] = 'fcn-v3';
 echo "FCN group visibility, user API projection and native installers passed\n";
 
 $node = new NodeFixture($node->getArrayCopy() + array_fill_keys([

@@ -12,6 +12,7 @@ import { TableBlock } from '@/components/TableBlock'
 import { V2Table } from '@/components/table/V2Table'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { formatTime } from '@/utils/format'
+import { NoticeEditor } from './NoticeEditor'
 
 // 公告管理（原版模块 JZE9 + model lETv）
 export default function NoticePage() {
@@ -84,11 +85,11 @@ export default function NoticePage() {
       key: 'action',
       align: 'right',
       fixed: 'right',
-      render: (_: unknown, record, index) => (
+      render: (_: unknown, record) => (
         <div>
           <JsLink
             onClick={() => {
-              setSubmit(notices[index] ?? record)
+              setSubmit(record)
               setVisible(true)
             }}
           >
@@ -117,6 +118,8 @@ export default function NoticePage() {
       <Modal
         title={submit.id ? '编辑公告' : '新建公告'}
         open={visible}
+        destroyOnHidden
+        width={720}
         onCancel={toggleModal}
         onOk={() => void save()}
         okText="提交"
@@ -138,19 +141,17 @@ export default function NoticePage() {
             />
           </FormGroup>
           <FormGroup label="公告内容（中文）">
-            <Input.TextArea
-              rows={7}
+            <NoticeEditor
+              label="公告内容（中文）"
               value={submit.content}
-              placeholder="请输入中文公告内容"
-              onChange={(e) => setSubmit({ ...submit, content: e.target.value })}
+              onChange={(content) => setSubmit((previous) => ({ ...previous, content: content }))}
             />
           </FormGroup>
           <FormGroup label="公告内容（英文）">
-            <Input.TextArea
-              rows={7}
-              value={submit.content_en ?? undefined}
-              placeholder="请输入英文公告内容"
-              onChange={(e) => setSubmit({ ...submit, content_en: e.target.value })}
+            <NoticeEditor
+              label="公告内容（英文）"
+              value={submit.content_en}
+              onChange={(content) => setSubmit((previous) => ({ ...previous, content_en: content }))}
             />
           </FormGroup>
           <FormGroup label="公告标签">

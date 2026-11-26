@@ -36,7 +36,7 @@ class TicketService {
         $ticket = Ticket::where('id', $ticketId)
             ->first();
         if (!$ticket) {
-            abort(500, '工单不存在');
+            abort(500, __('Ticket does not exist'));
         }
         
         DB::beginTransaction();
@@ -54,7 +54,7 @@ class TicketService {
         $ticket->touch();
         if (!$ticketMessage || !$ticket->save()) {
             DB::rollback();
-            abort(500, '工单回复失败');
+            abort(500, __('Ticket reply failed'));
         }
         DB::commit();
         $this->sendEmailNotify($ticket, $ticketMessage);

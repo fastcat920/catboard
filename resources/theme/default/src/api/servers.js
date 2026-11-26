@@ -1,4 +1,4 @@
-import request from './request';
+import request, { requestMessage } from './request';
 
 /**
  * fetchServerNodes - 获取服务器节点列表
@@ -26,7 +26,7 @@ export function fetchServerNodes() {
     }
     
     // 如果响应不是对象，则抛出错误
-    throw new Error('Invalid response format');
+    throw new Error(requestMessage('responseError'));
   }).catch(error => {
     console.error('Error fetching server nodes:', error);
     throw error;

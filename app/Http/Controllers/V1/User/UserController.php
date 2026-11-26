@@ -387,10 +387,10 @@ class UserController extends Controller
                         'd' => 0
                     ]
                 )) {
-                    throw new \Exception(__('Save failed'));
+                    abort(500, __('Save failed'));
                 }
             } else {
-                abort(500, __('You do not have enough time to renew your subscription'));
+                abort(500, __('There is not enough subscription time left to start the next period'));
             }
 
             DB::commit();
@@ -399,7 +399,7 @@ class UserController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            abort(500, $e->getMessage());
+            throw $e;
         }
     }
 
@@ -496,7 +496,7 @@ class UserController extends Controller
             }
 
             if (!$user->save() || !$giftcard->save()) {
-                throw new \Exception(__('Save failed'));
+                abort(500, __('Save failed'));
             }
 
             $redemption = GiftcardRedemption::create([
@@ -533,7 +533,7 @@ class UserController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            abort(500, $e->getMessage());
+            throw $e;
         }
     }
 

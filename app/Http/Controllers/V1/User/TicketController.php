@@ -55,7 +55,7 @@ class TicketController extends Controller
         try {
             DB::beginTransaction();
             if ((int)Ticket::where('status', 0)->where('user_id', $request->user['id'])->lockForUpdate()->count()) {
-                throw new \Exception(__('There are other unresolved tickets'));
+                abort(500, __('There are other unresolved tickets'));
             }
 
             // 获取工单状态
@@ -72,16 +72,16 @@ class TicketController extends Controller
                         ->exists();
 
                     if (!$hasOrder) {
-                        throw new \Exception(__('Please purchase a plan first'));
+                        abort(500, __('Please purchase a plan first'));
                     }
                     break;
                 case 2:
                     // 完全禁止所有工单
-                    throw new \Exception(__('Current plan does not allow creating tickets'));
+                    abort(500, __('Current plan does not allow creating tickets'));
                     break;
                 default:
                     // 处理未知状态
-                    throw new \Exception(__('Unknown ticket status'));
+                    abort(500, __('Unknown ticket status'));
             }
 
             $ticketData = $request->only(['subject', 'level']) + ['user_id' => $request->user['id']];
@@ -100,7 +100,7 @@ class TicketController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            abort(500, $e->getMessage());
+            throw $e;
         }
     }
 
@@ -189,7 +189,7 @@ class TicketController extends Controller
         $amount = (int)$request->input('withdraw_amount');
         $limit = config('v2board.commission_withdraw_limit', 100);
         if ($limit > ($amount / 100)) {
-            abort(500, __('The current required minimum withdrawal commission is :limit', ['limit' => $limit]));
+            abort(500, __('The current required minimum withdrawal commission is :limit', ['limit' => config('v2board.currency_symbol', '¥') . $limit]));
         }
         if ($amount > (int)$user->commission_balance) abort(500, __('Insufficient commission balance'));
 

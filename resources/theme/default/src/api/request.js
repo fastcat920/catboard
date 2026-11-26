@@ -4,6 +4,7 @@
 import axios from 'axios';
 import { API_BASE_URL, getApiBaseUrl, isXiaoV2board, isXboard, CUSTOM_HEADERS_CONFIG } from '@/utils/baseConfig';
 import { mapApiPath } from './utils/pathMapper';
+import { localizeRequestError, requestMessageForLocale } from './utils/requestError.mjs';
 import { getAvailableApiUrl } from '@/utils/apiAvailabilityChecker';
 import { getRequestLocale } from '@/utils/locale';
 
@@ -18,34 +19,8 @@ const request = axios.create({
 });
 
 let isRedirectingToLogin = false;
-const requestMessages = {
-  'zh-CN': {
-    configError: '请求配置错误',
-    responseError: '响应数据处理错误',
-    sessionExpired: '登录已过期，请重新登录',
-    badRequest: '请求参数错误',
-    unauthorized: '未授权，请重新登录',
-    forbidden: '拒绝访问',
-    notFound: '请求的资源不存在',
-    failed: '请求失败',
-    timeout: '请求超时',
-    network: '网络错误，请检查您的网络连接'
-  },
-  'en-US': {
-    configError: 'Request configuration error',
-    responseError: 'Failed to process response data',
-    sessionExpired: 'Your session has expired. Please sign in again',
-    badRequest: 'Invalid request parameters',
-    unauthorized: 'Unauthorized. Please sign in again',
-    forbidden: 'Access denied',
-    notFound: 'The requested resource was not found',
-    failed: 'Request failed',
-    timeout: 'Request timed out',
-    network: 'Network error. Please check your connection'
-  }
-};
-export const requestMessage = key => (requestMessages[getRequestLocale()] || requestMessages['zh-CN'])[key];
-const isAuthExpiredMessage = message => typeof message === 'string' && /未登录|未登陆|登录.*过期|登陆.*过期|unauthenticated|token.*(expired|invalid)/i.test(message);
+export const requestMessage = key => requestMessageForLocale(getRequestLocale(), key);
+const isAuthExpiredMessage = message => typeof message === 'string' && /未登录|未登陆|登录.*过期|登陆.*过期|unauthenticated|session (?:has )?expired|token.*(expired|invalid)/i.test(message);
 const handleSessionExpired = message => {
   if (isRedirectingToLogin) return;
   isRedirectingToLogin = true;
@@ -62,8 +37,6 @@ const handleSessionExpired = message => {
 request.interceptors.request.use(
   config => {
     const requestLocale = getRequestLocale();
-    config.headers['X-Locale'] = requestLocale;
-    config.headers['Accept-Language'] = requestLocale;
 
     // 设置基础URL
       config.baseURL = getApiBaseUrl();
@@ -196,6 +169,8 @@ request.interceptors.request.use(
       console.error('应用自定义标头失败:', error);
     }
     
+    config.headers['X-Locale'] = requestLocale;
+    config.headers['Accept-Language'] = requestLocale;
     return config;
   },
   error => {
@@ -214,7 +189,7 @@ request.interceptors.response.use(
       // 检查响应是否包含登录过期信息
       if (res && isAuthExpiredMessage(res.message)) {
         handleSessionExpired(res.message);
-        return Promise.reject(new Error(res.message));
+        return Promise.reject(new Error(requestMessage('sessionExpired')));
       }
       
       // 直接返回原始响应数据，让具体的业务代码处理
@@ -235,29 +210,7 @@ request.interceptors.response.use(
       handleSessionExpired(responseMessage || requestMessage('sessionExpired'));
     }
 
-    // 确保error.response.message存在，便于页面使用
-    if (error.response && error.response.data && error.response.data.message) {
-      // 将API返回的错误消息添加到error.response.message
-      error.response.message = error.response.data.message;
-    } else if (error.response) {
-      // 根据HTTP状态码设置通用错误信息
-      switch (error.response.status) {
-        case 400: error.response.message = requestMessage('badRequest'); break;
-        case 401: error.response.message = requestMessage('unauthorized'); break;
-        case 403: error.response.message = requestMessage('forbidden'); break;
-        case 404: error.response.message = requestMessage('notFound'); break;
-        default: error.response.message = `${requestMessage('failed')} (${statusCode})`;
-      }
-    } else if (error.message) {
-      if (error.message.includes('timeout')) {
-        error.message = requestMessage('timeout');
-      } else if (error.message.includes('Network Error')) {
-        error.message = requestMessage('network');
-      }
-    }
-    
-    // 返回处理后的原始错误对象
-    return Promise.reject(error);
+    return Promise.reject(localizeRequestError(error, getRequestLocale()));
   }
 );
 

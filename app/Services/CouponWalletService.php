@@ -71,10 +71,10 @@ class CouponWalletService
         if ($disableAuto && !$selectedId) return null;
         $available = $this->available($user, $order->plan_id, $order->period, $order->total_amount, $order->type);
         $selected = $selectedId ? $available->firstWhere('id', $selectedId) : $available->first();
-        if ($selectedId && !$selected) abort(422, '所选优惠券不满足当前订单使用条件');
+        if ($selectedId && !$selected) abort(422, __('The selected coupon cannot be used for this order'));
         if (!$selected) return null;
         $coupon = UserCoupon::where('id', $selected->id)->where('status', 'available')->lockForUpdate()->first();
-        if (!$coupon) abort(422, '优惠券已被使用或锁定，请重新选择');
+        if (!$coupon) abort(422, __('This coupon has been used or locked. Please select another coupon'));
         $discount = $this->discount($selected->template, $order->total_amount);
         $order->user_coupon_id = $coupon->id; $order->coupon_discount_amount = $discount;
         $order->discount_amount = (int)$order->discount_amount + $discount; $order->total_amount -= $discount;

@@ -1,4 +1,4 @@
-import request from './request';
+import request, { requestMessage } from './request';
 
 /**
  * fetchKnowledgeList - 获取知识库文档列表
@@ -27,7 +27,7 @@ export function fetchKnowledgeList(keyword = '') {
     }
     
     // 如果响应不是对象，则抛出错误
-    throw new Error('Invalid response format');
+    throw new Error(requestMessage('responseError'));
   }).catch(error => {
     console.error('Error fetching knowledge list:', error);
     throw error;
@@ -64,7 +64,7 @@ export function fetchKnowledgeDetail(id) {
     }
     
     // 如果响应不是对象，则抛出错误
-    throw new Error('Invalid response format');
+    throw new Error(requestMessage('responseError'));
   }).catch(error => {
     console.error('Error fetching knowledge detail:', error);
     throw error;

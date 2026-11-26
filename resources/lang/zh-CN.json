@@ -16,7 +16,7 @@
     "Ticket reply failed": "工单回复失败",
     "Close failed": "关闭失败",
     "Unsupported withdrawal method": "不支持的提现方式",
-    "The current required minimum withdrawal commission is :limit": "当前系统要求的最少提现佣金为：¥:limitCNY",
+    "The current required minimum withdrawal commission is :limit": "最低提现金额为 :limit",
     "[Commission Withdrawal Request] This ticket is opened by the system": "[提现申请] 本工单由系统发出",
     "Withdrawal method": "提现方式",
     "Withdrawal account": "提现账号",
@@ -120,5 +120,12 @@
     "Unknown ticket status": "未知的工单状态",
     "Withdrawal amount": "提现金额",
     "You do not allow to renew the subscription": "当前账号不允许续费",
-    "You do not have enough time to renew your subscription": "当前套餐剩余时长不足，无法续费"
+    "You do not have enough time to renew your subscription": "当前套餐剩余时长不足，无法续费",
+    "You are not signed in or your session has expired": "未登录或登录已过期，请重新登录",
+    "There is not enough subscription time left to start the next period": "当前套餐剩余时长不足，无法提前开启下一周期",
+    "The selected coupon cannot be used for this order": "所选优惠券不满足当前订单的使用条件",
+    "This coupon has been used or locked. Please select another coupon": "优惠券已使用或被锁定，请重新选择",
+    "Failed to add funds": "充值失败",
+    "Failed to activate the subscription": "套餐开通失败",
+    "Subscription changes are not allowed. Please contact support": "当前无法更改订阅，请联系客服或提交工单"
 }

@@ -34,7 +34,7 @@ class OrderController extends Controller
         ]);
         $plan = Plan::findOrFail($data['plan_id']);
         if (!array_key_exists($data['period'], $plan->getAttributes()) || $plan[$data['period']] === null) {
-            abort(422, '当前付款周期不可购买');
+            abort(422, __('This payment period cannot be purchased, please choose another period'));
         }
 
         $user = User::findOrFail($request->user['id']);
@@ -86,7 +86,7 @@ class OrderController extends Controller
             : ($request->input('user_coupon_id')
                 ? $available->firstWhere('id', (int)$request->input('user_coupon_id'))
                 : $available->first());
-        if ($request->input('user_coupon_id') && !$selected) abort(422, '所选优惠券不满足使用条件');
+        if ($request->input('user_coupon_id') && !$selected) abort(422, __('The selected coupon cannot be used for this order'));
 
         $couponDiscount = $selected ? (int)$selected->calculated_discount : 0;
         $afterCoupon = $couponBase - $couponDiscount;
@@ -488,7 +488,7 @@ class OrderController extends Controller
             $selected = collect($options)->first(function ($option) use ($couponId) {
                 return $option['type'] === 'coupon' && $option['coupon_id'] === $couponId;
             });
-            if (!$selected) abort(422, '所选优惠券不满足当前订单使用条件');
+            if (!$selected) abort(422, __('The selected coupon cannot be used for this order'));
         } elseif ($mode === 'flash_sale') {
             $selected = collect($options)->firstWhere('type', 'flash_sale');
         } elseif ($mode === 'standard') {

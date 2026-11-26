@@ -891,7 +891,7 @@ export default {
         return;
       }
       if (amount < minWithdrawAmount.value && minWithdrawAmount.value > 0) {
-        withdrawError.value = t('invite.withdraw.belowMinAmount');
+        withdrawError.value = t('invite.withdraw.belowMinAmount', { amount: currencySymbol.value + formatAmount(minWithdrawAmount.value) });
         return;
       }
       

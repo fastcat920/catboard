@@ -120,5 +120,12 @@
     "Unknown ticket status": "Unknown ticket status",
     "Withdrawal amount": "Withdrawal amount",
     "You do not allow to renew the subscription": "Your account is not allowed to renew the subscription",
-    "You do not have enough time to renew your subscription": "There is not enough remaining subscription time to renew"
+    "You do not have enough time to renew your subscription": "There is not enough remaining subscription time to renew",
+    "You are not signed in or your session has expired": "You are not signed in or your session has expired. Please sign in again.",
+    "There is not enough subscription time left to start the next period": "There is not enough subscription time left to start the next period.",
+    "The selected coupon cannot be used for this order": "The selected coupon cannot be used for this order.",
+    "This coupon has been used or locked. Please select another coupon": "This coupon has been used or locked. Please select another coupon.",
+    "Failed to add funds": "Failed to add funds.",
+    "Failed to activate the subscription": "Failed to activate the subscription.",
+    "Subscription changes are not allowed. Please contact support": "Subscription changes are not allowed. Please contact support."
 }

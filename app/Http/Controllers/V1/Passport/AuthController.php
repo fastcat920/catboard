@@ -244,10 +244,10 @@ class AuthController extends Controller
     public function getQuickLoginUrl(Request $request)
     {
         $authorization = $request->input('auth_data') ?? $request->header('authorization');
-        if (!$authorization) abort(403, '未登录或登陆已过期');
+        if (!$authorization) abort(403, __('You are not signed in or your session has expired'));
 
         $user = AuthService::decryptAuthData($authorization);
-        if (!$user) abort(403, '未登录或登陆已过期');
+        if (!$user) abort(403, __('You are not signed in or your session has expired'));
 
         $code = Helper::guid();
         $key = CacheKey::get('TEMP_TOKEN', $code);

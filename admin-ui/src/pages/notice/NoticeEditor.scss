@@ -52,3 +52,25 @@
 .notice-editor__body > :last-child { margin-bottom: 0; }
 .notice-editor__body p { margin-block: 0 0.65em; }
 .notice-editor__body img { max-width: 100%; height: auto; }
+
+.notice-editor-palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notice-editor-palette__swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.notice-editor-palette__swatch:focus-visible {
+  outline: 2px solid var(--ant-color-primary, #1677ff);
+  outline-offset: 2px;
+}
+
+.notice-editor__body [style*='color: rgb(1, 2, 3)'] { color: inherit !important; }

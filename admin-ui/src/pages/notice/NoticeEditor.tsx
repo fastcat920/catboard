@@ -1,8 +1,8 @@
 import {
   BoldOutlined, FontSizeOutlined, AlignLeftOutlined, ItalicOutlined,
-  OrderedListOutlined, UnderlineOutlined, UnorderedListOutlined,
+  OrderedListOutlined, FontColorsOutlined, UnderlineOutlined, UnorderedListOutlined,
 } from '@ant-design/icons'
-import { Button, Tooltip } from 'antd'
+import { Button, Popover, Tooltip } from 'antd'
 import MarkdownIt from 'markdown-it'
 import { useLayoutEffect, useRef, useState } from 'react'
 import './NoticeEditor.scss'
@@ -15,6 +15,15 @@ const allowedTags = new Set([
   'TD', 'TH', 'THEAD', 'TR', 'U', 'UL',
 ])
 const discardedTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'TEMPLATE'])
+
+const noticeColors = [
+  { label: '红色', value: 'rgb(190, 42, 52)' },
+  { label: '棕橙色', value: 'rgb(157, 81, 11)' },
+  { label: '绿色', value: 'rgb(23, 118, 77)' },
+  { label: '蓝色', value: 'rgb(27, 95, 184)' },
+  { label: '紫色', value: 'rgb(116, 63, 171)' },
+]
+const defaultColorMarker = 'rgb(1, 2, 3)'
 
 function cleanHtml(html: string) {
   const source = new DOMParser().parseFromString(html, 'text/html')
@@ -33,8 +42,16 @@ function cleanHtml(html: string) {
     }
     if (!(node instanceof Element) || discardedTags.has(node.tagName)) return
     let target = parent
-    if (allowedTags.has(node.tagName)) {
-      target = document.createElement(node.tagName)
+    if (allowedTags.has(node.tagName) || node.tagName === 'FONT') {
+      target = document.createElement(node.tagName === 'FONT' ? 'span' : node.tagName)
+      if (node instanceof HTMLElement) {
+        const color = node.style.color
+        if (color === defaultColorMarker || color === 'inherit') {
+          target.style.color = 'inherit'
+        } else if (noticeColors.some(({ value }) => value === color)) {
+          target.style.color = color
+        }
+      }
       const urlAttribute = node.tagName === 'A' ? 'href' : node.tagName === 'IMG' ? 'src' : null
       const url = urlAttribute && node.getAttribute(urlAttribute)
       if (url && urlAttribute) {
@@ -86,6 +103,8 @@ export function NoticeEditor({ label, placeholder, value, onChange }: {
   const editor = useRef<HTMLDivElement>(null)
   const initialValue = useRef(value ?? '')
   const [empty, setEmpty] = useState(true)
+  const [colorsOpen, setColorsOpen] = useState(false)
+  const colorRange = useRef<Range | null>(null)
 
   useLayoutEffect(() => {
     const html = initialHtml(initialValue.current)
@@ -98,6 +117,32 @@ export function NoticeEditor({ label, placeholder, value, onChange }: {
     const html = cleanHtml(editor.current.innerHTML)
     setEmpty(!html)
     onChange(html)
+  }
+
+  const rememberColorRange = () => {
+    const selection = document.getSelection()
+    if (editor.current && selection?.rangeCount && editor.current.contains(selection.anchorNode)
+      && editor.current.contains(selection.focusNode)) {
+      colorRange.current = selection.getRangeAt(0).cloneRange()
+    }
+  }
+
+  const applyColor = (color: string) => {
+    editor.current?.focus()
+    if (colorRange.current && editor.current?.contains(colorRange.current.commonAncestorContainer)) {
+      const selection = document.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(colorRange.current)
+    }
+    document.execCommand('styleWithCSS', false, 'true')
+    try {
+      document.execCommand('foreColor', false, color)
+    } finally {
+      document.execCommand('styleWithCSS', false, 'false')
+    }
+    colorRange.current = null
+    setColorsOpen(false)
+    sync()
   }
 
   return (
@@ -120,6 +165,43 @@ export function NoticeEditor({ label, placeholder, value, onChange }: {
             />
           </Tooltip>
         ))}
+        <Popover
+          trigger="click"
+          placement="bottomLeft"
+          open={colorsOpen}
+          onOpenChange={(open) => {
+            if (open) rememberColorRange()
+            setColorsOpen(open)
+          }}
+          content={
+            <div className="notice-editor-palette" role="group" aria-label="文字颜色">
+              {noticeColors.map(({ label: colorName, value: color }) => (
+                <Tooltip key={color} title={colorName}>
+                  <button
+                    type="button"
+                    className="notice-editor-palette__swatch"
+                    aria-label={colorName}
+                    style={{ backgroundColor: color }}
+                    onClick={() => applyColor(color)}
+                  />
+                </Tooltip>
+              ))}
+              <Button type="text" size="small" onClick={() => applyColor(defaultColorMarker)}>默认</Button>
+            </div>
+          }
+        >
+          <Button
+            type="text"
+            size="small"
+            aria-label="文字颜色"
+            aria-expanded={colorsOpen}
+            icon={<FontColorsOutlined />}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              rememberColorRange()
+            }}
+          />
+        </Popover>
       </div>
       <div
         ref={editor}

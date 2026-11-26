@@ -1,4 +1,14 @@
 {
+  "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
+    "file": "assets/worker-json-8CDXFfik.js",
+    "src": "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
+  },
+  "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
+    "file": "assets/darkreader-Cmw0ewJI.js",
+    "name": "darkreader",
+    "src": "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
+    "isDynamicEntry": true
+  },
   "_AdminLayout-BbTYaaPi.js": {
     "file": "assets/AdminLayout-BbTYaaPi.js",
     "name": "AdminLayout",
@@ -268,7 +278,7 @@
       "_staticApi-HeytMHj0.js"
     ],
     "dynamicImports": [
-      "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
+      "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
     ]
   },
   "_date-picker-uYVlbayM.js": {
@@ -363,6 +373,13 @@
       "_rolldown-runtime-hePW80VL.js",
       "_staticApi-HeytMHj0.js",
       "_darkMode-B6CJfQTR.js"
+    ]
+  },
+  "_markdown-it-qurWmgGq.js": {
+    "file": "assets/markdown-it-qurWmgGq.js",
+    "name": "markdown-it",
+    "imports": [
+      "_rolldown-runtime-hePW80VL.js"
     ]
   },
   "_modal-BxWaDp_t.js": {
@@ -578,7 +595,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-Ct_p5d3G.js",
+    "file": "assets/index-BQXcu5kH.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -631,16 +648,6 @@
       "assets/Simple-Line-Icons-D0KobG-u.woff2",
       "assets/Simple-Line-Icons-BAgH0-Pt.woff"
     ]
-  },
-  "node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
-    "file": "assets/worker-json-8CDXFfik.js",
-    "src": "node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
-  },
-  "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
-    "file": "assets/darkreader-Cmw0ewJI.js",
-    "name": "darkreader",
-    "src": "node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
-    "isDynamicEntry": true
   },
   "src/assets/fonts/fontawesome/fa-brands-400.woff": {
     "file": "assets/fa-brands-400-kK0FQ5N5.woff",
@@ -946,7 +953,7 @@
     ]
   },
   "src/pages/knowledge/KnowledgePage.tsx": {
-    "file": "assets/KnowledgePage-oCuLdyWU.js",
+    "file": "assets/KnowledgePage-BK6PDCOd.js",
     "name": "KnowledgePage",
     "src": "src/pages/knowledge/KnowledgePage.tsx",
     "isDynamicEntry": true,
@@ -969,7 +976,8 @@
       "_TableBlock-CaaIyUoB.js",
       "_confirmDelete-BcRp4KVx.js",
       "_FormGroup-D1ZYUfc5.js",
-      "_format-BqIWK_xw.js"
+      "_format-BqIWK_xw.js",
+      "_markdown-it-qurWmgGq.js"
     ],
     "css": [
       "assets/KnowledgePage-BaGo5uv4.css"
@@ -1018,7 +1026,7 @@
     ]
   },
   "src/pages/notice/NoticePage.tsx": {
-    "file": "assets/NoticePage-_j4Kd6mD.js",
+    "file": "assets/NoticePage-DK0T618p.js",
     "name": "NoticePage",
     "src": "src/pages/notice/NoticePage.tsx",
     "isDynamicEntry": true,
@@ -1027,6 +1035,7 @@
       "_staticApi-HeytMHj0.js",
       "_query--hTGPaFq.js",
       "_config-DFWtFCDM.js",
+      "_space-FzMidpRE.js",
       "_select-BQdeuFo0.js",
       "_button-DRhHkcc1.js",
       "_PlusOutlined-BLewF-m2.js",
@@ -1041,7 +1050,8 @@
       "_TableBlock-CaaIyUoB.js",
       "_confirmDelete-BcRp4KVx.js",
       "_FormGroup-D1ZYUfc5.js",
-      "_format-BqIWK_xw.js"
+      "_format-BqIWK_xw.js",
+      "_markdown-it-qurWmgGq.js"
     ]
   },
   "src/pages/order/OrderPage.tsx": {

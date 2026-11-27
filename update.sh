@@ -66,6 +66,8 @@ if ! mv "$stage/vendor" vendor; then
   exit 1
 fi
 if ! (
+  # Clear generated manifests before booting Artisan with the new dependencies.
+  rm -f bootstrap/cache/{config,events,packages,services}.php bootstrap/cache/routes-*.php &&
   php artisan package:discover &&
   php artisan v2board:update &&
   php artisan v2board:upgrade-database &&

@@ -39,8 +39,16 @@ class MysqlLoggerHandler extends AbstractProcessingHandler
             LogModel::insert(
                 $log
             );
-        }catch (\Exception $e){
-            Log::channel('daily')->error($e->getMessage().$e->getFile().$e->getTraceAsString());
+        } catch (\Throwable $storageError) {
+            try {
+                Log::channel('daily')->log(
+                    $logRecord->level->toPsrLogLevel(),
+                    $logRecord->message,
+                    $logRecord->context + ['mysql_log_error' => $storageError->getMessage()],
+                );
+            } catch (\Throwable) {
+                error_log($logRecord->level->getName() . ': ' . $logRecord->message);
+            }
         }
     }
 }

@@ -189,7 +189,11 @@ class TicketController extends Controller
         $amount = (int)$request->input('withdraw_amount');
         $limit = config('v2board.commission_withdraw_limit', 100);
         if ($limit > ($amount / 100)) {
-            abort(500, __('The current required minimum withdrawal commission is :limit', ['limit' => config('v2board.currency_symbol', '¥') . $limit]));
+            return response()->json([
+                'error_code' => 'WITHDRAWAL_BELOW_MINIMUM',
+                'error_params' => ['limit' => $limit],
+                'message' => __('The current required minimum withdrawal commission is :limit', ['limit' => config('v2board.currency_symbol', '¥') . $limit]),
+            ], 422);
         }
         if ($amount > (int)$user->commission_balance) abort(500, __('Insufficient commission balance'));
 

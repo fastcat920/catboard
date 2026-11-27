@@ -77,11 +77,15 @@ export function getSubscribe(options) {
  * @Board @url POST /user/newPeriod
  * @returns {Promise<object>}
  */
-export function startNewTrafficPeriod() {
+export function startNewTrafficPeriod(preview) {
   return request({
     url: '/user/newPeriod',
     method: 'post',
-    data: {}
+    data: {
+      operation_id: globalThis.crypto?.randomUUID?.(),
+      preview_reset_at: preview?.reset_at,
+      preview_expires_at: preview?.current_expires_at
+    }
   });
 }
 

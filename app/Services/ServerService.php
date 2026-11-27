@@ -283,7 +283,8 @@ class ServerService
             $server['cache_key'] = "{$server['type']}-{$server['id']}-{$server['updated_at']}-{$server['is_online']}";
             return $server;
         }, $servers);
-        return (new NodeEntryPoolService())->expand($servers, $client);
+        $expanded = (new NodeEntryPoolService())->expand($servers, $client);
+        return array_map([\App\Services\NodeSecurity\PublicNodeSettings::class, 'strip'], $expanded);
     }
 
     public function getAvailableUsers($groupId)

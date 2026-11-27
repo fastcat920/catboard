@@ -363,7 +363,14 @@ class OrderController extends Controller
             $order->handling_amount = round(($order->total_amount * ($payment->handling_fee_percent / 100)) + $payment->handling_fee_fixed);
         }
         $order->payment_id = $method;
-        if (!$order->save()) abort(500, __('Request failed, please try again later'));
+        $bound = Order::whereKey($order->id)->where('status', 0)->update([
+            'handling_amount' => $order->handling_amount,
+            'payment_id' => $order->payment_id,
+        ]);
+        if (!$bound && !Order::whereKey($order->id)->where('status', 0)
+            ->where('payment_id', $order->payment_id)->exists()) {
+            abort(500, __('Request failed, please try again later'));
+        }
         $result = $paymentService->pay([
             'trade_no' => $tradeNo,
             'total_amount' => isset($order->handling_amount) ? ($order->total_amount + $order->handling_amount) : $order->total_amount,

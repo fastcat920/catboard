@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Divider, Input, Modal, Select, Switch, type TableColumnsType } from 'antd'
 import { useState } from 'react'
 import { unwrap } from '@/api/request'
-import { dropNotice, fetchNotices, saveNotice, toggleNoticeShow } from '@/api/services/notice'
+import { dropNotice, fetchNotice, fetchNotices, saveNotice, toggleNoticeShow } from '@/api/services/notice'
 import type { Notice } from '@/api/types'
 import { confirmDelete } from '@/components/confirmDelete'
 import { FormGroup } from '@/components/FormGroup'
@@ -17,10 +17,17 @@ import { NoticeEditor } from './NoticeEditor'
 // 公告管理（原版模块 JZE9 + model lETv）
 export default function NoticePage() {
   const queryClient = useQueryClient()
-  const { data: notices = [], isFetching } = useQuery({
-    queryKey: ['notice', 'list'],
-    queryFn: () => unwrap(fetchNotices()),
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+  const { data, isFetching } = useQuery({
+    queryKey: ['notice', 'list', page],
+    queryFn: async () => {
+      const request = fetchNotices(page, pageSize)
+      const notices = await unwrap(request)
+      return { notices, total: (await request).total ?? notices.length }
+    },
   })
+  const notices = data?.notices ?? []
   const [visible, setVisible] = useState(false)
   const [submit, setSubmit] = useState<Partial<Notice>>({})
 
@@ -41,7 +48,18 @@ export default function NoticePage() {
 
   const drop = async (record: Notice) => {
     const res = await dropNotice(record.id)
-    if (res.code === 200) void refetch()
+    if (res.code === 200) {
+      if (notices.length === 1 && page > 1) setPage(page - 1)
+      void refetch()
+    }
+  }
+
+  const edit = async (id: number) => {
+    const res = await fetchNotice(id)
+    if (res.code === 200 && res.data) {
+      setSubmit(res.data)
+      setVisible(true)
+    }
   }
 
   const columns: TableColumnsType<Notice> = [
@@ -88,10 +106,7 @@ export default function NoticePage() {
       render: (_: unknown, record) => (
         <div>
           <JsLink
-            onClick={() => {
-              setSubmit(record)
-              setVisible(true)
-            }}
+            onClick={() => void edit(record.id)}
           >
             编辑
           </JsLink>
@@ -113,7 +128,7 @@ export default function NoticePage() {
           </Button>
         }
       >
-        <V2Table<Notice> dataSource={notices} pagination={false} columns={columns} scroll={{ x: 950 }} />
+        <V2Table<Notice> dataSource={notices} pagination={{ current: page, pageSize, total: data?.total, showSizeChanger: false, onChange: setPage }} columns={columns} scroll={{ x: 950 }} />
       </TableBlock>
       <Modal
         title={submit.id ? '编辑公告' : '新建公告'}

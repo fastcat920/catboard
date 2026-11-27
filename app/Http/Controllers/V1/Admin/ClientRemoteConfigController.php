@@ -68,8 +68,15 @@ class ClientRemoteConfigController extends Controller
         ]);
         $this->validateRemoteUrls($data['content']);
 
-        $row = !empty($data['id']) ? ClientRemoteConfig::findOrFail($data['id']) : null;
-        if (!$row || !in_array($row->status, ['draft', 'partial'], true)) {
+        return DB::transaction(function () use ($data, $crypto) {
+            return $this->persistDraft($data, $crypto);
+        });
+    }
+
+    private function persistDraft(array $data, ClientConfigCryptoService $crypto)
+    {
+        $row = !empty($data['id']) ? ClientRemoteConfig::lockForUpdate()->findOrFail($data['id']) : null;
+        if (!$row || $row->status !== 'draft' || $row->publication_payload !== null) {
             $row = new ClientRemoteConfig();
             $row->config_version = ((int)ClientRemoteConfig::max('config_version')) + 1;
             $row->status = 'draft';
@@ -80,7 +87,6 @@ class ClientRemoteConfigController extends Controller
         $row->checksum = $crypto->checksum($content);
         $row->encryption_mode = $data['encryption_mode'];
         $row->change_summary = trim((string)($data['change_summary'] ?? '')) ?: null;
-        if ($row->status === 'partial') $row->status = 'draft';
         $row->save();
         return response(['data' => $this->configRow($row, true)]);
     }
@@ -247,24 +253,32 @@ class ClientRemoteConfigController extends Controller
             'target_ids' => 'required|array|min:1',
             'target_ids.*' => 'integer|exists:v2_client_storage_target,id',
         ]);
-        $config = ClientRemoteConfig::findOrFail($data['config_id']);
-        if ($config->status === 'publishing') abort(422, '该版本正在发布，请勿重复提交');
+        $configId = $data['config_id'];
         $targets = ClientStorageTarget::whereIn('id', array_unique($data['target_ids']))->where('enabled', true)->get();
         if ($targets->isEmpty()) abort(422, '没有可用的云存储目标');
-        $payload = $crypto->encode($config);
-        $checksum = hash('sha256', $payload);
-
-        $publications = DB::transaction(function () use ($config, $targets, $checksum) {
-            $config->status = 'publishing';
-            $config->save();
+        $publications = DB::transaction(function () use ($configId, $targets, $crypto) {
+            $config = ClientRemoteConfig::lockForUpdate()->findOrFail($configId);
+            if ($config->status === 'publishing') abort(422, '该版本正在发布，请勿重复提交');
+            if ($config->publication_payload === null && $config->publications()->exists()) {
+                abort(422, '旧发布版本无法锁定原始产物，请复制为新版本再发布。');
+            }
+            $config->publication_payload = $config->publication_payload ?? $crypto->encode($config);
+            $checksum = hash('sha256', $config->publication_payload);
             $rows = collect();
             foreach ($targets as $target) {
+                if ($config->publications()->where('target_id', $target->id)
+                    ->where('status', 'success')->exists()) {
+                    continue;
+                }
                 $row = ClientConfigPublication::updateOrCreate(
                     ['config_id' => $config->id, 'target_id' => $target->id],
                     ['status' => 'queued', 'object_key' => $target->object_key, 'public_url' => null, 'etag' => null, 'checksum' => $checksum, 'error' => null, 'attempts' => 0, 'started_at' => null, 'finished_at' => null]
                 );
                 $rows->push($row);
             }
+            if ($rows->isEmpty()) abort(422, '所选镜像已发布此版本。');
+            $config->status = 'publishing';
+            $config->save();
             return $rows;
         });
         foreach ($publications as $publication) PublishClientRemoteConfig::dispatch($publication->id)->onQueue('default');
@@ -274,13 +288,18 @@ class ClientRemoteConfigController extends Controller
     public function retryPublication(Request $request)
     {
         $data = $request->validate(['id' => 'required|integer|exists:v2_client_config_publication,id']);
-        $row = ClientConfigPublication::findOrFail($data['id']);
-        if (in_array($row->status, ['queued', 'publishing'], true)) abort(422, '该任务正在执行');
-        $row->status = 'queued';
-        $row->error = null;
-        $row->finished_at = null;
-        $row->save();
-        $row->config()->update(['status' => 'publishing', 'updated_at' => time()]);
+        $row = DB::transaction(function () use ($data) {
+            $publication = ClientConfigPublication::findOrFail($data['id']);
+            $config = ClientRemoteConfig::lockForUpdate()->findOrFail($publication->config_id);
+            $publication = ClientConfigPublication::lockForUpdate()->findOrFail($publication->id);
+            if ($publication->status !== 'failed') abort(422, '只有失败的发布任务可以重试。');
+            if ($config->publication_payload === null) {
+                abort(422, '旧任务没有锁定的发布产物，请复制为新版本再发布。');
+            }
+            $publication->update(['status' => 'queued', 'error' => null, 'finished_at' => null]);
+            $config->update(['status' => 'publishing']);
+            return $publication;
+        });
         PublishClientRemoteConfig::dispatch($row->id)->onQueue('default');
         return response(['data' => $row]);
     }

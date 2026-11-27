@@ -167,6 +167,7 @@
 </template>
 
 <script setup name="MoreOptions">
+import { describeNewTrafficPeriod } from '@/utils/newTrafficPeriod';
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -208,6 +209,8 @@ const userStats = reactive({ remainingTraffic: '', remainingDays: '', userEmail:
 const userPlan = ref({ name: '', expireDate: null, expiredAt: null, isExpireDatePermanent: false, totalTraffic: '', totalTrafficBytes: 0, resetDay: null, deviceLimit: null, aliveIp: 0, subscribeUrl: '' });
 const userPlanId = ref(null);
 const allowNewPeriod = ref(false);
+const newPeriodPreview = ref(null);
+const confirmedPeriodPreview = ref(null);
 const userBalance = ref('0.00');
 const currencySymbol = ref('¥');
 const hasPlan = ref(true);
@@ -257,6 +260,7 @@ const fetchSubscribe = async (force = false) => {
     if (response.data) {
       const subscribe = response.data;
       allowNewPeriod.value = subscribe.allow_new_period === true || Number(subscribe.allow_new_period) === 1;
+      newPeriodPreview.value = subscribe.new_period ?? null;
       if (subscribe.plan?.name) userPlan.value.name = subscribe.plan.name;
       if (subscribe.plan?.id) userPlanId.value = subscribe.plan.id;
       if (subscribe.transfer_enable) {
@@ -367,7 +371,7 @@ const showRenewPlanButton = computed(() => {
 });
 
 const showResetTrafficButton = computed(() => {
-  if (allowNewPeriod.value) return !isExpired.value && isTrafficDepleted.value;
+  if (allowNewPeriod.value) return !isExpired.value && newPeriodPreview.value?.eligible === true;
   if (!DASHBOARD_CONFIG.enableResetTraffic) return false;
   switch (DASHBOARD_CONFIG.resetTrafficDisplayMode) {
     case 'always': return true;
@@ -381,7 +385,7 @@ const trafficActionMode = computed(() => allowNewPeriod.value ? 'new-period' : '
 const trafficRecoveryCopy = computed(() => allowNewPeriod.value
   ? {
       title: t('dashboard.newPeriodConfirm'),
-      description: t('dashboard.newPeriodDesc'),
+      description: describeNewTrafficPeriod(confirmedPeriodPreview.value ?? newPeriodPreview.value, t, locale.value) || t('dashboard.newPeriodDesc'),
       warning: t('dashboard.newPeriodWarning')
     }
   : {
@@ -442,6 +446,7 @@ const confirmRenewPlan = () => {
 };
 
 const openResetTrafficModal = () => {
+  confirmedPeriodPreview.value = newPeriodPreview.value;
   showResetTrafficModal.value = true;
   resetConfirmCooldown.value = 3;
   resetConfirmTimer = setInterval(() => {
@@ -484,7 +489,7 @@ const startNextTrafficPeriod = async () => {
   if (resetConfirmCooldown.value > 0) return;
   isCreatingResetOrder.value = true;
   try {
-    await startNewTrafficPeriod();
+    await startNewTrafficPeriod(confirmedPeriodPreview.value);
     showToast(t('dashboard.newPeriodSuccess'), 'success');
     closeResetTrafficModal();
     await fetchSubscribe(true);

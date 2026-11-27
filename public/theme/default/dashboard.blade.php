@@ -19,8 +19,8 @@
     if (!window.location.hash) window.location.replace(window.location.pathname + window.location.search + '#/');
   </script>
 
-  <script defer src="/theme/default/static/js/754.34eefdb9.js?v={{ $version }}"></script>
-  <script defer src="/theme/default/static/js/index.c91fc062.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/770.6851ef7c.js?v={{ $version }}"></script>
+  <script defer src="/theme/default/static/js/index.3dd212df.js?v={{ $version }}"></script>
 </head>
 <body>
   <div id="app"></div>

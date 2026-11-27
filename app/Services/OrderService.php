@@ -303,17 +303,33 @@ class OrderService
         $order->surplus_order_ids = array_column($orders, 'id');
     }
 
-    public function paid(string $callbackNo)
+    public function paid(string $callbackNo, ?int $paymentId = null, ?bool &$newlyPaid = null): bool
     {
-        $order = $this->order;
-        if ($order->status !== 0) return true;
-        $order->status = 1;
-        $order->paid_at = time();
-        $order->callback_no = $callbackNo;
-        if (!$order->save()) return false;
+        $newlyPaid = false;
+        $state = DB::transaction(function () use ($callbackNo, $paymentId, &$newlyPaid) {
+            $order = Order::whereKey($this->order->id)->lockForUpdate()->firstOrFail();
+            if ($paymentId !== null && (int) $order->payment_id !== $paymentId) return null;
+
+            $this->order = $order;
+            $status = (int) $order->status;
+            if ($status !== 0) return $status;
+
+            $order->status = 1;
+            $order->paid_at = time();
+            $order->callback_no = $callbackNo;
+            if (!$order->save()) return null;
+            $newlyPaid = true;
+            return 1;
+        });
+        if ($state === null) return false;
+        if ($state !== 1) return true;
+
+        // Repeated callbacks can recover a previously failed dispatch. The job
+        // locks the order and applies its entitlement only while status is 1.
         try {
-            OrderHandleJob::dispatch($order->trade_no);
-        } catch (\Exception $e) {
+            OrderHandleJob::dispatch($this->order->trade_no);
+        } catch (\Throwable $e) {
+            report($e);
             return false;
         }
         return true;
@@ -378,6 +394,9 @@ class OrderService
 
     private function buyByPeriod(Order $order, Plan $plan)
     {
+        if (in_array((int) $order->type, [1, 3], true)) {
+            $this->user->traffic_reset_not_before = null;
+        }
         // change plan process
         if ((int)$order->type === 3) {
             $this->user->expired_at = time();
@@ -417,6 +436,7 @@ class OrderService
         $this->user->device_limit = $plan->device_limit;
         $this->user->plan_id = $plan->id;
         $this->user->group_id = $plan->group_id;
+        $this->user->traffic_reset_not_before = null;
         $this->user->expired_at = NULL;
     }
 

@@ -4,7 +4,8 @@ namespace App\Jobs;
 
 use App\Models\ClientConfigPublication;
 use App\Models\ClientRemoteConfig;
-use App\Services\ClientConfigCryptoService;
+use App\Models\ClientStorageTarget;
+use Illuminate\Support\Facades\DB;
 use App\Services\ClientConfigStorageService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,7 @@ class PublishClientRemoteConfig implements ShouldQueue
         $this->onQueue('default');
     }
 
-    public function handle(ClientConfigCryptoService $crypto, ClientConfigStorageService $storage)
+    public function handle(ClientConfigStorageService $storage)
     {
         $publication = ClientConfigPublication::with(['config', 'target'])->find($this->publicationId);
         if (!$publication || !$publication->config || !$publication->target) return;
@@ -39,25 +40,35 @@ class PublishClientRemoteConfig implements ShouldQueue
 
         try {
             if (!$publication->target->enabled) throw new \RuntimeException('该云存储目标已停用');
-            $payload = $crypto->encode($publication->config);
-            $payloadChecksum = hash('sha256', $payload);
-            if (!hash_equals($publication->checksum, $payloadChecksum)) {
-                $publication->checksum = $payloadChecksum;
+            $payload = $publication->config->publication_payload;
+            if ($payload === null || !hash_equals($publication->checksum, hash('sha256', $payload))) {
+                throw new \RuntimeException('发布产物缺失或校验失败，请创建新版本。');
             }
 
             $versionKey = $storage->versionedObjectKey($publication->target, (int)$publication->config->config_version);
             $storage->upload($publication->target, $versionKey, $payload);
             $storage->verifyPublicObject($storage->publicUrlFor($publication->target, $versionKey), $payload);
 
-            $result = $storage->upload($publication->target, $publication->object_key, $payload);
-            $publicUrl = $storage->publicUrlFor($publication->target, $publication->object_key);
-            $storage->verifyPublicObject($publicUrl, $payload);
+            DB::transaction(function () use ($publication, $storage, $payload) {
+                $target = ClientStorageTarget::lockForUpdate()->findOrFail($publication->target_id);
+                $newerRelease = ClientConfigPublication::where('target_id', $target->id)
+                    ->where('object_key', $publication->object_key)
+                    ->where('status', 'success')
+                    ->whereHas('config', function ($query) use ($publication) {
+                        $query->where('config_version', '>', $publication->config->config_version);
+                    })->exists();
+                if ($newerRelease) throw new \RuntimeException('该镜像已启用更新版本，请发布更高版本。');
+                if (!$target->enabled) throw new \RuntimeException('该云存储目标已停用');
+                $result = $storage->upload($target, $publication->object_key, $payload);
+                $publicUrl = $storage->publicUrlFor($target, $publication->object_key);
+                $storage->verifyPublicObject($publicUrl, $payload);
 
-            $publication->status = 'success';
-            $publication->public_url = $publicUrl;
-            $publication->etag = $result['etag'] ?: null;
-            $publication->finished_at = time();
-            $publication->save();
+                $publication->status = 'success';
+                $publication->public_url = $publicUrl;
+                $publication->etag = $result['etag'] ?: null;
+                $publication->finished_at = time();
+                $publication->save();
+            });
             $this->refreshConfigStatus($publication->config_id);
         } catch (\Throwable $e) {
             $publication->status = $this->attempts() >= $this->tries ? 'failed' : 'queued';
@@ -89,7 +100,13 @@ class PublishClientRemoteConfig implements ShouldQueue
 
         $allSuccess = $rows->isNotEmpty() && $rows->every(function ($row) { return $row->status === 'success'; });
         if ($allSuccess) {
-            ClientRemoteConfig::where('id', '<>', $config->id)->where('status', 'published')->update([
+            if (ClientRemoteConfig::where('config_version', '>', $config->config_version)
+                ->where('status', 'published')->exists()) {
+                $config->status = 'archived';
+                $config->save();
+                return;
+            }
+            ClientRemoteConfig::where('config_version', '<', $config->config_version)->where('status', 'published')->update([
                 'status' => 'archived', 'updated_at' => time(),
             ]);
             $config->status = 'published';

@@ -17,8 +17,13 @@ class PaymentService
         $this->method = $method;
         $this->class = '\\App\\Payments\\' . $this->method;
         if (!class_exists($this->class)) abort(500, __('Payment method is not available'));
-        if ($id) $payment = Payment::find($id)->toArray();
-        if ($uuid) $payment = Payment::where('uuid', $uuid)->first()->toArray();
+        if ($id || $uuid) {
+            $record = $id ? Payment::find($id) : Payment::where('uuid', $uuid)->first();
+            if (!$record || $record->payment !== $method) {
+                abort(422, __('Payment method is not available'));
+            }
+            $payment = $record->toArray();
+        }
         $this->config = [];
         if (isset($payment)) {
             $this->config = $payment['config'];
@@ -28,6 +33,11 @@ class PaymentService
             $this->config['notify_domain'] = $payment['notify_domain'];
         };
         $this->payment = new $this->class($this->config);
+    }
+
+    public function paymentId(): int
+    {
+        return (int) $this->config['id'];
     }
 
     public function notify($params)

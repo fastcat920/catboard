@@ -9,6 +9,7 @@ class ClientRemoteConfig extends Model
     protected $table = 'v2_client_config';
     protected $dateFormat = 'U';
     protected $guarded = ['id'];
+    protected $hidden = ['publication_payload'];
     protected $casts = ['config_version' => 'integer'];
 
     public function getContentAttribute(): array

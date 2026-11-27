@@ -27,8 +27,9 @@ class ServerController extends Controller
         }
         $audit = new AuditService();
         $servers = $audit->prepare($request, $servers, 'user.server.fetch');
-        $eTag = sha1(json_encode(array_column($servers, 'cache_key')));
-        if (strpos($request->header('If-None-Match'), $eTag) !== false ) {
+        $servers = array_map([\App\Services\NodeSecurity\PublicNodeSettings::class, 'forNodeList'], $servers);
+        $eTag = sha1(json_encode($servers));
+        if (strpos((string) $request->header('If-None-Match'), $eTag) !== false ) {
             $response = response('', 304)->header('ETag', "{$eTag}");
             $audit->record($request, $response);
             return $response;

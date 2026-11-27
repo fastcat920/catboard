@@ -238,6 +238,7 @@ export default {
     newPeriodTrafficExhausted: '套餐流量已用尽，可以提前开启下一流量周期',
     newPeriodConfirm: '确认开启下一流量周期',
     newPeriodDesc: '此操作将重置已使用流量，并从套餐时长中扣除当前流量周期的剩余天数，是否继续？',
+    newPeriodPreview: '预计扣除 {days} 天 {hours} 小时 {minutes} 分钟。开启后预计到期时间为 {expiry}。',
     newPeriodWarning: '开启后无法撤销，请确认套餐剩余时长充足',
     newPeriodSuccess: '新的流量周期已开启',
     newPeriodFailed: '开启新的流量周期失败，请稍后重试',

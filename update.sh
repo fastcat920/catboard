@@ -1,56 +1,86 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 set -euo pipefail
 
-if [ ! -d ".git" ]; then
-  echo "Please deploy using Git."
+cd "$(dirname "$0")"
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo "Tracked files have local changes. Commit or save them before updating." >&2
   exit 1
 fi
 
-if ! command -v git &> /dev/null; then
-    echo "Git is not installed! Please install git and try again."
-    exit 1
-fi
-
-git config --global --add safe.directory "$(pwd)"
 git fetch origin custom
-git reset --hard origin/custom
-rm -rf composer.lock composer.phar
-wget https://github.com/composer/composer/releases/latest/download/composer.phar -O composer.phar
-php composer.phar update -vvv
+revision="$(git rev-parse --verify "${1:-origin/custom}^{commit}")"
+previous="$(git rev-parse HEAD)"
+git merge-base --is-ancestor "$previous" "$revision" || {
+  echo "The target revision must be a fast-forward from the current release." >&2
+  exit 1
+}
 
-if ! grep -q '^TRIAL_IDENTITY_KEY=..*' .env; then
-    trial_identity_key="$(php -r 'echo bin2hex(random_bytes(32));')"
-    if grep -q '^TRIAL_IDENTITY_KEY=' .env; then
-        sed -i "s/^TRIAL_IDENTITY_KEY=.*/TRIAL_IDENTITY_KEY=${trial_identity_key}/" .env
+stage="$(mktemp -d "$PWD/.fcboard-release.XXXXXXXX")"
+previous_vendor=''
+cleanup() {
+  local status=$?
+  if [[ "$status" -ne 0 && -n "$previous_vendor" && -d "$previous_vendor" ]]; then
+    local backup="$PWD/vendor.previous.${stage##*.}"
+    if mv "$previous_vendor" "$backup"; then
+      echo "Previous dependencies saved at $backup." >&2
     else
-        printf '\nTRIAL_IDENTITY_KEY=%s\n' "$trial_identity_key" >> .env
+      echo "Previous dependencies remain at $previous_vendor." >&2
+      return
     fi
-    echo "Generated TRIAL_IDENTITY_KEY for account trial protection."
+  fi
+  rm -rf -- "$stage"
+}
+trap cleanup EXIT
+git archive "$revision" | tar -x -C "$stage"
+
+# An external lockfile is useful when operators keep release artifacts outside Git.
+if [[ ! -f "$stage/composer.lock" && -n "${FCBOARD_COMPOSER_LOCK:-}" ]]; then
+  cp -- "$FCBOARD_COMPOSER_LOCK" "$stage/composer.lock"
+fi
+if [[ ! -f "$stage/composer.lock" ]]; then
+  echo "This release needs an audited composer.lock. Provide FCBOARD_COMPOSER_LOCK or include it in the release." >&2
+  exit 1
 fi
 
-php_main_version=$(php -v | head -n 1 | cut -d ' ' -f 2 | cut -d '.' -f 1)
-if [ "$php_main_version" -ge 8 ]; then
-    php composer.phar require joanhey/adapterman
-    if ! php -m | grep -q "pcntl"; then
-        echo "Adding pcntl extension to cli-php.ini"
-        sed -i '/extension=redis.so/a extension=pcntl.so' cli-php.ini
-    fi
-    php -c cli-php.ini webman.php stop
-    echo "Webman stopped.Please restart it by yourself."
+composer_cmd=("${FCBOARD_COMPOSER:-composer}")
+if [[ "${composer_cmd[0]}" == *.phar ]]; then
+  composer_cmd=(php "${composer_cmd[0]}")
 fi
+(
+  cd "$stage"
+  "${composer_cmd[@]}" validate --no-check-publish --strict
+  "${composer_cmd[@]}" install --no-dev --prefer-dist --no-interaction --no-scripts
+  "${composer_cmd[@]}" check-platform-reqs --no-dev
+)
 
-php artisan v2board:update
-
-echo "Running registered database upgrades..."
-php artisan v2board:upgrade-database
-echo "Database migrations and one-time data upgrades completed."
-
-echo "Refreshing application routes and compiled views..."
-php artisan route:clear
-php artisan view:clear
-echo "Application routes and views refreshed."
-
-if [ -f "/etc/init.d/bt" ]; then
-  chown -R www "$(pwd)";
+if [[ -d vendor ]]; then
+  previous_vendor="$stage/vendor.previous"
 fi
+echo "Updating FCboard from $previous to $revision."
+git merge --ff-only "$revision"
+if [[ -n "$previous_vendor" ]]; then
+  mv vendor "$previous_vendor"
+fi
+if ! mv "$stage/vendor" vendor; then
+  if [[ -n "$previous_vendor" ]]; then mv "$previous_vendor" vendor; fi
+  exit 1
+fi
+if ! (
+  php artisan package:discover &&
+  php artisan v2board:update &&
+  php artisan v2board:upgrade-database &&
+  php artisan route:clear &&
+  php artisan view:clear
+); then
+  echo "Update stopped at $revision. Previous commit: $previous. Check migration output before rolling back." >&2
+  exit 1
+fi
+if [[ -n "${FCBOARD_RELOAD_COMMAND:-}" ]]; then
+  bash -c "$FCBOARD_RELOAD_COMMAND"
+else
+  echo 'Reload the running web and queue services to activate the new release.'
+fi
+if [[ -n "${FCBOARD_HEALTH_URL:-}" ]]; then
+  curl --fail --silent --show-error --max-time 15 -- "$FCBOARD_HEALTH_URL" >/dev/null
+fi
+echo "FCboard $revision prepared successfully."

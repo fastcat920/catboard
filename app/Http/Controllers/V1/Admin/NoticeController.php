@@ -12,8 +12,24 @@ class NoticeController extends Controller
 {
     public function fetch(Request $request)
     {
+        $notices = Notice::query()->orderByDesc('id');
+        if ($request->filled('id')) {
+            return response(['data' => $notices->findOrFail($request->validate([
+                'id' => 'required|integer|min:1',
+            ])['id'])]);
+        }
+        if (!$request->has('current') && !$request->has('pageSize')) {
+            return response(['data' => $notices->get()]);
+        }
+        $page = $request->validate([
+            'current' => 'required|integer|min:1',
+            'pageSize' => 'required|integer|min:1|max:100',
+        ]);
+        $total = $notices->count();
         return response([
-            'data' => Notice::orderBy('id', 'DESC')->get()
+            'data' => $notices->forPage($page['current'], $page['pageSize'])
+                ->get(['id', 'title', 'title_en', 'show', 'tags', 'created_at', 'updated_at']),
+            'total' => $total,
         ]);
     }
 

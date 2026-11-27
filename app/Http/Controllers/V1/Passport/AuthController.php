@@ -292,6 +292,9 @@ class AuthController extends Controller
         if (!$user) {
             abort(500, __('This email is not registered in the system'));
         }
+        if (strtolower(trim($user->email)) !== $cacheKeyEmail) {
+            abort(500, __('Incorrect email verification code'));
+        }
         $user->password      = password_hash($password, PASSWORD_DEFAULT);
         $user->password_algo = null;
         $user->password_salt = null;

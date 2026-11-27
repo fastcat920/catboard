@@ -50,8 +50,39 @@ class UserService
         return (int)(($nextYear - time()) / 86400);
     }
 
+    public function previewNewTrafficPeriod(User $user): array
+    {
+        $plan = $user->plan ?? ($user->plan_id ? Plan::find($user->plan_id) : null);
+        return NewTrafficPeriod::preview(
+            (bool) config('v2board.allow_new_period', 0),
+            (bool) $user->banned,
+            $plan ? (int) ($plan->reset_traffic_method ?? config('v2board.reset_traffic_method', 0)) : null,
+            (int) $user->u + (int) $user->d,
+            (int) $user->transfer_enable,
+            $user->expired_at !== null ? (int) $user->expired_at : null,
+            (int) $user->traffic_reset_not_before,
+            new \DateTimeImmutable()
+        );
+    }
+
+    public function getNextTrafficResetAt(User $user): ?int
+    {
+        $plan = $user->plan ?? ($user->plan_id ? Plan::find($user->plan_id) : null);
+        if (!$plan || $user->expired_at === null) return null;
+        return NewTrafficPeriod::nextResetAt(
+            new \DateTimeImmutable(),
+            (int) $user->expired_at,
+            (int) ($plan->reset_traffic_method ?? config('v2board.reset_traffic_method', 0)),
+            (int) $user->traffic_reset_not_before
+        );
+    }
+
     public function getResetDay(User $user)
     {
+        if ((int) $user->traffic_reset_not_before > time()) {
+            $next = $this->getNextTrafficResetAt($user);
+            return $next === null ? null : (int) ceil(($next - time()) / 86400);
+        }
         if (!isset($user->plan)) {
             if ($user->plan_id === NULL) return null;
             $user->plan = Plan::find($user->plan_id);

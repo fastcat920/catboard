@@ -336,71 +336,57 @@ class UserController extends Controller
         return response(['data' => true]);
     }
 
-    public function newPeriod(Request $request) 
+    public function newPeriod(Request $request)
     {
-        if (!config('v2board.allow_new_period', 0)) {
-            abort(500, __('Renewal is not allowed'));
-        }
-        DB::beginTransaction();
-        try {
-            $user = User::find($request->user['id']);
-            if (!$user) {
-                abort(500, __('The user does not exist'));
+        $input = $request->validate([
+            'operation_id' => 'nullable|uuid',
+            'preview_reset_at' => 'required_with:preview_expires_at|integer',
+            'preview_expires_at' => 'required_with:preview_reset_at|integer',
+        ]);
+        $operationId = $input['operation_id'] ?? null;
+        return DB::transaction(function () use ($request, $operationId, $input) {
+            $user = User::whereKey($request->user['id'])->lockForUpdate()->firstOrFail();
+            $receipts = DB::table('v2_new_period_receipt')->where('user_id', $user->id);
+            if ($operationId !== null && (clone $receipts)->where('operation_id', $operationId)->exists()) {
+                return response(['data' => true]);
             }
-            if (($user->u + $user->d) * 100 < $user->transfer_enable * 90) {
-                abort(500, __('You need to use at least 90% of your traffic before starting the next period'));
+            $preview = (new UserService())->previewNewTrafficPeriod($user);
+            if (!$preview['eligible']) {
+                $messages = [
+                    'NEW_PERIOD_NOT_ALLOWED' => __('Renewal is not allowed'),
+                    'NEW_PERIOD_USAGE_TOO_LOW' => __('You need to use at least 90% of your traffic before starting the next period'),
+                    'NEW_PERIOD_INSUFFICIENT_DURATION' => __('You do not have enough time to renew your subscription'),
+                ];
+                return response()->json([
+                    'error_code' => $preview['reason'],
+                    'message' => $messages[$preview['reason']],
+                ], 422);
             }
-            $userService = new UserService();
-            $reset_day = $userService->getResetDay($user);
-            if ($reset_day === null) {
-                abort(500, __('You do not allow to renew the subscription'));
+            if (isset($input['preview_reset_at']) &&
+                ((int) $input['preview_reset_at'] !== $preview['reset_at'] ||
+                 (int) $input['preview_expires_at'] !== $preview['current_expires_at'])) {
+                return response()->json([
+                    'error_code' => 'NEW_PERIOD_PREVIEW_CHANGED',
+                    'message' => __('Subscription changed. Refresh and confirm again.'),
+                ], 409);
             }
-            unset($user->plan);
-            $reset_period = $userService->getResetPeriod($user);
-            if ($reset_period === null) {
-                abort(500, __('You do not allow to renew the subscription'));
-            }
-            switch ($reset_period) {
-                case 1:
-                    $reset_day = 30;
-                    $reset_period = 30;
-                    break;
-                case 30:
-                    break;
-                case 12:
-                    $reset_day = 365;
-                    $reset_period = 365;
-                    break;
-                case 365:
-                    break;
-                default:
-                    abort(500, __('Invalid reset period'));
-            }
-            if ($reset_day <= 0) {
-                $reset_day = $reset_period;
-            }
-            if ($user->expired_at !== null && ($reset_period + 1) * 86400 < $user->expired_at - time()) {
-                if (!$user->update(
-                    [
-                        'expired_at' => $user->expired_at - $reset_day * 86400,
-                        'u' => 0,
-                        'd' => 0
-                    ]
-                )) {
-                    abort(500, __('Save failed'));
-                }
-            } else {
-                abort(500, __('There is not enough subscription time left to start the next period'));
+            if (!$user->update([
+                'expired_at' => $preview['new_expires_at'],
+                'traffic_reset_not_before' => $preview['hold_until'],
+                'u' => 0,
+                'd' => 0,
+            ])) {
+                throw new \RuntimeException(__('Save failed'));
             }
 
-            DB::commit();
-            return response([
-                'data' => true
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+            if ($operationId !== null) {
+                DB::table('v2_new_period_receipt')->insert([
+                    'user_id' => $user->id, 'operation_id' => $operationId, 'created_at' => time()
+                ]);
+                $receipts->where('created_at', '<', time() - 7 * 86400)->delete();
+            }
+            return response(['data' => true]);
+        });
     }
 
     public function redeemgiftcard(UserRedeemGiftCard $request)
@@ -605,6 +591,8 @@ class UserController extends Controller
                 'plan_id',
                 'token',
                 'expired_at',
+                'banned',
+                'traffic_reset_not_before',
                 'u',
                 'd',
                 'transfer_enable',
@@ -636,7 +624,12 @@ class UserController extends Controller
 
         $userService = new UserService();
         $user['reset_day'] = $userService->getResetDay($user);
+        $user['next_reset_at'] = $userService->getNextTrafficResetAt($user);
         $user['allow_new_period'] = config('v2board.allow_new_period', 0);
+        $preview = $userService->previewNewTrafficPeriod($user);
+        unset($preview['hold_until']);
+        $user['new_period'] = $preview;
+        $user->makeHidden(['banned', 'traffic_reset_not_before']);
         return response([
             'data' => $user
         ]);

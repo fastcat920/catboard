@@ -41,6 +41,7 @@ class AuthService
 
     public static function decryptAuthData($jwt)
     {
+        if (!is_string($jwt) || $jwt === '') return false;
         try {
             if (!Cache::has($jwt)) {
                 $data = (array)JWT::decode($jwt, new Key(config('app.key'), 'HS256'));

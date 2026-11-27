@@ -35,7 +35,11 @@ class ResetTraffic extends Command
     {
         parent::__construct();
         $this->builder = User::where('expired_at', '!=', NULL)
-            ->where('expired_at', '>', time());
+            ->where('expired_at', '>', time())
+            ->where(function ($query) {
+                $query->whereNull('traffic_reset_not_before')
+                    ->orWhere('traffic_reset_not_before', '<=', strtotime('today'));
+            });
     }
 
     /**
@@ -113,14 +117,18 @@ class ResetTraffic extends Command
     {
         $users = [];
         foreach ($builder->get() as $item) {
-            $expireDay = date('m-d', $item->expired_at);
+            $expiry = (new \DateTimeImmutable())->setTimestamp($item->expired_at);
+            $todayDate = new \DateTimeImmutable('today');
+            $expireDay = \App\Services\NewTrafficPeriod::dayInMonth(
+                $todayDate, (int) $todayDate->format('Y'), (int) $expiry->format('n'), (int) $expiry->format('j')
+            )->format('m-d');
             $today = date('m-d');
             if ($expireDay === $today) {
                 array_push($users, $item->id);
             }
         }
         $this->retryTransaction(function () use ($users) {
-            User::whereIn('id', $users)->update([
+            (clone $this->builder)->whereIn('id', $users)->update([
                 'u' => 0,
                 'd' => 0
             ]);
@@ -167,7 +175,7 @@ class ResetTraffic extends Command
 
         }
         $this->retryTransaction(function () use ($users) {
-            User::whereIn('id', $users)->update([
+            (clone $this->builder)->whereIn('id', $users)->update([
                 'u' => 0,
                 'd' => 0
             ]);

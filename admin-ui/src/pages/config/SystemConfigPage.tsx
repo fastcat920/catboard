@@ -310,7 +310,7 @@ export default function SystemConfigPage() {
           </ConfigItem>
           <ConfigItem
             title="允许提前开启流量周期"
-            description="开启后用户流量用尽时可以选择扣除订阅时长为代价重置流量，按月重置时扣除本周期剩余订阅时长，每月1号重置时扣除整月时间30天。"
+            description="套餐流量使用达到 90%，且到期前仍有一个完整的下一流量周期时，用户可提前开启。系统按实际重置日期扣除本周期剩余时长。"
           >
             {toggle('subscribe', 'allow_new_period')}
           </ConfigItem>

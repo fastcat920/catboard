@@ -232,6 +232,7 @@ export default {
     newPeriodTrafficExhausted: 'Plan traffic is exhausted. You can start the next traffic period early.',
     newPeriodConfirm: 'Start the Next Traffic Period?',
     newPeriodDesc: 'This resets used traffic and deducts the remaining days of the current traffic period from your plan. Continue?',
+    newPeriodPreview: 'Estimated deduction: {days} d, {hours} h, {minutes} min. Estimated new expiry: {expiry}.',
     newPeriodWarning: 'This action cannot be undone. Make sure your plan has enough remaining time.',
     newPeriodSuccess: 'The new traffic period has started',
     newPeriodFailed: 'Could not start a new traffic period. Please try again later.',

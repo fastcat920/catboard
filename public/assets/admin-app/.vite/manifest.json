@@ -1,12 +1,12 @@
 {
-  "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
+  "../../../../Users/pizihu/Projects/FCboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js": {
     "file": "assets/worker-json-8CDXFfik.js",
-    "src": "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
+    "src": "../../../../Users/pizihu/Projects/FCboard/admin-ui/node_modules/.pnpm/ace-builds@1.44.0/node_modules/ace-builds/src-noconflict/worker-json.js"
   },
-  "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
+  "../../../../Users/pizihu/Projects/FCboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs": {
     "file": "assets/darkreader-Cmw0ewJI.js",
     "name": "darkreader",
-    "src": "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
+    "src": "../../../../Users/pizihu/Projects/FCboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs",
     "isDynamicEntry": true
   },
   "_AdminLayout-BbTYaaPi.js": {
@@ -286,7 +286,7 @@
       "_staticApi-HeytMHj0.js"
     ],
     "dynamicImports": [
-      "../../fcn-v3-panel-integration/catboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
+      "../../../../Users/pizihu/Projects/FCboard/admin-ui/node_modules/.pnpm/darkreader@4.9.132/node_modules/darkreader/darkreader.mjs"
     ]
   },
   "_date-picker-uYVlbayM.js": {
@@ -612,7 +612,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-DIAEUTb_.js",
+    "file": "assets/index-ChDVZcZK.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -852,7 +852,7 @@
     ]
   },
   "src/pages/config/SystemConfigPage.tsx": {
-    "file": "assets/SystemConfigPage-uwccnadX.js",
+    "file": "assets/SystemConfigPage-pN2GyeMn.js",
     "name": "SystemConfigPage",
     "src": "src/pages/config/SystemConfigPage.tsx",
     "isDynamicEntry": true,
@@ -1044,7 +1044,7 @@
     ]
   },
   "src/pages/notice/NoticePage.tsx": {
-    "file": "assets/NoticePage-ldeLvFn4.js",
+    "file": "assets/NoticePage-hGiak-9e.js",
     "name": "NoticePage",
     "src": "src/pages/notice/NoticePage.tsx",
     "isDynamicEntry": true,

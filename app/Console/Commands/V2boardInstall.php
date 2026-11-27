@@ -58,6 +58,7 @@ class V2boardInstall extends Command
             }
             $this->saveToEnv([
                 'APP_KEY' => 'base64:' . base64_encode(Encrypter::generateKey('AES-256-CBC')),
+                'TRIAL_IDENTITY_KEY' => bin2hex(random_bytes(32)),
                 'DB_HOST' => $this->ask('请输入数据库地址（默认:localhost）', 'localhost'),
                 'DB_DATABASE' => $this->ask('请输入数据库名'),
                 'DB_USERNAME' => $this->ask('请输入数据库用户名'),
@@ -82,7 +83,7 @@ class V2boardInstall extends Command
             $this->info('正在导入数据库请稍等...');
             foreach ($sql as $item) {
                 try {
-                    DB::select(DB::raw($item));
+                    DB::statement($item);
                 } catch (\Exception $e) {
                 }
             }

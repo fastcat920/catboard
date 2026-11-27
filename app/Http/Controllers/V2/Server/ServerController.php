@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\ServerService;
 use Illuminate\Http\Request;
 use App\Utils\Helper;
+use App\Services\FCNCertificate;
 
 class ServerController extends Controller
 {
@@ -52,6 +53,26 @@ class ServerController extends Controller
     // 后端获取配置
     public function config(Request $request)
     {
+        $settings = $this->nodeInfo->tls_settings;
+        $protocol = $this->nodeInfo->protocol;
+        if (in_array($protocol, ['fcn-v1', 'fcn-v2'], true)
+            && ($settings['fcn_trust_mode'] ?? 'ca') === 'spki') {
+            // Renew with the same key before expiry; subscriptions keep the same SPKI pin.
+            $name = !empty($settings['server_name']) ? $settings['server_name'] : $this->nodeInfo->host;
+            $prepared = FCNCertificate::prepare($settings, $name);
+            if ($prepared !== $settings) {
+                $this->nodeInfo->tls_settings = $prepared;
+                $this->nodeInfo->save();
+            }
+            $settings = $prepared;
+        } elseif (in_array($protocol, ['fcn-v1', 'fcn-v2', 'fcn-v3'], true)
+            && in_array($settings['cert_mode'] ?? '', ['http', 'dns'], true)) {
+            $domain = FCNCertificate::automaticDomain($settings, $this->nodeInfo->host);
+            if ($domain !== null) {
+                $settings['server_name'] = $domain;
+            }
+        }
+
         $response = [
             'listen_ip' => $this->nodeInfo->listen_ip,
             'server_port' => $this->nodeInfo->server_port,
@@ -60,7 +81,7 @@ class ServerController extends Controller
             'trusted_x_forwarded_for'=> $this->nodeInfo->trusted_x_forwarded_for,
             'protocol' => $this->nodeInfo->protocol,
             'tls' => $this->nodeInfo->tls,
-            'tls_settings' => $this->nodeInfo->tls_settings,
+            'tls_settings' => $settings,
             'encryption' => $this->nodeInfo->encryption,
             'encryption_settings' => $this->nodeInfo->encryption_settings,
             'flow' => $this->nodeInfo->flow,

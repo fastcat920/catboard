@@ -41,6 +41,7 @@ class AuthService
 
     public static function decryptAuthData($jwt)
     {
+        if (!is_string($jwt) || $jwt === '') return false;
         try {
             if (!Cache::has($jwt)) {
                 $data = (array)JWT::decode($jwt, new Key(config('app.key'), 'HS256'));
@@ -53,7 +54,9 @@ class AuthService
                 ])
                     ->find($data['id']);
                 if (!$user) return false;
-                Cache::put($jwt, $user->toArray(), 3600);
+                $authUser = $user->toArray();
+                $authUser['auth_session'] = $data['session'];
+                Cache::put($jwt, $authUser, 3600);
             }
             return Cache::get($jwt);
         } catch (\Exception $e) {

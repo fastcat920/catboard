@@ -1,13 +1,14 @@
 #!/bin/bash
 
-rm -rf composer.phar
-wget https://github.com/composer/composer/releases/latest/download/composer.phar -O composer.phar
-php composer.phar install -vvv
+set -euo pipefail
+cd "$(dirname "$0")"
 
-php_main_version=$(php -v | head -n 1 | cut -d ' ' -f 2 | cut -d '.' -f 1)
-if [ $php_main_version -ge 8 ]; then
-    php composer.phar require joanhey/adapterman
+composer_cmd=("${FCBOARD_COMPOSER:-composer}")
+if [[ "${composer_cmd[0]}" == *.phar ]]; then
+    composer_cmd=(php "${composer_cmd[0]}")
 fi
+"${composer_cmd[@]}" install --no-dev --prefer-dist --no-interaction
+"${composer_cmd[@]}" check-platform-reqs --no-dev
 
 php artisan v2board:install
 

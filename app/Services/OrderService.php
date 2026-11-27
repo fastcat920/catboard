@@ -28,27 +28,55 @@ class OrderService
 
     public function open()
     {
+        return DB::transaction(function () {
+            $this->order = Order::where('id', $this->order->id)->lockForUpdate()->firstOrFail();
+            if ((int)$this->order->status !== 1) return;
+            User::where('id', $this->order->user_id)->lockForUpdate()->firstOrFail();
+            return $this->openLocked();
+        });
+    }
+
+    private function openLocked()
+    {
         $order = $this->order;
         $this->user = User::find($order->user_id);
         if ($order->type == 9) {
             DB::beginTransaction();
-            $this->user->balance += $order->total_amount + $this->getbounus($order->total_amount);
+            $balanceBefore = (int)$this->user->balance;
+            $bonus = $this->getbounus($order->total_amount);
+            $creditedAmount = (int)$order->total_amount + $bonus;
+            $this->user->balance += $creditedAmount;
 
             if (!$this->user->save()) {
                 DB::rollBack();
-                abort(500, '充值失败');
+                abort(500, __('Failed to add funds'));
             }
             $order->status = 3;
             if (!$order->save()) {
                 DB::rollBack();
-                abort(500, '充值失败');
+                abort(500, __('Failed to add funds'));
             }
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'deposit',
+                'amount' => $creditedAmount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'deposit:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '余额充值',
+                'meta' => ['paid_amount' => (int)$order->total_amount, 'bonus_amount' => $bonus],
+            ]);
             DB::commit();
             return;
         }
 
         $plan = Plan::find($order->plan_id);
 
+        $refundBalanceBefore = (int)$this->user->balance;
         if ($order->refund_amount) {
             $this->user->balance = $this->user->balance + $order->refund_amount;
         }
@@ -60,7 +88,7 @@ class OrderService
                 ]);
             } catch (\Exception $e) {
                 DB::rollback();
-                abort(500, '开通失败');
+                abort(500, __('Failed to activate the subscription'));
             }
         }
         switch ((string)$order->period) {
@@ -90,15 +118,37 @@ class OrderService
 
         if (!$this->user->save()) {
             DB::rollBack();
-            abort(500, '开通失败');
+            abort(500, __('Failed to activate the subscription'));
         }
         $order->status = 3;
         if (!$order->save()) {
             DB::rollBack();
-            abort(500, '开通失败');
+            abort(500, __('Failed to activate the subscription'));
         }
+        if ((int)$order->refund_amount > 0) {
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $this->user->id,
+                'type' => 'refund',
+                'amount' => (int)$order->refund_amount,
+                'balance_before' => $refundBalanceBefore,
+                'balance_after' => (int)$this->user->balance,
+                'source_key' => 'order_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '订单差额退回余额',
+            ]);
+        }
+        app(CouponWalletService::class)->consume($order);
+        app(FlashSaleService::class)->complete($order);
 
         DB::commit();
+        try {
+            app(ReferralProgramService::class)->processCompletedOrder($order->fresh());
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
 
@@ -110,7 +160,7 @@ class OrderService
         } else if ($order->period === 'reset_price') {
             $order->type = 4;
         } else if ($user->plan_id !== NULL && $order->plan_id !== $user->plan_id && ($user->expired_at > time() || $user->expired_at === NULL)) {
-            if (!(int)config('v2board.plan_change_enable', 1)) abort(500, '目前不允许更改订阅，请联系客服或提交工单操作');
+            if (!(int)config('v2board.plan_change_enable', 1)) abort(500, __('Subscription changes are not allowed. Please contact support'));
             $order->type = 3;
             if ((int)config('v2board.surplus_enable', 1)) $this->getSurplusValue($user, $order);
             if ($order->surplus_amount >= $order->total_amount) {
@@ -129,10 +179,12 @@ class OrderService
     public function setVipDiscount(User $user)
     {
         $order = $this->order;
-        if ($user->discount) {
-            $order->discount_amount = $order->discount_amount + ($order->total_amount * ($user->discount / 100));
+        $discountRate = app(ReferralProgramService::class)->memberDiscountRate($user);
+        if ($discountRate) {
+            $vipDiscount = (int)round($order->total_amount * ($discountRate / 100));
+            $order->discount_amount = $order->discount_amount + $vipDiscount;
+            $order->total_amount = $order->total_amount - $vipDiscount;
         }
-        $order->total_amount = $order->total_amount - $order->discount_amount;
     }
 
     public function setInvite(User $user):void
@@ -142,6 +194,8 @@ class OrderService
         $order->invite_user_id = $user->invite_user_id;
         $inviter = User::find($user->invite_user_id);
         if (!$inviter) return;
+        $referralService = app(ReferralProgramService::class);
+        if (!$referralService->inviterCommissionEligible($user)) return;
         $isCommission = false;
         switch ((int)$inviter->commission_type) {
             case 0:
@@ -157,11 +211,9 @@ class OrderService
         }
 
         if (!$isCommission) return;
-        if ($inviter && $inviter->commission_rate) {
-            $order->commission_balance = $order->total_amount * ($inviter->commission_rate / 100);
-        } else {
-            $order->commission_balance = $order->total_amount * (config('v2board.invite_commission', 10) / 100);
-        }
+        $commissionRate = $referralService->commissionRate($inviter);
+        $commissionRate = min($commissionRate, 100);
+        $order->commission_balance = $order->total_amount * ($commissionRate / 100);
     }
 
     private function haveValidOrder(User $user)
@@ -196,7 +248,10 @@ class OrderService
         $notUsedTraffic = $nowUserTraffic - (($user->u + $user->d) / 1073741824);
         $remainingTrafficRatio = $notUsedTraffic / $nowUserTraffic;
         $result = $remainingTrafficRatio * $paidTotalAmount;
-        $order->surplus_amount = max($result, 0);
+        // All order amounts are stored in integer cents. Round the calculated
+        // float before it is used to reduce the new order, so the preview,
+        // persisted order and payment request cannot disagree by one cent.
+        $order->surplus_amount = (int)round(max($result, 0));
         $orderModel = Order::where('user_id', $user->id)->where('period', '!=', 'reset_price')->where('status', 3);
         $order->surplus_order_ids = array_column($orderModel->get()->toArray(), 'id');
     }
@@ -236,41 +291,61 @@ class OrderService
     
         $remainingTrafficRatio = ($totalTraffic - $usedTraffic) / $totalTraffic;
     
-        $avgPricePerSecond = $orderAmountSum / $orderRangeSecond;
-        if ($orderRangeSecond <= 31 * 86400) {
-            $remainingExpiredTimeRatio = $orderSurplusSecond / $orderRangeSecond;
-            $surplusRatio = min($remainingExpiredTimeRatio, $remainingTrafficRatio);
-            $orderSurplusAmount = $avgPricePerSecond * $orderSurplusSecond * $surplusRatio;
-        } else {
-            $monthSeconds = 30 * 86400;
-            $firstMonthRemainSeconds = $orderSurplusSecond % $monthSeconds;
-            $surplusRatio = min($firstMonthRemainSeconds / $monthSeconds, $remainingTrafficRatio);
-            $laterMonthsSeconds = $orderSurplusSecond - $firstMonthRemainSeconds;
-            $orderSurplusAmount = $avgPricePerSecond * $monthSeconds * $surplusRatio +
-                                  $avgPricePerSecond * $laterMonthsSeconds;
-        }
+        if ($orderRangeSecond <= 0) return;
+        $surplusRatio = max(0, min(1, $orderSurplusSecond / $orderRangeSecond, $remainingTrafficRatio));
+        $orderSurplusAmount = $orderAmountSum * $surplusRatio;
     
-        $order->surplus_amount = max($orderSurplusAmount, 0);
+        // Keep the replacement credit in integer cents. Previously the float
+        // was truncated in different places (preview vs. order persistence),
+        // which could make the displayed deduction and payable amount differ
+        // by one cent.
+        $order->surplus_amount = (int)round(max($orderSurplusAmount, 0));
         $order->surplus_order_ids = array_column($orders, 'id');
     }
 
-    public function paid(string $callbackNo)
+    public function paid(string $callbackNo, ?int $paymentId = null, ?bool &$newlyPaid = null): bool
     {
-        $order = $this->order;
-        if ($order->status !== 0) return true;
-        $order->status = 1;
-        $order->paid_at = time();
-        $order->callback_no = $callbackNo;
-        if (!$order->save()) return false;
+        $newlyPaid = false;
+        $state = DB::transaction(function () use ($callbackNo, $paymentId, &$newlyPaid) {
+            $order = Order::whereKey($this->order->id)->lockForUpdate()->firstOrFail();
+            if ($paymentId !== null && (int) $order->payment_id !== $paymentId) return null;
+
+            $this->order = $order;
+            $status = (int) $order->status;
+            if ($status !== 0) return $status;
+
+            $order->status = 1;
+            $order->paid_at = time();
+            $order->callback_no = $callbackNo;
+            if (!$order->save()) return null;
+            $newlyPaid = true;
+            return 1;
+        });
+        if ($state === null) return false;
+        if ($state !== 1) return true;
+
+        // Repeated callbacks can recover a previously failed dispatch. The job
+        // locks the order and applies its entitlement only while status is 1.
         try {
-            OrderHandleJob::dispatch($order->trade_no);
-        } catch (\Exception $e) {
+            OrderHandleJob::dispatch($this->order->trade_no);
+        } catch (\Throwable $e) {
+            report($e);
             return false;
         }
         return true;
     }
 
     public function cancel():bool
+    {
+        return DB::transaction(function () {
+            $this->order = Order::where('id', $this->order->id)->lockForUpdate()->firstOrFail();
+            if ((int)$this->order->status === 2) return true;
+            if ((int)$this->order->status !== 0) return false;
+            return $this->cancelLocked();
+        });
+    }
+
+    private function cancelLocked():bool
     {
         $order = $this->order;
         DB::beginTransaction();
@@ -280,12 +355,28 @@ class OrderService
             return false;
         }
         if ($order->balance_amount) {
+            $balanceBefore = (int)User::where('id', $order->user_id)->value('balance');
             $userService = new UserService();
             if (!$userService->addBalance($order->user_id, $order->balance_amount)) {
                 DB::rollBack();
                 return false;
             }
+            $balanceAfter = (int)User::where('id', $order->user_id)->value('balance');
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $order->user_id,
+                'type' => 'refund',
+                'amount' => (int)$order->balance_amount,
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'source_key' => 'order_cancel_refund:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '取消订单退回余额',
+            ]);
         }
+        app(CouponWalletService::class)->release($order);
         DB::commit();
         return true;
     }
@@ -303,6 +394,9 @@ class OrderService
 
     private function buyByPeriod(Order $order, Plan $plan)
     {
+        if (in_array((int) $order->type, [1, 3], true)) {
+            $this->user->traffic_reset_not_before = null;
+        }
         // change plan process
         if ((int)$order->type === 3) {
             $this->user->expired_at = time();
@@ -342,6 +436,7 @@ class OrderService
         $this->user->device_limit = $plan->device_limit;
         $this->user->plan_id = $plan->id;
         $this->user->group_id = $plan->group_id;
+        $this->user->traffic_reset_not_before = null;
         $this->user->expired_at = NULL;
     }
 

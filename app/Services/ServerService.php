@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Cache;
 
 class ServerService
 {
+    private const FCN_NATIVE_BOOTSTRAP_URL = 'https://github.com/fastcat920/CatNode/releases/download/v0.7.1/bootstrap.sh';
+
     public function getAvailableVless(User $user): array
     {
         $servers = [];
@@ -200,7 +202,17 @@ class ServerService
             $v2node[$key]['type'] = 'v2node';
             $v2node[$key]['last_check_at'] = Cache::get(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $v['id']));
             if (!in_array($user->group_id, $v['group_id'])) continue;
-            if (isset($v2node[$v['parent_id']])) {
+            if ($v['protocol'] === 'fastcat-v2' && $v['parent_id']) {
+                $parent = $v2node[$v['parent_id']] ?? null;
+                if (!$parent || $parent['protocol'] !== 'fastcat-v2' || $parent['parent_id']
+                    || !in_array($user->group_id, $parent['group_id'])) {
+                    continue;
+                }
+                $v2node[$key]['_fastcat_managed_parent'] = (int) $parent['id'];
+                $v2node[$key]['_fastcat_parent_mode'] = $parent['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+                $v2node[$key]['_fastcat_managed_sni'] = $parent['host'];
+            }
+            if (isset($v['parent_id'], $v2node[$v['parent_id']])) {
                 $v2node[$key]['last_check_at'] = Cache::get(CacheKey::get('SERVER_V2NODE_LAST_CHECK_AT', $v['parent_id']));
                 $v2node[$key]['created_at'] = $v2node[$v['parent_id']]['created_at'];
             }
@@ -217,12 +229,37 @@ class ServerService
                     $v2node[$key]['encryption_settings'] = array_diff_key($v2node[$key]['encryption_settings'], array('private_key' => ''));
                 }
             }
-            $servers[] = $v2node[$key]->toArray();
+            $export = $v2node[$key]->toArray();
+            if ($v['protocol'] === 'fcn-v3') {
+                // This projection also feeds the user-facing JSON node API.
+                $serverName = trim((string) ($export['tls_settings']['server_name'] ?? ''));
+                // Keep the TLS identity when the entry pool substitutes a dial address.
+                $export['tls_settings'] = ['server_name' => $serverName !== '' ? $serverName : $export['host']];
+                $export['encryption_settings'] = null;
+                $export['network_settings'] = null;
+                $export['obfs_password'] = null;
+            }
+            if (in_array($v['protocol'], ['fcn-v1', 'fcn-v2'], true)) {
+                $identityNode = $v2node[$key];
+                $seen = [$key => true];
+                $parentId = $v['parent_id'];
+                while ($parentId && !isset($seen[$parentId])) {
+                    $parent = $v2node[$parentId] ?? null;
+                    if (!$parent || !in_array($parent['protocol'], ['fcn-v1', 'fcn-v2'], true)) break;
+                    $identityNode = $parent;
+                    $seen[$parentId] = true;
+                    $parentId = $parent['parent_id'];
+                }
+                $export['tls_settings'] = \App\Services\FCNCertificate::publicSettings(
+                    $identityNode['tls_settings'] ?? [], $identityNode['host']
+                );
+            }
+            $servers[] = $export;
         }
         return $servers;
     }
 
-    public function getAvailableServers(User $user)
+    public function getAvailableServers(User $user, ?array $client = null)
     {
         $servers = array_merge(
             $this->getAvailableShadowsocks($user),
@@ -236,7 +273,7 @@ class ServerService
         );
         $tmp = array_column($servers, 'sort');
         array_multisort($tmp, SORT_ASC, $servers);
-        return array_map(function ($server) {
+        $servers = array_map(function ($server) {
             if (strpos($server['port'], '-')) {
                 $server['mport'] = (string)$server['port'];
             } else {
@@ -246,6 +283,8 @@ class ServerService
             $server['cache_key'] = "{$server['type']}-{$server['id']}-{$server['updated_at']}-{$server['is_online']}";
             return $server;
         }, $servers);
+        $expanded = (new NodeEntryPoolService())->expand($servers, $client);
+        return array_map([\App\Services\NodeSecurity\PublicNodeSettings::class, 'strip'], $expanded);
     }
 
     public function getAvailableUsers($groupId)
@@ -378,18 +417,58 @@ class ServerService
         return $servers;
     }
 
+    private function fastCatDeployCommand(array $node, string $panel): ?string
+    {
+        $port = filter_var($node['server_port'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]);
+        if (!$port) return null;
+        if ($node['parent_id']) {
+            $parent = $this->getServer((int) $node['parent_id'], 'v2node');
+            if (!$parent || $parent['protocol'] !== 'fastcat-v2' || $parent['parent_id']) return null;
+            $host = $parent['tls_settings']['fastcat_endpoint_ipv4'] ?? $parent['host'];
+            $targetPort = filter_var($parent['port'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]);
+            if (!$targetPort || !filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
+            $parentMode = $parent['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+            $childMode = $node['tls_settings']['fastcat_transport_mode'] ?? 'auto';
+            $mode = $childMode === 'auto' ? $parentMode : $childMode;
+            if ($parentMode !== 'auto' && $mode !== $parentMode) return null;
+            $streams = [];
+            if ($mode !== 'h3') $streams[] = sprintf('server { listen %d; proxy_pass %s:%d; }', $port, $host, $targetPort);
+            if ($mode !== 'h2') $streams[] = sprintf('server { listen %d udp reuseport; proxy_pass %s:%d; proxy_timeout 10m; }', $port, $host, $targetPort);
+            return implode("\n", $streams);
+        }
+        if (parse_url($panel, PHP_URL_SCHEME) !== 'https' || !parse_url($panel, PHP_URL_HOST)
+            || !filter_var($node['host'], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) return null;
+        $apiKey = (string) config('v2board.server_token', '');
+        if ($apiKey === '') return null;
+        return sprintf(
+            'curl -fsSLo catnode-install.sh https://github.com/fastcat920/CatNode/releases/download/v0.4.0/bootstrap.sh && ' .
+            'bash catnode-install.sh --api-host %s --node-id %d --domain %s --port %d --api-key %s%s',
+            escapeshellarg($panel), (int) $node['id'], escapeshellarg($node['host']), $port, escapeshellarg($apiKey), $port === 443 ? ' --shared-https' : ''
+        );
+    }
+
     public function getAllV2node()
     {
         $servers = ServerV2node::orderBy('sort', 'ASC')
             ->get()
             ->toArray();
+        $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
+        $fcnApiHost = $this->fcnPanelApiHost();
         foreach ($servers as $k => $v) {
             $servers[$k]['type'] = 'v2node';
             if (isset($v['padding_scheme'])) {
                 $servers[$k]['padding_scheme'] = json_encode($v['padding_scheme']);
             }
 
-            $apiHost = config('v2board.server_api_url', config('v2board.app_url'));
+            if (in_array($v['protocol'] ?? '', ['fcn-v1', 'fcn-v2', 'fcn-v3'], true)) {
+                $servers[$k] = array_replace($servers[$k], $this->fcnDeployment($v, $fcnApiHost));
+                continue;
+            }
+            if (($v['protocol'] ?? '') === 'fastcat-v2') {
+                $servers[$k]['install_command'] = $this->fastCatDeployCommand($v, (string) $apiHost);
+                continue;
+            }
+
             $apiKey = config('v2board.server_token', '');
             $nodeId = (int) $v['id'];
             $apiHostArg = escapeshellarg((string) $apiHost);
@@ -402,6 +481,46 @@ class ServerService
             );
         }
         return $servers;
+    }
+
+    private function fcnPanelApiHost(): ?string
+    {
+        foreach ([config('v2board.server_api_url'), config('v2board.app_url'), config('app.url')] as $candidate) {
+            $url = trim((string) $candidate);
+            // Match CatNode's accepted API base URL format.
+            if (filter_var($url, FILTER_VALIDATE_URL)
+                && preg_match('~\Ahttps://[a-zA-Z0-9.:-]+(?:/[a-zA-Z0-9._/-]*)?\z~', $url)) {
+                return $url;
+            }
+        }
+        return null;
+    }
+
+    private function fcnDeployment(array $node, ?string $panel): array
+    {
+        $apiKey = (string) config('v2board.server_token', '');
+        if ($apiKey === '') {
+            return ['install_command' => null, 'install_command_error' => '面板未配置节点通讯 Token，无法生成部署命令。'];
+        }
+
+        $bootstrap = self::FCN_NATIVE_BOOTSTRAP_URL;
+        if ($node['protocol'] === 'fcn-v3') {
+            $override = trim((string) config('fastcat.fcn_v3_native_bootstrap_url', ''));
+            if (filter_var($override, FILTER_VALIDATE_URL) && parse_url($override, PHP_URL_SCHEME) === 'https'
+                && parse_url($override, PHP_URL_USER) === null && parse_url($override, PHP_URL_FRAGMENT) === null) {
+                $bootstrap = $override;
+            }
+        }
+
+        // Prompt for the address when the panel has no HTTPS URL in its configuration.
+        $prompt = $panel === null ? "printf '%s' '面板 HTTPS 地址: ' && IFS= read -r catnode_panel_url && " : '';
+        $panelArgument = $panel === null ? '"$catnode_panel_url"' : escapeshellarg($panel);
+        $command = $prompt . sprintf(
+            "curl --proto '=https' --proto-redir '=https' -fsSLo catnode-install.sh -- %s && " .
+            'bash catnode-install.sh --native --api-host %s --node-id %d --api-key %s',
+            escapeshellarg($bootstrap), $panelArgument, (int) $node['id'], escapeshellarg($apiKey)
+        );
+        return ['install_command' => $command];
     }
 
     private function mergeData(&$servers)

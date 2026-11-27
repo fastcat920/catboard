@@ -5,8 +5,10 @@ namespace App\Http\Controllers\V1\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
+use App\Models\CommissionLedger;
 use App\Services\TicketService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class TicketController extends Controller
 {
@@ -77,6 +79,10 @@ class TicketController extends Controller
         $ticket->status = 1;
         if (!$ticket->save()) {
             abort(500, '关闭失败');
+        }
+        if (Schema::hasTable('v2_commission_ledger')) {
+            CommissionLedger::where('ticket_id', $ticket->id)->where('type', 'withdrawal')->where('status', 'pending')
+                ->update(['status' => 'completed', 'updated_at' => time()]);
         }
         return response([
             'data' => true

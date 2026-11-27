@@ -4,25 +4,162 @@ namespace App\Http\Controllers\V1\User;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\UserChangePassword;
+use App\Http\Requests\User\UserChangeEmail;
+use App\Http\Requests\User\UserSendChangeEmailVerify;
 use App\Http\Requests\User\UserRedeemGiftCard;
 use App\Http\Requests\User\UserTransfer;
 use App\Http\Requests\User\UserUpdate;
 use App\Models\Giftcard;
+use App\Models\GiftcardRedemption;
+use App\Models\BalanceLedger;
 use App\Models\Order;
 use App\Models\Plan;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Jobs\SendEmailJob;
 use App\Services\AuthService;
+use App\Services\AccountDeletionService;
+use App\Services\CommissionLedgerService;
+use App\Services\BalanceLedgerService;
 use App\Services\OrderService;
 use App\Services\UserService;
+use App\Support\ContentLocale;
 use App\Utils\CacheKey;
+use App\Utils\Dict;
 use App\Utils\Helper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 class UserController extends Controller
 {
+    public function balanceRecords(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = 10;
+        if (!Schema::hasTable('v2_balance_ledger')) {
+            return response(['data' => [], 'total' => 0, 'current' => $current, 'pageSize' => $pageSize]);
+        }
+
+        $builder = BalanceLedger::where('user_id', $request->user['id'])
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC');
+        $total = $builder->count();
+        $data = $builder->forPage($current, $pageSize)->get([
+            'id', 'type', 'amount', 'balance_before', 'balance_after', 'status',
+            'trade_no', 'description', 'meta', 'created_at'
+        ]);
+
+        return response([
+            'data' => $data,
+            'total' => $total,
+            'current' => $current,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
+    public function giftcardRedemptions(Request $request)
+    {
+        $current = max((int)$request->input('current', 1), 1);
+        $pageSize = min(max((int)$request->input('pageSize', 10), 1), 50);
+        $builder = GiftcardRedemption::where('user_id', $request->user['id'])
+            ->orderBy('redeemed_at', 'DESC')
+            ->orderBy('id', 'DESC');
+
+        $total = $builder->count();
+        $records = $builder->forPage($current, $pageSize)->get();
+        $planNames = Plan::whereIn('id', $records->pluck('plan_id')->filter()->unique())
+            ->get()
+            ->each(function ($plan) use ($request) {
+                ContentLocale::localize($plan, ['name'], $request);
+            })
+            ->pluck('name', 'id');
+        $giftcardCodes = Giftcard::whereIn('id', $records->pluck('giftcard_id')->unique())
+            ->pluck('code', 'id');
+
+        $data = $records->map(function ($record) use ($planNames, $giftcardCodes) {
+            $code = $giftcardCodes->get($record->giftcard_id, $record->code_snapshot);
+            return [
+                'id' => $record->id,
+                'giftcard_name' => $record->name_snapshot,
+                'code_masked' => $this->maskGiftcardCode($code),
+                'type' => $record->type,
+                'value' => $record->value,
+                'plan_id' => $record->plan_id,
+                'plan_name' => $record->plan_id ? $planNames->get($record->plan_id) : null,
+                'redeemed_at' => $record->redeemed_at,
+            ];
+        });
+
+        return response([
+            'data' => $data,
+            'total' => $total,
+            'current' => $current,
+            'pageSize' => $pageSize,
+        ]);
+    }
+
+    public function sendDeleteAccountVerify(Request $request)
+    {
+        $user = User::find($request->user['id']);
+        if (!$user || $user->deleted_at) {
+            abort(500, __('The user does not exist'));
+        }
+
+        $rateLimitKey = 'delete-account-email:' . $user->id . ':' . $request->ip();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            abort(429, __('Too many requests, please try again later.'));
+        }
+        RateLimiter::hit($rateLimitKey, 3600);
+
+        $lastSendKey = CacheKey::get('LAST_SEND_DELETE_ACCOUNT_VERIFY_TIMESTAMP', $user->id);
+        if (Cache::has($lastSendKey)) {
+            abort(500, __('Email verification code has been sent, please request again later'));
+        }
+
+        $code = (string)random_int(100000, 999999);
+        SendEmailJob::dispatch([
+            'email' => $user->email,
+            'subject' => config('v2board.app_name', 'V2Board') . __('Account deletion verification code'),
+            'template_name' => 'verify',
+            'template_value' => [
+                'name' => config('v2board.app_name', 'V2Board'),
+                'code' => $code,
+                'url' => config('v2board.app_url')
+            ]
+        ]);
+
+        Cache::put(CacheKey::get('DELETE_ACCOUNT_VERIFY_CODE', $user->id), $code, 300);
+        Cache::put($lastSendKey, time(), 60);
+        return response(['data' => true]);
+    }
+
+    public function deleteAccount(Request $request, AccountDeletionService $deletionService)
+    {
+        $request->validate([
+            'email_code' => 'required|digits:6',
+            'confirm' => 'required|in:DELETE',
+        ]);
+
+        $user = User::find($request->user['id']);
+        if (!$user || $user->deleted_at) {
+            abort(500, __('The user does not exist'));
+        }
+
+        $codeKey = CacheKey::get('DELETE_ACCOUNT_VERIFY_CODE', $user->id);
+        $cachedCode = Cache::get($codeKey);
+        if ($cachedCode === null || !hash_equals((string)$cachedCode, (string)$request->input('email_code'))) {
+            abort(500, __('Incorrect email verification code'));
+        }
+
+        $deletionService->anonymize($user, 'user', null, 'User requested account deletion');
+        Cache::forget($codeKey);
+        Cache::forget(CacheKey::get('LAST_SEND_DELETE_ACCOUNT_VERIFY_TIMESTAMP', $user->id));
+        return response(['data' => true]);
+    }
+
     public function getActiveSession(Request $request)
     {
         $user = User::find($request->user['id']);
@@ -87,71 +224,169 @@ class UserController extends Controller
         ]);
     }
 
-    public function newPeriod(Request $request) 
+    public function sendChangeEmailVerify(UserSendChangeEmailVerify $request)
     {
-        if (!config('v2board.allow_new_period', 0)) {
-            abort(500, __('Renewal is not allowed'));
+        $user = User::find($request->user['id']);
+        if (!$user) {
+            abort(500, __('The user does not exist'));
         }
-        DB::beginTransaction();
+        if (!Helper::multiPasswordVerify(
+            $user->password_algo,
+            $user->password_salt,
+            $request->input('password'),
+            $user->password
+        )) {
+            abort(500, __('The password is wrong'));
+        }
+
+        $newEmail = strtolower(trim((string)$request->input('new_email')));
+        if ((int)config('v2board.email_whitelist_enable', 0) && !Helper::emailSuffixVerify(
+            $newEmail,
+            config('v2board.email_whitelist_suffix', Dict::EMAIL_WHITELIST_SUFFIX_DEFAULT)
+        )) {
+            abort(500, __('Email suffix is not in the Whitelist'));
+        }
+        if ((int)config('v2board.email_gmail_limit_enable', 0)) {
+            $prefix = explode('@', $newEmail)[0];
+            if (strpos($prefix, '.') !== false || strpos($prefix, '+') !== false) {
+                abort(500, __('Gmail alias is not supported'));
+            }
+        }
+        if (strcasecmp($user->email, $newEmail) === 0) {
+            abort(500, __('The new email must be different from the current email'));
+        }
+        if (User::whereRaw('LOWER(email) = ?', [$newEmail])->exists()) {
+            abort(500, __('Email already exists'));
+        }
+
+        $rateLimitKey = 'change-email:' . $user->id . ':' . $request->ip();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            abort(429, __('Too many requests, please try again later.'));
+        }
+        RateLimiter::hit($rateLimitKey, 3600);
+
+        $lastSendKey = CacheKey::get('LAST_SEND_CHANGE_EMAIL_VERIFY_TIMESTAMP', $user->id . ':' . $newEmail);
+        if (Cache::has($lastSendKey)) {
+            abort(500, __('Email verification code has been sent, please request again later'));
+        }
+
+        $code = (string)random_int(100000, 999999);
+        SendEmailJob::dispatch([
+            'email' => $newEmail,
+            'subject' => config('v2board.app_name', 'V2Board') . __('Email verification code'),
+            'template_name' => 'verify',
+            'template_value' => [
+                'name' => config('v2board.app_name', 'V2Board'),
+                'code' => $code,
+                'url' => config('v2board.app_url')
+            ]
+        ]);
+
+        Cache::put(CacheKey::get('CHANGE_EMAIL_VERIFY_CODE', $user->id . ':' . $newEmail), $code, 300);
+        Cache::put($lastSendKey, time(), 60);
+        return response(['data' => true]);
+    }
+
+    public function changeEmail(UserChangeEmail $request)
+    {
+        $user = User::find($request->user['id']);
+        if (!$user) {
+            abort(500, __('The user does not exist'));
+        }
+        if (!Helper::multiPasswordVerify(
+            $user->password_algo,
+            $user->password_salt,
+            $request->input('password'),
+            $user->password
+        )) {
+            abort(500, __('The password is wrong'));
+        }
+
+        $newEmail = strtolower(trim((string)$request->input('new_email')));
+        if (strcasecmp($user->email, $newEmail) === 0) {
+            abort(500, __('The new email must be different from the current email'));
+        }
+        if (User::whereRaw('LOWER(email) = ?', [$newEmail])->where('id', '!=', $user->id)->exists()) {
+            abort(500, __('Email already exists'));
+        }
+
+        $codeKey = CacheKey::get('CHANGE_EMAIL_VERIFY_CODE', $user->id . ':' . $newEmail);
+        $cachedCode = Cache::get($codeKey);
+        $inputCode = (string)$request->input('email_code');
+        if ($cachedCode === null || !hash_equals((string)$cachedCode, $inputCode)) {
+            abort(500, __('Incorrect email verification code'));
+        }
+
+        $user->email = $newEmail;
         try {
-            $user = User::find($request->user['id']);
-            if (!$user) {
-                abort(500, __('The user does not exist'));
+            if (!$user->save()) {
+                abort(500, __('Save failed'));
             }
-            if ($user->transfer_enable > $user->u + $user->d) {
-                abort(500, __('You have not used up your traffic, you cannot renew your subscription'));
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ((string)$e->getCode() === '23000') {
+                abort(500, __('Email already exists'));
             }
-            $userService = new UserService();
-            $reset_day = $userService->getResetDay($user);
-            if ($reset_day === null) {
-                abort(500, __('You do not allow to renew the subscription'));
+            throw $e;
+        }
+
+        Cache::forget($codeKey);
+        Cache::forget(CacheKey::get('LAST_SEND_CHANGE_EMAIL_VERIFY_TIMESTAMP', $user->id . ':' . $newEmail));
+        $authService = new AuthService($user);
+        $authService->removeAllSession();
+        return response(['data' => true]);
+    }
+
+    public function newPeriod(Request $request)
+    {
+        $input = $request->validate([
+            'operation_id' => 'nullable|uuid',
+            'preview_reset_at' => 'required_with:preview_expires_at|integer',
+            'preview_expires_at' => 'required_with:preview_reset_at|integer',
+        ]);
+        $operationId = $input['operation_id'] ?? null;
+        return DB::transaction(function () use ($request, $operationId, $input) {
+            $user = User::whereKey($request->user['id'])->lockForUpdate()->firstOrFail();
+            $receipts = DB::table('v2_new_period_receipt')->where('user_id', $user->id);
+            if ($operationId !== null && (clone $receipts)->where('operation_id', $operationId)->exists()) {
+                return response(['data' => true]);
             }
-            unset($user->plan);
-            $reset_period = $userService->getResetPeriod($user);
-            if ($reset_period === null) {
-                abort(500, __('You do not allow to renew the subscription'));
+            $preview = (new UserService())->previewNewTrafficPeriod($user);
+            if (!$preview['eligible']) {
+                $messages = [
+                    'NEW_PERIOD_NOT_ALLOWED' => __('Renewal is not allowed'),
+                    'NEW_PERIOD_USAGE_TOO_LOW' => __('You need to use at least 90% of your traffic before starting the next period'),
+                    'NEW_PERIOD_INSUFFICIENT_DURATION' => __('You do not have enough time to renew your subscription'),
+                ];
+                return response()->json([
+                    'error_code' => $preview['reason'],
+                    'message' => $messages[$preview['reason']],
+                ], 422);
             }
-            switch ($reset_period) {
-                case 1:
-                    $reset_day = 30;
-                    $reset_period = 30;
-                    break;
-                case 30:
-                    break;
-                case 12:
-                    $reset_day = 365;
-                    $reset_period = 365;
-                    break;
-                case 365:
-                    break;
-                default:
-                    abort(500, __('Invalid reset period'));
+            if (isset($input['preview_reset_at']) &&
+                ((int) $input['preview_reset_at'] !== $preview['reset_at'] ||
+                 (int) $input['preview_expires_at'] !== $preview['current_expires_at'])) {
+                return response()->json([
+                    'error_code' => 'NEW_PERIOD_PREVIEW_CHANGED',
+                    'message' => __('Subscription changed. Refresh and confirm again.'),
+                ], 409);
             }
-            if ($reset_day <= 0) {
-                $reset_day = $reset_period;
-            }
-            if ($user->expired_at !== null && ($reset_period + 1) * 86400 < $user->expired_at - time()) {
-                if (!$user->update(
-                    [
-                        'expired_at' => $user->expired_at - $reset_day * 86400,
-                        'u' => 0,
-                        'd' => 0
-                    ]
-                )) {
-                    throw new \Exception(__('Save failed'));
-                }
-            } else {
-                abort(500, __('You do not have enough time to renew your subscription'));
+            if (!$user->update([
+                'expired_at' => $preview['new_expires_at'],
+                'traffic_reset_not_before' => $preview['hold_until'],
+                'u' => 0,
+                'd' => 0,
+            ])) {
+                throw new \RuntimeException(__('Save failed'));
             }
 
-            DB::commit();
-            return response([
-                'data' => true
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            abort(500, $e->getMessage());
-        }
+            if ($operationId !== null) {
+                DB::table('v2_new_period_receipt')->insert([
+                    'user_id' => $user->id, 'operation_id' => $operationId, 'created_at' => time()
+                ]);
+                $receipts->where('created_at', '<', time() - 7 * 86400)->delete();
+            }
+            return response(['data' => true]);
+        });
     }
 
     public function redeemgiftcard(UserRedeemGiftCard $request)
@@ -164,7 +399,7 @@ class UserController extends Controller
                 abort(500, __('The user does not exist'));
             }
             $giftcard_input = $request->giftcard;
-            $giftcard = Giftcard::where('code', $giftcard_input)->first();
+            $giftcard = Giftcard::where('code', $giftcard_input)->lockForUpdate()->first();
 
             if (!$giftcard) {
                 abort(500, __('The gift card does not exist'));
@@ -197,6 +432,7 @@ class UserController extends Controller
             $usedUserIds[] = $user->id;
             $giftcard->used_user_ids = json_encode($usedUserIds);
 
+            $giftcardBalanceBefore = (int)$user->balance;
             switch ($giftcard->type) {
                 case 1:
                     $user->balance += $giftcard->value;
@@ -246,7 +482,32 @@ class UserController extends Controller
             }
 
             if (!$user->save() || !$giftcard->save()) {
-                throw new \Exception(__('Save failed'));
+                abort(500, __('Save failed'));
+            }
+
+            $redemption = GiftcardRedemption::create([
+                'giftcard_id' => $giftcard->id,
+                'user_id' => $user->id,
+                'code_snapshot' => $giftcard->code,
+                'name_snapshot' => $giftcard->name,
+                'type' => $giftcard->type,
+                'value' => $giftcard->value,
+                'plan_id' => $giftcard->plan_id,
+                'redeemed_at' => $currentTime,
+            ]);
+
+            if ((int)$giftcard->type === 1) {
+                app(BalanceLedgerService::class)->record([
+                    'user_id' => $user->id,
+                    'type' => 'giftcard',
+                    'amount' => (int)$giftcard->value,
+                    'balance_before' => $giftcardBalanceBefore,
+                    'balance_after' => (int)$user->balance,
+                    'source_key' => 'giftcard_redemption:' . $redemption->id,
+                    'source_type' => 'giftcard_redemption',
+                    'source_id' => $redemption->id,
+                    'description' => '礼品卡兑换余额',
+                ]);
             }
 
             DB::commit();
@@ -258,8 +519,20 @@ class UserController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            abort(500, $e->getMessage());
+            throw $e;
         }
+    }
+
+    private function maskGiftcardCode($code)
+    {
+        $length = strlen($code);
+        if ($length <= 2) {
+            return str_repeat('*', $length);
+        }
+        if ($length <= 4) {
+            return substr($code, 0, 1) . str_repeat('*', $length - 2) . substr($code, -1);
+        }
+        return substr($code, 0, 2) . str_repeat('*', $length - 4) . substr($code, -2);
     }
 
     public function info(Request $request)
@@ -318,6 +591,8 @@ class UserController extends Controller
                 'plan_id',
                 'token',
                 'expired_at',
+                'banned',
+                'traffic_reset_not_before',
                 'u',
                 'd',
                 'transfer_enable',
@@ -334,6 +609,7 @@ class UserController extends Controller
             if (!$user['plan']) {
                 abort(500, __('Subscription plan does not exist'));
             }
+            ContentLocale::localize($user['plan'], ['name', 'content'], $request);
         }
 
         //统计在线设备
@@ -348,7 +624,12 @@ class UserController extends Controller
 
         $userService = new UserService();
         $user['reset_day'] = $userService->getResetDay($user);
+        $user['next_reset_at'] = $userService->getNextTrafficResetAt($user);
         $user['allow_new_period'] = config('v2board.allow_new_period', 0);
+        $preview = $userService->previewNewTrafficPeriod($user);
+        unset($preview['hold_until']);
+        $user['new_period'] = $preview;
+        $user->makeHidden(['banned', 'traffic_reset_not_before']);
         return response([
             'data' => $user
         ]);
@@ -409,37 +690,60 @@ class UserController extends Controller
 
     public function transfer(UserTransfer $request)
     {
-        $user = User::find($request->user['id']);
-        if (!$user) {
-            abort(500, __('The user does not exist'));
-        }
-        if ($request->input('transfer_amount') > $user->commission_balance) {
-            abort(500, __('Insufficient commission balance'));
-        }
-        DB::beginTransaction();
-        $order = new Order();
-        $orderService = new OrderService($order);
-        $order->user_id = $request->user['id'];
-        $order->plan_id = 0;
-        $order->period = 'deposit';
-        $order->trade_no = Helper::generateOrderNo();
-        $order->total_amount = $request->input('transfer_amount');
+        DB::transaction(function () use ($request) {
+            $user = User::where('id', $request->user['id'])->lockForUpdate()->first();
+            if (!$user) abort(500, __('The user does not exist'));
+            $amount = (int)$request->input('transfer_amount');
+            if ($amount > $user->commission_balance) abort(500, __('Insufficient commission balance'));
 
-        $orderService->setOrderType($user);
-        $orderService->setInvite($user);
+            $before = (int)$user->commission_balance;
+            $walletBefore = (int)$user->balance;
+            $order = new Order();
+            $orderService = new OrderService($order);
+            $order->user_id = $request->user['id'];
+            $order->plan_id = 0;
+            $order->period = 'deposit';
+            $order->trade_no = Helper::generateOrderNo();
+            $order->total_amount = $amount;
+            $orderService->setOrderType($user);
+            $orderService->setInvite($user);
 
-        $user->commission_balance = $user->commission_balance - $request->input('transfer_amount');
-        $user->balance = $user->balance + $request->input('transfer_amount');
-        $order->status = 3;
-        $order->total_amount = 0;
-        $order->surplus_amount = $request->input('transfer_amount');
-        $order->callback_no = '佣金划转 Commission transfer';
-        if (!$order->save()||!$user->save()) {
-            DB::rollback();
-            abort(500, __('Transfer failed'));
-        }
+            $user->commission_balance -= $amount;
+            $user->balance += $amount;
+            $order->status = 3;
+            $order->total_amount = 0;
+            $order->surplus_amount = $amount;
+            $order->callback_no = Order::CALLBACK_COMMISSION_TRANSFER;
+            if (!$order->save() || !$user->save()) abort(500, __('Transfer failed'));
 
-        DB::commit();
+            app(CommissionLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'transfer_out',
+                'amount' => -$amount,
+                'balance_before' => $before,
+                'balance_after' => (int)$user->commission_balance,
+                'source_key' => 'commission_transfer:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '佣金划转至钱包余额',
+                'meta' => ['wallet_balance_after' => (int)$user->balance],
+            ]);
+            app(BalanceLedgerService::class)->record([
+                'user_id' => $user->id,
+                'type' => 'commission_transfer',
+                'amount' => $amount,
+                'balance_before' => $walletBefore,
+                'balance_after' => (int)$user->balance,
+                'source_key' => 'commission_transfer:' . $order->id,
+                'source_type' => 'order',
+                'source_id' => $order->id,
+                'order_id' => $order->id,
+                'trade_no' => $order->trade_no,
+                'description' => '佣金划转至钱包余额',
+            ]);
+        });
 
         return response([
             'data' => true

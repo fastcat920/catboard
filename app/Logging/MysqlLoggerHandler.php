@@ -1,10 +1,10 @@
 <?php
 namespace App\Logging;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Logger;
+use Monolog\LogRecord;
 use App\Models\Log as LogModel;
 
 class MysqlLoggerHandler extends AbstractProcessingHandler
@@ -14,8 +14,10 @@ class MysqlLoggerHandler extends AbstractProcessingHandler
         parent::__construct($level, $bubble);
     }
 
-    protected function write(array $record): void
+    protected function write(LogRecord $logRecord): void
     {
+        $record = $logRecord->toArray();
+
         try{
             if(isset($record['context']['exception']) && is_object($record['context']['exception'])){
                 $record['context']['exception'] = (array)$record['context']['exception'];
@@ -30,15 +32,23 @@ class MysqlLoggerHandler extends AbstractProcessingHandler
                 'ip' => request()->getClientIp(),
                 'data' => json_encode($record['request_data']) ,
                 'context' => isset($record['context']) ? json_encode($record['context']) : '',
-                'created_at' => strtotime($record['datetime']),
-                'updated_at' => strtotime($record['datetime']),
+                'created_at' => $logRecord->datetime->getTimestamp(),
+                'updated_at' => $logRecord->datetime->getTimestamp(),
             ];
 
             LogModel::insert(
                 $log
             );
-        }catch (\Exception $e){
-            Log::channel('daily')->error($e->getMessage().$e->getFile().$e->getTraceAsString());
+        } catch (\Throwable $storageError) {
+            try {
+                Log::channel('daily')->log(
+                    $logRecord->level->toPsrLogLevel(),
+                    $logRecord->message,
+                    $logRecord->context + ['mysql_log_error' => $storageError->getMessage()],
+                );
+            } catch (\Throwable) {
+                error_log($logRecord->level->getName() . ': ' . $logRecord->message);
+            }
         }
     }
 }

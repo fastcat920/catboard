@@ -7,6 +7,7 @@ use App\Models\ServerV2node;
 use Illuminate\Http\Request;
 use ParagonIE_Sodium_Compat as SodiumCompat;
 use App\Utils\Helper;
+use App\Services\FCNCertificate;
 
 class V2nodeController extends Controller
 {
@@ -21,7 +22,7 @@ class V2nodeController extends Controller
             'listen_ip' => 'nullable',
             'port' => 'required',
             'server_port' => 'required',
-            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls',
+            'protocol' => 'required|in:shadowsocks,vmess,vless,trojan,tuic,hysteria2,anytls,fastcat-v2,fcn-v1,fcn-v2,fcn-v3',
             'tls' => 'required|in:0,1,2',
             'tls_settings' => 'nullable|array',
             'flow' => 'nullable|in:xtls-rprx-vision',
@@ -45,6 +46,104 @@ class V2nodeController extends Controller
             'show' => 'nullable|in:0,1',
             'sort' => 'nullable'
         ]);
+        $legacyFCN = in_array($params['protocol'], ['fcn-v1', 'fcn-v2'], true);
+        $isFCNV3 = $params['protocol'] === 'fcn-v3';
+        if ($legacyFCN || $isFCNV3) {
+            $rules = [
+                'tls_settings.fcn_trust_mode' => $legacyFCN ? 'nullable|in:ca,spki' : 'nullable|in:ca',
+                'tls_settings.fcn_rotate_key' => 'nullable|boolean',
+                'tls_settings.server_name' => 'nullable|string|max:253',
+                'host' => 'required|string|max:253',
+                'port' => 'required|integer|min:1|max:65535',
+                'server_port' => 'required|integer|min:1|max:65535',
+            ];
+            if ($isFCNV3) {
+                $rules['listen_ip'] = 'nullable|ip';
+            }
+            $request->validate($rules);
+            $settings = $params['tls_settings'] ?? [];
+            if ($isFCNV3) {
+                foreach ([$params['host'], $settings['server_name'] ?? ''] as $name) {
+                    if ($name !== '' && !filter_var($name, FILTER_VALIDATE_IP)
+                        && !filter_var($name, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                        abort(422, 'FCN v3 的连接地址和 SNI 必须是有效的域名或 IP。');
+                    }
+                }
+            }
+
+            if ($legacyFCN && ($settings['fcn_trust_mode'] ?? 'ca') === 'spki') {
+                $existing = $request->input('id') ? ServerV2node::find($request->input('id')) : null;
+                $old = $existing ? ($existing->tls_settings ?? []) : [];
+                // Preserve managed keys from the stored node only.
+                try {
+                    $name = trim($settings['server_name'] ?? '') ?: $params['host'];
+                    $settings = FCNCertificate::forSave([], $old, $name, (bool) ($settings['fcn_rotate_key'] ?? false));
+                } catch (\InvalidArgumentException $e) {
+                    abort(422, $e->getMessage());
+                }
+            } else {
+                $request->validate([
+                    'tls_settings.cert_mode' => $legacyFCN ? 'required|in:file,http,dns,remote' : 'required|in:file,http,dns',
+                    'tls_settings.cert_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                    'tls_settings.key_file' => 'required_if:tls_settings.cert_mode,file|nullable|string|starts_with:/',
+                    'tls_settings.tls_cert' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+                    'tls_settings.tls_key' => 'required_if:tls_settings.cert_mode,remote|nullable|string',
+                    'tls_settings.provider' => 'required_if:tls_settings.cert_mode,dns|nullable|string|regex:/\A[a-z0-9_-]+\z/',
+                    'tls_settings.dns_env' => 'nullable|string',
+                ], [
+                    'tls_settings.cert_mode.required' => 'FCN 需要选择可信证书模式。',
+                    'tls_settings.cert_mode.in' => '请选择此 FCN 协议支持的证书模式。',
+                    'tls_settings.cert_file.required_if' => '请填写已有证书链的绝对路径。',
+                    'tls_settings.key_file.required_if' => '请填写已有私钥的绝对路径。',
+                    'tls_settings.provider.required_if' => '请填写 DNS 服务商。',
+                    'tls_settings.provider.regex' => '请填写有效的 DNS 服务商代码。',
+                ]);
+                try {
+                    $settings = FCNCertificate::caSettingsForSave($settings, $params['host']);
+                } catch (\InvalidArgumentException $e) {
+                    abort(422, $e->getMessage());
+                }
+            }
+            $params['tls_settings'] = $settings;
+        }
+        if ($isFCNV3) {
+            $params['listen_ip'] = $params['listen_ip'] ?? '0.0.0.0';
+            $params['cipher'] = null;
+            $params['obfs'] = null;
+            $params['udp_relay_mode'] = null;
+            $params['up_mbps'] = 0;
+            $params['down_mbps'] = 0;
+        }
+        if ($legacyFCN || $isFCNV3) {
+            $params['tls'] = 1;
+            $params['network'] = 'tcp'; // Database field. FCN transports use QUIC over UDP.
+            $params['flow'] = null;
+            $params['network_settings'] = null;
+            $params['trusted_x_forwarded_for'] = null;
+            $params['encryption'] = null;
+            $params['encryption_settings'] = null;
+            $params['disable_sni'] = 0;
+            $params['zero_rtt_handshake'] = 0;
+            $params['congestion_control'] = 'bbr';
+        }
+        if ($params['protocol'] === 'fastcat-v2') {
+            $request->validate([
+                'host' => 'required|string|max:253',
+                'port' => 'required|integer|min:1|max:65535',
+                'server_port' => 'required|integer|min:1|max:65535',
+                'tls_settings.fastcat_endpoint_ipv4' => 'nullable|ipv4',
+                'tls_settings.fastcat_transport_mode' => 'nullable|in:auto,h2,h3',
+                'tls_settings.fastcat_tls_key_exchange' => 'nullable|in:default,x25519,x25519mlkem768',
+            ]);
+            $params['tls'] = 1;
+            $params['network'] = 'tcp';
+            $params['flow'] = null;
+            $params['network_settings'] = null;
+            $params['trusted_x_forwarded_for'] = null;
+            $params['encryption'] = null;
+            $params['encryption_settings'] = null;
+            $params['disable_sni'] = 0;
+        }
         if ($params['protocol'] == 'anytls' && $params['tls'] === 0) {
             $params['tls'] = 1;
         }

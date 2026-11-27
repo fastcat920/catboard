@@ -16,6 +16,7 @@ class Staff
      */
     public function handle($request, Closure $next)
     {
+        if (!config('fastcat.staff_api_enabled', false)) abort(404);
         $authorization = $request->input('auth_data') ?? $request->header('authorization');
         if (!$authorization) abort(403, '未登录或登陆已过期');
 

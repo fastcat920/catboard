@@ -29,13 +29,13 @@ class ClientConfigCryptoServiceTest extends TestCase
     {
         $service = new ClientConfigCryptoService();
         $pair = SodiumCompat::crypto_sign_keypair();
-        $setting = new ClientConfigSetting([
+        $setting = (new ClientConfigSetting())->forceFill([
             'encryption_mode' => 'signed_xor_v2',
             'legacy_xor_key_encrypted' => Crypt::encryptString('test-xor-key'),
             'signing_public_key' => base64_encode(SodiumCompat::crypto_sign_publickey($pair)),
             'signing_private_key_encrypted' => Crypt::encryptString(base64_encode(SodiumCompat::crypto_sign_secretkey($pair))),
         ]);
-        $config = new ClientRemoteConfig([
+        $config = (new ClientRemoteConfig())->forceFill([
             'content_json' => '{"config_version":"1","domains":["https://api.example.com"]}',
             'encryption_mode' => 'signed_xor_v2',
         ]);

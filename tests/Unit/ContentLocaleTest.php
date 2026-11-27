@@ -11,7 +11,7 @@ class ContentLocaleTest extends TestCase
 {
     public function test_english_content_is_selected_from_x_locale_header(): void
     {
-        $plan = new Plan([
+        $plan = (new Plan())->forceFill([
             'name' => '中文套餐',
             'name_en' => 'English plan',
             'content' => '中文描述',
@@ -29,7 +29,7 @@ class ContentLocaleTest extends TestCase
 
     public function test_missing_english_content_falls_back_to_chinese(): void
     {
-        $plan = new Plan([
+        $plan = (new Plan())->forceFill([
             'name' => '中文套餐',
             'name_en' => '',
             'content' => '中文描述',
@@ -45,7 +45,7 @@ class ContentLocaleTest extends TestCase
 
     public function test_chinese_locale_keeps_original_content(): void
     {
-        $plan = new Plan([
+        $plan = (new Plan())->forceFill([
             'name' => '中文套餐',
             'name_en' => 'English plan',
         ]);

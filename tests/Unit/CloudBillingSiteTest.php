@@ -4,23 +4,23 @@ namespace Tests\Unit;
 
 use App\Models\CloudAccount;
 use App\Services\CloudBillingService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use Tests\TestCase;
 
 class CloudBillingSiteTest extends TestCase
 {
-    /** @dataProvider endpointProvider */
+    #[DataProvider('endpointProvider')]
     public function test_cloud_billing_endpoints_follow_account_site($method, $site, $expected)
     {
         $account = new CloudAccount();
         $account->site = $site;
         $reflection = new ReflectionMethod(CloudBillingService::class, $method);
-        $reflection->setAccessible(true);
 
         $this->assertSame($expected, $reflection->invoke(new CloudBillingService(), $account));
     }
 
-    public function endpointProvider()
+    public static function endpointProvider(): array
     {
         return [
             ['aliyunEndpoint', 'china', 'https://business.aliyuncs.com/'],

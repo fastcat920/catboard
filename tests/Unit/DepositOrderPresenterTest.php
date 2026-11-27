@@ -11,7 +11,7 @@ class DepositOrderPresenterTest extends TestCase
     public function testCommissionTransferUsesSurplusAmountWithoutDepositBonus()
     {
         config(['v2board.deposit_bounus' => ['10:5']]);
-        $order = new Order([
+        $order = (new Order())->forceFill([
             'plan_id' => 0,
             'period' => 'deposit',
             'total_amount' => 0,
@@ -29,7 +29,7 @@ class DepositOrderPresenterTest extends TestCase
     public function testOnlineDepositKeepsConfiguredBonusCalculation()
     {
         config(['v2board.deposit_bounus' => ['10:2', '30:5']]);
-        $order = new Order([
+        $order = (new Order())->forceFill([
             'plan_id' => 0,
             'period' => 'deposit',
             'total_amount' => 3000,

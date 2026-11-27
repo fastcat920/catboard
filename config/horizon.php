@@ -3,8 +3,18 @@
 use Illuminate\Support\Str;
 use Linfo\Linfo;
 
-$lInfo = new Linfo();
-$parser = $lInfo->getParser();
+$maxProcesses = 2;
+if (env('APP_ENV') !== 'testing') {
+    try {
+        $memory = (new Linfo())->getParser()->getRam()['total'] ?? null;
+        if (is_numeric($memory) && $memory > 0) {
+            $maxProcesses = (int) ceil($memory / 1073741824 * 6);
+        }
+    } catch (\Throwable $exception) {
+        // Use the small worker default when no system memory probe is available.
+    }
+}
+$maxProcesses = max(1, min($maxProcesses, (int) env('HORIZON_MAX_PROCESSES', 128)));
 
 return [
 
@@ -183,10 +193,7 @@ return [
                 ],
                 'balance' => 'auto',
                 'minProcesses' => 1,
-                'maxProcesses' => min(
-                    (int)ceil($parser->getRam()['total'] / 1024 / 1024 / 1024 * 6),
-                    (int)env('HORIZON_MAX_PROCESSES', 128)
-                ),
+                'maxProcesses' => $maxProcesses,
                 'tries' => 1,
                 'balanceCooldown' => 3,
             ],
